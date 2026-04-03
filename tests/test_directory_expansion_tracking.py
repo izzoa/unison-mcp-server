@@ -122,7 +122,7 @@ def helper_function():
             assert any(str(Path(f).resolve()) == expected_resolved for f in captured_files)
 
     @pytest.mark.asyncio
-    @patch("utils.conversation_memory.get_storage")
+    @patch("utils.conversation_store.get_storage")
     @patch("providers.ModelProviderRegistry.get_provider_for_model")
     async def test_conversation_continuation_with_directory_files(
         self, mock_get_provider, mock_storage, tool, temp_directory_with_files
@@ -200,7 +200,7 @@ def helper_function():
         # This test shows the fix is working - conversation continuation properly filters out
         # already-embedded files. The exact length depends on whether any new files are found.
 
-    @patch("utils.conversation_memory.get_storage")
+    @patch("utils.conversation_store.get_storage")
     def test_get_conversation_embedded_files_with_expanded_files(self, mock_storage, tool, temp_directory_with_files):
         """Test that get_conversation_embedded_files returns expanded files"""
         # Setup mock Redis client with in-memory storage
@@ -241,7 +241,7 @@ def helper_function():
         assert set(embedded_files) == set(expected_files)
         assert directory not in embedded_files
 
-    @patch("utils.conversation_memory.get_storage")
+    @patch("utils.conversation_store.get_storage")
     def test_file_filtering_with_mixed_files_and_directories(self, mock_storage, tool, temp_directory_with_files):
         """Test file filtering when request contains both individual files and directories"""
         # Setup mock Redis client with in-memory storage

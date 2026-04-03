@@ -650,7 +650,19 @@ async def reconstruct_thread_context(arguments: dict[str, Any]) -> dict[str, Any
         logger.debug("[CONVERSATION_DEBUG] Building conversation history for thread %s", continuation_id)
         logger.debug("[CONVERSATION_DEBUG] Thread has %d turns, tool: %s", len(context.turns), context.tool_name)
         logger.debug("[CONVERSATION_DEBUG] Using model: %s", model_context.model_name)
-    conversation_history, conversation_tokens = build_conversation_history(context, model_context)
+    def _tool_formatter_fn(tool_name, turn):
+        """Look up tool-specific turn formatting from the TOOLS registry."""
+        tool = TOOLS.get(tool_name)
+        if tool:
+            try:
+                return tool.format_conversation_turn(turn)
+            except AttributeError:
+                pass
+        return None
+
+    conversation_history, conversation_tokens = build_conversation_history(
+        context, model_context, tool_formatter_fn=_tool_formatter_fn
+    )
     logger.debug("[CONVERSATION_DEBUG] Conversation history built: %s tokens", f"{conversation_tokens:,}")
     logger.debug(
         "[CONVERSATION_DEBUG] Conversation history length: %d chars (~%s tokens)",

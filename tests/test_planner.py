@@ -91,10 +91,10 @@ class TestPlannerTool:
         }
 
         # Mock conversation memory functions and UUID generation
-        with patch("utils.conversation_memory.uuid.uuid4") as mock_uuid:
+        with patch("utils.conversation_store.uuid.uuid4") as mock_uuid:
             mock_uuid.return_value.hex = "test-uuid-123"
             mock_uuid.return_value.__str__ = lambda x: "test-uuid-123"
-            with patch("utils.conversation_memory.add_turn"):
+            with patch("utils.conversation_store.add_turn"):
                 result = await tool.execute(arguments)
 
         # Should return a list with TextContent
@@ -129,7 +129,7 @@ class TestPlannerTool:
         }
 
         # Mock conversation memory functions
-        with patch("utils.conversation_memory.add_turn"):
+        with patch("utils.conversation_store.add_turn"):
             result = await tool.execute(arguments)
 
         # Should return a list with TextContent
@@ -182,8 +182,8 @@ class TestPlannerTool:
             initial_context={},
         )
 
-        with patch("utils.conversation_memory.get_thread", return_value=mock_thread):
-            with patch("utils.conversation_memory.add_turn"):
+        with patch("utils.conversation_store.get_thread", return_value=mock_thread):
+            with patch("utils.conversation_store.add_turn"):
                 result = await tool.execute(arguments)
 
         # Should return a list with TextContent
@@ -213,7 +213,7 @@ class TestPlannerTool:
         }
 
         # Mock conversation memory functions
-        with patch("utils.conversation_memory.add_turn"):
+        with patch("utils.conversation_store.add_turn"):
             result = await tool.execute(arguments)
 
         # Should return a list with TextContent
@@ -248,7 +248,7 @@ class TestPlannerTool:
         }
 
         # Mock conversation memory functions
-        with patch("utils.conversation_memory.add_turn"):
+        with patch("utils.conversation_store.add_turn"):
             result = await tool.execute(arguments)
 
         # Should return a list with TextContent
@@ -278,7 +278,7 @@ class TestPlannerTool:
         }
 
         # Mock conversation memory functions
-        with patch("utils.conversation_memory.add_turn"):
+        with patch("utils.conversation_store.add_turn"):
             result = await tool.execute(arguments)
 
         # Should return a list with TextContent
@@ -314,7 +314,7 @@ class TestPlannerTool:
         }
 
         # Mock conversation memory functions
-        with patch("utils.conversation_memory.add_turn"):
+        with patch("utils.conversation_store.add_turn"):
             result = await tool.execute(arguments)
 
         # Should return a list with TextContent
@@ -368,8 +368,8 @@ class TestPlannerTool:
         }
 
         # Mock conversation memory functions
-        with patch("utils.conversation_memory.create_thread", return_value="test-uuid-history"):
-            with patch("utils.conversation_memory.add_turn"):
+        with patch("utils.conversation_store.create_thread", return_value="test-uuid-history"):
+            with patch("utils.conversation_store.add_turn"):
                 await tool.execute(step1_args)
                 await tool.execute(step2_args)
 
@@ -401,10 +401,10 @@ class TestPlannerToolIntegration:
         }
 
         # Mock conversation memory functions and UUID generation
-        with patch("utils.conversation_memory.uuid.uuid4") as mock_uuid:
+        with patch("utils.conversation_store.uuid.uuid4") as mock_uuid:
             mock_uuid.return_value.hex = "test-flow-uuid"
             mock_uuid.return_value.__str__ = lambda x: "test-flow-uuid"
-            with patch("utils.conversation_memory.add_turn"):
+            with patch("utils.conversation_store.add_turn"):
                 result = await self.tool.execute(arguments)
 
         # Verify response structure
@@ -434,10 +434,10 @@ class TestPlannerToolIntegration:
         }
 
         # Mock conversation memory functions and UUID generation
-        with patch("utils.conversation_memory.uuid.uuid4") as mock_uuid:
+        with patch("utils.conversation_store.uuid.uuid4") as mock_uuid:
             mock_uuid.return_value.hex = "test-simple-uuid"
             mock_uuid.return_value.__str__ = lambda x: "test-simple-uuid"
-            with patch("utils.conversation_memory.add_turn"):
+            with patch("utils.conversation_store.add_turn"):
                 result = await self.tool.execute(arguments)
 
         # Verify response structure

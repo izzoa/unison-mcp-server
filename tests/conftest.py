@@ -216,14 +216,20 @@ def disable_force_env_override(monkeypatch):
     import sys
 
     import config
+    import utils.conversation_store as conversation_store
+    import utils.context_reconstructor as context_reconstructor
     import utils.conversation_memory as conversation_memory
 
     importlib.reload(config)
+    importlib.reload(conversation_store)
+    importlib.reload(context_reconstructor)
     importlib.reload(conversation_memory)
 
-    test_conversation_module = sys.modules.get("tests.test_conversation_memory")
-    if test_conversation_module is not None:
-        test_conversation_module.MAX_CONVERSATION_TURNS = conversation_memory.MAX_CONVERSATION_TURNS
+    # Sync MAX_CONVERSATION_TURNS to test modules that import it at module level
+    for mod_name in ("tests.test_conversation_memory", "tests.test_conversation_store"):
+        test_mod = sys.modules.get(mod_name)
+        if test_mod is not None:
+            test_mod.MAX_CONVERSATION_TURNS = conversation_store.MAX_CONVERSATION_TURNS
 
     try:
         yield

@@ -37,7 +37,7 @@ LABEL org.opencontainers.image.description="AI-powered Model Context Protocol se
 LABEL org.opencontainers.image.version="1.0.0"
 LABEL org.opencontainers.image.source="https://github.com/izzoa/unison-mcp-server"
 LABEL org.opencontainers.image.documentation="https://github.com/izzoa/unison-mcp-server/blob/main/README.md"
-LABEL org.opencontainers.image.licenses="Apache 2.0 License"
+LABEL org.opencontainers.image.licenses="AGPL-3.0-only"
 
 # Create non-root user for security
 RUN groupadd -r unisonuser && useradd -r -g unisonuser unisonuser

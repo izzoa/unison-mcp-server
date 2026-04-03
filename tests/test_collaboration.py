@@ -81,8 +81,8 @@ class TestDynamicContextRequests:
 
     @pytest.mark.asyncio
     @patch("tools.shared.base_tool.BaseTool.get_model_provider")
-    @patch("utils.conversation_memory.create_thread", return_value="debug-test-uuid")
-    @patch("utils.conversation_memory.add_turn")
+    @patch("utils.conversation_store.create_thread", return_value="debug-test-uuid")
+    @patch("utils.conversation_store.add_turn")
     async def test_normal_response_not_parsed_as_clarification(
         self, mock_add_turn, mock_create_thread, mock_get_provider, debug_tool
     ):
