@@ -69,7 +69,7 @@ class TestAutoModeComprehensive:
         ModelProviderRegistry.register_provider(ProviderType.XAI, XAIModelProvider)
 
     @pytest.mark.parametrize(
-        "provider_config,expected_models",
+        "provider_config,expected_checks",
         [
             # Only Gemini API available
             (
@@ -80,9 +80,9 @@ class TestAutoModeComprehensive:
                     "OPENROUTER_API_KEY": None,
                 },
                 {
-                    "EXTENDED_REASONING": "gemini-3-pro-preview",  # Gemini 3 Pro Preview for deep thinking
-                    "FAST_RESPONSE": "gemini-2.5-flash",  # Flash for speed
-                    "BALANCED": "gemini-2.5-flash",  # Flash as balanced
+                    "EXTENDED_REASONING": {"provider": ProviderType.GOOGLE, "thinking": True},
+                    "FAST_RESPONSE": {"provider": ProviderType.GOOGLE, "fast_tier": True},
+                    "BALANCED": {"provider": ProviderType.GOOGLE},
                 },
             ),
             # Only OpenAI API available
@@ -94,9 +94,9 @@ class TestAutoModeComprehensive:
                     "OPENROUTER_API_KEY": None,
                 },
                 {
-                    "EXTENDED_REASONING": "gpt-5.1-codex",  # GPT-5.1 Codex prioritized for coding tasks
-                    "FAST_RESPONSE": "gpt-5.2",  # Prefer gpt-5.2 for speed
-                    "BALANCED": "gpt-5.2",  # Prefer gpt-5.2 for balanced
+                    "EXTENDED_REASONING": {"provider": ProviderType.OPENAI, "thinking": True},
+                    "FAST_RESPONSE": {"provider": ProviderType.OPENAI, "fast_tier": True},
+                    "BALANCED": {"provider": ProviderType.OPENAI},
                 },
             ),
             # Only X.AI API available
@@ -108,9 +108,9 @@ class TestAutoModeComprehensive:
                     "OPENROUTER_API_KEY": None,
                 },
                 {
-                    "EXTENDED_REASONING": "grok-4-1-fast-reasoning",  # Latest Grok 4.1 Fast Reasoning
-                    "FAST_RESPONSE": "grok-4-1-fast-reasoning",  # Latest fast SKU
-                    "BALANCED": "grok-4-1-fast-reasoning",  # Latest balanced default
+                    "EXTENDED_REASONING": {"provider": ProviderType.XAI, "thinking": True},
+                    "FAST_RESPONSE": {"provider": ProviderType.XAI},
+                    "BALANCED": {"provider": ProviderType.XAI},
                 },
             ),
             # Both Gemini and OpenAI available - Google comes first in priority
@@ -122,9 +122,9 @@ class TestAutoModeComprehensive:
                     "OPENROUTER_API_KEY": None,
                 },
                 {
-                    "EXTENDED_REASONING": "gemini-3-pro-preview",  # Gemini 3 Pro Preview comes first in priority
-                    "FAST_RESPONSE": "gemini-2.5-flash",  # Prefer flash for speed
-                    "BALANCED": "gemini-2.5-flash",  # Prefer flash for balanced
+                    "EXTENDED_REASONING": {"provider": ProviderType.GOOGLE, "thinking": True},
+                    "FAST_RESPONSE": {"provider": ProviderType.GOOGLE, "fast_tier": True},
+                    "BALANCED": {"provider": ProviderType.GOOGLE},
                 },
             ),
             # All native APIs available - Google still comes first
@@ -136,14 +136,14 @@ class TestAutoModeComprehensive:
                     "OPENROUTER_API_KEY": None,
                 },
                 {
-                    "EXTENDED_REASONING": "gemini-3-pro-preview",  # Gemini 3 Pro Preview comes first in priority
-                    "FAST_RESPONSE": "gemini-2.5-flash",  # Prefer flash for speed
-                    "BALANCED": "gemini-2.5-flash",  # Prefer flash for balanced
+                    "EXTENDED_REASONING": {"provider": ProviderType.GOOGLE, "thinking": True},
+                    "FAST_RESPONSE": {"provider": ProviderType.GOOGLE, "fast_tier": True},
+                    "BALANCED": {"provider": ProviderType.GOOGLE},
                 },
             ),
         ],
     )
-    def test_auto_mode_model_selection_by_provider(self, provider_config, expected_models):
+    def test_auto_mode_model_selection_by_provider(self, provider_config, expected_checks):
         """Test that auto mode selects correct models based on available providers."""
 
         # Set up environment with specific provider configuration
@@ -175,16 +175,36 @@ class TestAutoModeComprehensive:
                 ModelProviderRegistry.register_provider(ProviderType.OPENROUTER, OpenRouterProvider)
 
             # Test each tool category
-            for category_name, expected_model in expected_models.items():
+            for category_name, checks in expected_checks.items():
                 category = ToolModelCategory(category_name.lower())
 
                 # Get preferred fallback model for this category
                 fallback_model = ModelProviderRegistry.get_preferred_fallback_model(category)
 
-                assert fallback_model == expected_model, (
-                    f"Provider config {provider_config}: "
-                    f"Expected {expected_model} for {category_name}, got {fallback_model}"
+                # Validate the model is valid for the expected provider
+                provider = ModelProviderRegistry.get_provider(checks["provider"])
+                assert provider is not None, (
+                    f"Provider {checks['provider']} not available for config {provider_config}"
                 )
+                assert provider.validate_model_name(fallback_model), (
+                    f"Provider config {provider_config}: "
+                    f"Model '{fallback_model}' not valid for {checks['provider']} in {category_name}"
+                )
+
+                # Check capability properties if specified
+                if checks.get("thinking"):
+                    caps = provider.get_capabilities(fallback_model)
+                    assert caps.supports_extended_thinking, (
+                        f"Provider config {provider_config}: "
+                        f"Expected thinking model for {category_name}, got {fallback_model}"
+                    )
+                if checks.get("fast_tier"):
+                    assert any(
+                        p in fallback_model.lower() for p in ("flash", "mini", "lite", "fast", "nano")
+                    ), (
+                        f"Provider config {provider_config}: "
+                        f"Expected fast-tier model for {category_name}, got {fallback_model}"
+                    )
 
     @pytest.mark.parametrize(
         "tool_class,expected_category",
@@ -440,9 +460,12 @@ class TestAutoModeComprehensive:
             assert "o3" not in available_models
             assert "o3-mini" not in available_models
 
-            # Should still include all Gemini models (no restrictions)
-            assert "gemini-2.5-flash" in available_models
-            assert "gemini-2.5-pro" in available_models
+            # Should still include Gemini models (no restrictions) -- use provider alias resolution
+            _gemini_prov_for_res = GeminiModelProvider(api_key="test-key")
+            _flash_tgt = _gemini_prov_for_res._resolve_model_name("flash")
+            _pro_tgt = _gemini_prov_for_res._resolve_model_name("pro")
+            assert _flash_tgt in available_models
+            assert _pro_tgt in available_models
 
     def test_openrouter_fallback_when_no_native_apis(self):
         """Test that OpenRouter provides fallback models when no native APIs are available."""
@@ -527,10 +550,11 @@ class TestAutoModeComprehensive:
             mock_provider = MagicMock()
             mock_response = MagicMock()
             mock_response.content = "test response"
-            mock_response.model_name = "gemini-2.5-flash"  # The resolved name
+            _gemini_flash = GeminiModelProvider(api_key="dummy")._resolve_model_name("flash")
+            mock_response.model_name = _gemini_flash  # The resolved name
             mock_response.usage = {"input_tokens": 10, "output_tokens": 5}
             # Mock _resolve_model_name to simulate alias resolution
-            mock_provider._resolve_model_name = lambda alias: ("gemini-2.5-flash" if alias == "flash" else alias)
+            mock_provider._resolve_model_name = lambda alias: (_gemini_flash if alias == "flash" else alias)
             mock_provider.generate_content.return_value = mock_response
 
             with patch.object(ModelProviderRegistry, "get_provider_for_model", return_value=mock_provider):

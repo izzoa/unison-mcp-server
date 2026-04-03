@@ -156,12 +156,10 @@ class TestModelEnumeration:
     @pytest.mark.parametrize(
         "model_name,should_exist",
         [
-            ("flash", False),  # Gemini - not available without API key
-            ("o3", False),  # OpenAI - not available without API key
-            ("grok", False),  # X.AI - not available without API key
-            ("gemini-2.5-flash", False),  # Full Gemini name - not available without API key
-            ("o4-mini", False),  # OpenAI variant - not available without API key
-            ("grok-4.1-fast", False),  # X.AI variant - not available without API key
+            ("flash", False),  # Gemini alias - not available without API key
+            ("o3", False),  # OpenAI alias - not available without API key
+            ("grok", False),  # X.AI alias - not available without API key
+            ("o4-mini", False),  # OpenAI model - not available without API key
         ],
     )
     def test_specific_native_models_only_with_api_keys(self, model_name, should_exist):

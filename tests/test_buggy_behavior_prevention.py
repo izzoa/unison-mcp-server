@@ -67,18 +67,22 @@ class TestBuggyBehaviorPrevention:
         provider = GeminiModelProvider(api_key="test-key")
         all_known = provider.list_models(respect_restrictions=False, include_aliases=True, lowercase=True, unique=True)
 
+        # Dynamically look up expected target models via alias resolution
+        flash_target = provider._resolve_model_name("flash")
+        pro_target = provider._resolve_model_name("pro")
+
         # Verify both aliases and targets are included
         assert "flash" in all_known  # alias
-        assert "gemini-2.5-flash" in all_known  # target
+        assert flash_target in all_known  # target
         assert "pro" in all_known  # alias
-        assert "gemini-2.5-pro" in all_known  # target
+        assert pro_target in all_known  # target
 
         # Simulate admin restricting to target model names
         service = ModelRestrictionService()
         service.restrictions = {
             ProviderType.GOOGLE: {
-                "gemini-2.5-flash",  # Target name restriction
-                "gemini-2.5-pro",  # Target name restriction
+                flash_target,  # Target name restriction
+                pro_target,  # Target name restriction
             }
         }
 
@@ -89,8 +93,8 @@ class TestBuggyBehaviorPrevention:
             # Should NOT warn about these valid target models
             all_warnings = [str(call) for call in mock_logger.warning.call_args_list]
             for warning in all_warnings:
-                assert "gemini-2.5-flash" not in warning or "not a recognized" not in warning
-                assert "gemini-2.5-pro" not in warning or "not a recognized" not in warning
+                assert flash_target not in warning or "not a recognized" not in warning
+                assert pro_target not in warning or "not a recognized" not in warning
 
     def test_policy_enforcement_remains_comprehensive(self):
         """Policy validation must account for both aliases and targets."""
@@ -207,9 +211,15 @@ class TestBuggyBehaviorPrevention:
 
     def test_alias_listing_covers_targets_for_all_providers(self):
         """Alias-aware listings should expose targets across providers."""
+        # Dynamically look up expected target models via alias resolution
+        gemini_provider = GeminiModelProvider(api_key="test-key")
+        gemini_flash_target = gemini_provider._resolve_model_name("flash")
+        openai_provider = OpenAIModelProvider(api_key="test-key")
+        openai_mini_target = openai_provider._resolve_model_name("mini")
+
         providers_to_test = [
-            (OpenAIModelProvider(api_key="test-key"), "mini", "o4-mini"),
-            (GeminiModelProvider(api_key="test-key"), "flash", "gemini-2.5-flash"),
+            (openai_provider, "mini", openai_mini_target),
+            (GeminiModelProvider(api_key="test-key"), "flash", gemini_flash_target),
         ]
 
         for provider, alias, target in providers_to_test:

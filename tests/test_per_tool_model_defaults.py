@@ -98,8 +98,11 @@ class TestModelSelection:
             ModelProviderRegistry.register_provider(ProviderType.OPENAI, OpenAIModelProvider)
 
             model = ModelProviderRegistry.get_preferred_fallback_model(ToolModelCategory.EXTENDED_REASONING)
-            # OpenAI prefers GPT-5.1-Codex for extended reasoning (coding tasks)
-            assert model == "gpt-5.1-codex"
+            # Should return a valid OpenAI model with thinking support for extended reasoning
+            provider = ModelProviderRegistry.get_provider(ProviderType.OPENAI)
+            assert provider.validate_model_name(model)
+            caps = provider.get_capabilities(model)
+            assert caps.supports_extended_thinking
 
     def test_extended_reasoning_with_gemini_only(self):
         """Test EXTENDED_REASONING prefers pro when only Gemini is available."""
@@ -115,9 +118,11 @@ class TestModelSelection:
             ModelProviderRegistry.register_provider(ProviderType.GOOGLE, GeminiModelProvider)
 
             model = ModelProviderRegistry.get_preferred_fallback_model(ToolModelCategory.EXTENDED_REASONING)
-            # Gemini should return one of its models for extended reasoning
-            # The default behavior may return flash when pro is not explicitly preferred
-            assert model in ["gemini-3-pro-preview", "gemini-2.5-flash", "gemini-2.0-flash"]
+            # Gemini should return a valid model with thinking support for extended reasoning
+            provider = ModelProviderRegistry.get_provider(ProviderType.GOOGLE)
+            assert provider.validate_model_name(model)
+            caps = provider.get_capabilities(model)
+            assert caps.supports_extended_thinking
 
     def test_fast_response_with_openai(self):
         """Test FAST_RESPONSE with OpenAI provider."""
@@ -133,8 +138,10 @@ class TestModelSelection:
             ModelProviderRegistry.register_provider(ProviderType.OPENAI, OpenAIModelProvider)
 
             model = ModelProviderRegistry.get_preferred_fallback_model(ToolModelCategory.FAST_RESPONSE)
-            # OpenAI now prefers gpt-5.2 for fast response (based on our new preference order)
-            assert model == "gpt-5.2"
+            # Should return a valid OpenAI model; for fast response prefer fast-tier models
+            provider = ModelProviderRegistry.get_provider(ProviderType.OPENAI)
+            assert provider.validate_model_name(model)
+            assert any(p in model.lower() for p in ("flash", "mini", "lite", "fast", "nano"))
 
     def test_fast_response_with_gemini_only(self):
         """Test FAST_RESPONSE prefers flash when only Gemini is available."""
@@ -150,8 +157,10 @@ class TestModelSelection:
             ModelProviderRegistry.register_provider(ProviderType.GOOGLE, GeminiModelProvider)
 
             model = ModelProviderRegistry.get_preferred_fallback_model(ToolModelCategory.FAST_RESPONSE)
-            # Gemini should return one of its models for fast response
-            assert model in ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.5-pro"]
+            # Gemini should return a valid fast-tier model for fast response
+            provider = ModelProviderRegistry.get_provider(ProviderType.GOOGLE)
+            assert provider.validate_model_name(model)
+            assert any(p in model.lower() for p in ("flash", "mini", "lite", "fast", "nano"))
 
     def test_balanced_category_fallback(self):
         """Test BALANCED category uses existing logic."""
@@ -167,8 +176,9 @@ class TestModelSelection:
             ModelProviderRegistry.register_provider(ProviderType.OPENAI, OpenAIModelProvider)
 
             model = ModelProviderRegistry.get_preferred_fallback_model(ToolModelCategory.BALANCED)
-            # OpenAI prefers gpt-5.2 for balanced (based on our new preference order)
-            assert model == "gpt-5.2"
+            # Should return a valid OpenAI model for balanced use
+            provider = ModelProviderRegistry.get_provider(ProviderType.OPENAI)
+            assert provider.validate_model_name(model)
 
     def test_no_category_uses_balanced_logic(self):
         """Test that no category specified uses balanced logic."""
@@ -179,8 +189,9 @@ class TestModelSelection:
             ModelProviderRegistry.register_provider(ProviderType.GOOGLE, GeminiModelProvider)
 
             model = ModelProviderRegistry.get_preferred_fallback_model()
-            # Should pick flash for balanced use
-            assert model == "gemini-2.5-flash"
+            # Should return a valid Gemini model for balanced use
+            provider = ModelProviderRegistry.get_provider(ProviderType.GOOGLE)
+            assert provider.validate_model_name(model)
 
 
 class TestFlexibleModelSelection:
@@ -195,21 +206,21 @@ class TestFlexibleModelSelection:
                 "env": {"OPENAI_API_KEY": "test-key"},
                 "provider_type": ProviderType.OPENAI,
                 "category": ToolModelCategory.EXTENDED_REASONING,
-                "expected": "gpt-5.1-codex",  # GPT-5.1-Codex prioritized for coding tasks
+                "check": "thinking",  # Should return a model with thinking support
             },
             # Case 2: Gemini provider for fast response
             {
                 "env": {"GEMINI_API_KEY": "test-key"},
                 "provider_type": ProviderType.GOOGLE,
                 "category": ToolModelCategory.FAST_RESPONSE,
-                "expected": "gemini-2.5-flash",
+                "check": "fast",  # Should return a fast-tier model
             },
             # Case 3: OpenAI provider for fast response
             {
                 "env": {"OPENAI_API_KEY": "test-key"},
                 "provider_type": ProviderType.OPENAI,
                 "category": ToolModelCategory.FAST_RESPONSE,
-                "expected": "gpt-5.2",  # Based on new preference order
+                "check": "fast",  # Should return a fast-tier model
             },
         ]
 
@@ -232,7 +243,15 @@ class TestFlexibleModelSelection:
                     ModelProviderRegistry.register_provider(ProviderType.GOOGLE, GeminiModelProvider)
 
                 model = ModelProviderRegistry.get_preferred_fallback_model(case["category"])
-                assert model == case["expected"], f"Failed for case: {case}, got {model}"
+                provider = ModelProviderRegistry.get_provider(case["provider_type"])
+                assert provider.validate_model_name(model), f"Invalid model for case: {case}, got {model}"
+                if case["check"] == "thinking":
+                    caps = provider.get_capabilities(model)
+                    assert caps.supports_extended_thinking, f"Expected thinking model for case: {case}, got {model}"
+                elif case["check"] == "fast":
+                    assert any(
+                        p in model.lower() for p in ("flash", "mini", "lite", "fast", "nano")
+                    ), f"Expected fast-tier model for case: {case}, got {model}"
 
 
 class TestCustomProviderFallback:
@@ -254,7 +273,7 @@ class TestCustomProviderFallback:
                 assert model is not None
 
     def test_extended_reasoning_final_fallback(self):
-        """Test EXTENDED_REASONING falls back to default when no providers."""
+        """Test EXTENDED_REASONING raises ValueError when no providers available."""
         # Clear all providers
         ModelProviderRegistry.clear_cache()
         for provider_type in list(
@@ -262,9 +281,8 @@ class TestCustomProviderFallback:
         ):
             ModelProviderRegistry.unregister_provider(provider_type)
 
-        model = ModelProviderRegistry.get_preferred_fallback_model(ToolModelCategory.EXTENDED_REASONING)
-        # Should fall back to hardcoded default
-        assert model == "gemini-2.5-flash"
+        with pytest.raises(ValueError, match="No models available"):
+            ModelProviderRegistry.get_preferred_fallback_model(ToolModelCategory.EXTENDED_REASONING)
 
 
 class TestAutoModeErrorMessages:
@@ -343,7 +361,7 @@ class TestProviderHelperMethods:
             assert model is not None
 
     def test_fallback_when_no_providers_available(self):
-        """Test fallback when no providers are available."""
+        """Test fallback raises ValueError when no providers are available."""
         # Clear all providers
         ModelProviderRegistry.clear_cache()
         for provider_type in list(
@@ -351,9 +369,9 @@ class TestProviderHelperMethods:
         ):
             ModelProviderRegistry.unregister_provider(provider_type)
 
-        # Should return hardcoded fallback
-        model = ModelProviderRegistry.get_preferred_fallback_model(ToolModelCategory.EXTENDED_REASONING)
-        assert model == "gemini-2.5-flash"
+        # Should raise ValueError when no providers have models
+        with pytest.raises(ValueError, match="No models available"):
+            ModelProviderRegistry.get_preferred_fallback_model(ToolModelCategory.EXTENDED_REASONING)
 
 
 class TestEffectiveAutoMode:

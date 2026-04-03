@@ -454,68 +454,8 @@ class GeminiModelProvider(RegistryBackedProviderMixin, ModelProvider):
             return None
 
     def get_preferred_model(self, category: "ToolModelCategory", allowed_models: list[str]) -> Optional[str]:
-        """Get Gemini's preferred model for a given category from allowed models.
-
-        Args:
-            category: The tool category requiring a model
-            allowed_models: Pre-filtered list of models allowed by restrictions
-
-        Returns:
-            Preferred model name or None
-        """
-        from tools.models import ToolModelCategory
-
-        if not allowed_models:
-            return None
-
-        capability_map = self.get_all_model_capabilities()
-
-        # Helper to find best model from candidates
-        def find_best(candidates: list[str]) -> Optional[str]:
-            """Return best model from candidates (sorted for consistency)."""
-            return sorted(candidates, reverse=True)[0] if candidates else None
-
-        if category == ToolModelCategory.EXTENDED_REASONING:
-            # For extended reasoning, prefer models with thinking support
-            # First try Pro models that support thinking
-            pro_thinking = [
-                m
-                for m in allowed_models
-                if "pro" in m and m in capability_map and capability_map[m].supports_extended_thinking
-            ]
-            if pro_thinking:
-                return find_best(pro_thinking)
-
-            # Then any model that supports thinking
-            any_thinking = [
-                m for m in allowed_models if m in capability_map and capability_map[m].supports_extended_thinking
-            ]
-            if any_thinking:
-                return find_best(any_thinking)
-
-            # Finally, just prefer Pro models even without thinking
-            pro_models = [m for m in allowed_models if "pro" in m]
-            if pro_models:
-                return find_best(pro_models)
-
-        elif category == ToolModelCategory.FAST_RESPONSE:
-            # Prefer Flash models for speed
-            flash_models = [m for m in allowed_models if "flash" in m]
-            if flash_models:
-                return find_best(flash_models)
-
-        # Default for BALANCED or as fallback
-        # Prefer Flash for balanced use, then Pro, then anything
-        flash_models = [m for m in allowed_models if "flash" in m]
-        if flash_models:
-            return find_best(flash_models)
-
-        pro_models = [m for m in allowed_models if "pro" in m]
-        if pro_models:
-            return find_best(pro_models)
-
-        # Ultimate fallback to best available model
-        return find_best(allowed_models)
+        """Select the best Gemini model for *category* using capability metadata."""
+        return self.select_preferred_model(category, allowed_models)
 
 
 # Load registry data at import time for registry consumers

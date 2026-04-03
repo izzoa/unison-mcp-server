@@ -36,30 +36,34 @@ class TestIntelligentFallback:
         registry._initialized_providers.update(self._original_initialized)
 
     @patch.dict(os.environ, {"OPENAI_API_KEY": "sk-test-key", "GEMINI_API_KEY": ""}, clear=False)
-    def test_prefers_openai_o3_mini_when_available(self):
-        """Test that gpt-5.2 is preferred when OpenAI API key is available (based on new preference order)"""
+    def test_prefers_openai_when_available(self):
+        """Test that a valid OpenAI model is preferred when OpenAI API key is available"""
         # Register only OpenAI provider for this test
         from providers.openai import OpenAIModelProvider
 
         ModelProviderRegistry.register_provider(ProviderType.OPENAI, OpenAIModelProvider)
 
         fallback_model = ModelProviderRegistry.get_preferred_fallback_model()
-        assert fallback_model == "gpt-5.2"  # Based on new preference order: gpt-5.2 before o4-mini
+        # Should return a valid OpenAI model (highest intelligence_score for BALANCED)
+        provider = ModelProviderRegistry.get_provider(ProviderType.OPENAI)
+        assert provider.validate_model_name(fallback_model)
 
     @patch.dict(os.environ, {"OPENAI_API_KEY": "", "GEMINI_API_KEY": "test-gemini-key"}, clear=False)
-    def test_prefers_gemini_flash_when_openai_unavailable(self):
-        """Test that gemini-2.5-flash is used when only Gemini API key is available"""
+    def test_prefers_gemini_when_openai_unavailable(self):
+        """Test that a valid Gemini model is used when only Gemini API key is available"""
         # Register only Gemini provider for this test
         from providers.gemini import GeminiModelProvider
 
         ModelProviderRegistry.register_provider(ProviderType.GOOGLE, GeminiModelProvider)
 
         fallback_model = ModelProviderRegistry.get_preferred_fallback_model()
-        assert fallback_model == "gemini-2.5-flash"
+        # Should return a valid Gemini model
+        provider = ModelProviderRegistry.get_provider(ProviderType.GOOGLE)
+        assert provider.validate_model_name(fallback_model)
 
     @patch.dict(os.environ, {"OPENAI_API_KEY": "sk-test-key", "GEMINI_API_KEY": "test-gemini-key"}, clear=False)
-    def test_prefers_openai_when_both_available(self):
-        """Test that OpenAI is preferred when both API keys are available"""
+    def test_returns_valid_model_when_both_available(self):
+        """Test that a valid model is returned when both API keys are available"""
         # Register both OpenAI and Gemini providers
         from providers.gemini import GeminiModelProvider
         from providers.openai import OpenAIModelProvider
@@ -68,11 +72,13 @@ class TestIntelligentFallback:
         ModelProviderRegistry.register_provider(ProviderType.GOOGLE, GeminiModelProvider)
 
         fallback_model = ModelProviderRegistry.get_preferred_fallback_model()
-        assert fallback_model == "gemini-2.5-flash"  # Gemini has priority now (based on new PROVIDER_PRIORITY_ORDER)
+        # Gemini has priority in PROVIDER_PRIORITY_ORDER, so should return a Gemini model
+        provider = ModelProviderRegistry.get_provider(ProviderType.GOOGLE)
+        assert provider.validate_model_name(fallback_model)
 
     @patch.dict(os.environ, {"OPENAI_API_KEY": "", "GEMINI_API_KEY": ""}, clear=False)
     def test_fallback_when_no_keys_available(self):
-        """Test fallback behavior when no API keys are available"""
+        """Test fallback raises ValueError when no API keys are available"""
         # Register providers but with no API keys available
         from providers.gemini import GeminiModelProvider
         from providers.openai import OpenAIModelProvider
@@ -80,8 +86,8 @@ class TestIntelligentFallback:
         ModelProviderRegistry.register_provider(ProviderType.OPENAI, OpenAIModelProvider)
         ModelProviderRegistry.register_provider(ProviderType.GOOGLE, GeminiModelProvider)
 
-        fallback_model = ModelProviderRegistry.get_preferred_fallback_model()
-        assert fallback_model == "gemini-2.5-flash"  # Default fallback
+        with pytest.raises(ValueError, match="No models available"):
+            ModelProviderRegistry.get_preferred_fallback_model()
 
     def test_available_providers_with_keys(self):
         """Test the get_available_providers_with_keys method"""
@@ -147,8 +153,13 @@ class TestIntelligentFallback:
 
                 history, tokens = build_conversation_history(context, model_context=None)
 
-                # Verify that ModelContext was called with gpt-5.2 (the intelligent fallback based on new preference order)
-                mock_context_class.assert_called_once_with("gpt-5.2")
+                # Verify that ModelContext was called with a valid OpenAI model (the intelligent fallback)
+                mock_context_class.assert_called_once()
+                called_model = mock_context_class.call_args[0][0]
+                from providers.openai import OpenAIModelProvider
+
+                openai_provider = OpenAIModelProvider(api_key="dummy")
+                assert openai_provider.validate_model_name(called_model)
 
     def test_auto_mode_with_gemini_only(self):
         """Test auto mode behavior when only Gemini API key is available"""
@@ -186,14 +197,22 @@ class TestIntelligentFallback:
 
                 history, tokens = build_conversation_history(context, model_context=None)
 
-                # Should use gemini-2.5-flash when only Gemini is available
-                mock_context_class.assert_called_once_with("gemini-2.5-flash")
+                # Should use a valid Gemini model when only Gemini is available
+                mock_context_class.assert_called_once()
+                called_model = mock_context_class.call_args[0][0]
+                from providers.gemini import GeminiModelProvider
+
+                gemini_provider = GeminiModelProvider(api_key="dummy")
+                assert gemini_provider.validate_model_name(called_model)
 
     def test_non_auto_mode_unchanged(self):
         """Test that non-auto mode behavior is unchanged"""
+        from providers.gemini import GeminiModelProvider
         from utils.conversation_memory import ThreadContext, build_conversation_history
 
-        with patch("config.IS_AUTO_MODE", False), patch("config.DEFAULT_MODEL", "gemini-2.5-pro"):
+        gemini_pro = GeminiModelProvider(api_key="test-key")._resolve_model_name("pro")
+
+        with patch("config.IS_AUTO_MODE", False), patch("config.DEFAULT_MODEL", gemini_pro):
             from utils.conversation_memory import ConversationTurn
 
             context = ThreadContext(
@@ -219,7 +238,7 @@ class TestIntelligentFallback:
                 history, tokens = build_conversation_history(context, model_context=None)
 
                 # Should use the configured DEFAULT_MODEL, not the intelligent fallback
-                mock_context_class.assert_called_once_with("gemini-2.5-pro")
+                mock_context_class.assert_called_once_with(gemini_pro)
 
 
 if __name__ == "__main__":

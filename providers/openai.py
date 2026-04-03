@@ -91,76 +91,8 @@ class OpenAIModelProvider(RegistryBackedProviderMixin, OpenAICompatibleProvider)
     # ------------------------------------------------------------------
 
     def get_preferred_model(self, category: "ToolModelCategory", allowed_models: list[str]) -> Optional[str]:
-        """Get OpenAI's preferred model for a given category from allowed models.
-
-        Args:
-            category: The tool category requiring a model
-            allowed_models: Pre-filtered list of models allowed by restrictions
-
-        Returns:
-            Preferred model name or None
-        """
-        from tools.models import ToolModelCategory
-
-        if not allowed_models:
-            return None
-
-        # Helper to find first available from preference list
-        def find_first(preferences: list[str]) -> Optional[str]:
-            """Return first available model from preference list."""
-            for model in preferences:
-                if model in allowed_models:
-                    return model
-            return None
-
-        if category == ToolModelCategory.EXTENDED_REASONING:
-            # Prefer models with extended thinking support
-            # GPT-5.1 Codex first for coding tasks
-            preferred = find_first(
-                [
-                    "gpt-5.1-codex",
-                    "gpt-5.2",
-                    "gpt-5-codex",
-                    "gpt-5.2-pro",
-                    "o3-pro",
-                    "gpt-5",
-                    "o3",
-                ]
-            )
-            return preferred if preferred else allowed_models[0]
-
-        elif category == ToolModelCategory.FAST_RESPONSE:
-            # Prefer fast, cost-efficient models
-            # GPT-5.2 models for speed, GPT-5.1-Codex after (premium pricing but cached)
-            preferred = find_first(
-                [
-                    "gpt-5.2",
-                    "gpt-5.1-codex-mini",
-                    "gpt-5",
-                    "gpt-5-mini",
-                    "gpt-5-codex",
-                    "o4-mini",
-                    "o3-mini",
-                ]
-            )
-            return preferred if preferred else allowed_models[0]
-
-        else:  # BALANCED or default
-            # Prefer balanced performance/cost models
-            # Include GPT-5.2 family for latest capabilities
-            preferred = find_first(
-                [
-                    "gpt-5.2",
-                    "gpt-5.1-codex",
-                    "gpt-5",
-                    "gpt-5-codex",
-                    "gpt-5.2-pro",
-                    "gpt-5-mini",
-                    "o4-mini",
-                    "o3-mini",
-                ]
-            )
-            return preferred if preferred else allowed_models[0]
+        """Select the best OpenAI model for *category* using capability metadata."""
+        return self.select_preferred_model(category, allowed_models)
 
 
 # Load registry data at import time so dependent providers (Azure) can reuse it

@@ -26,10 +26,6 @@ class XAIModelProvider(RegistryBackedProviderMixin, OpenAICompatibleProvider):
     REGISTRY_CLASS = XAIModelRegistry
     MODEL_CAPABILITIES: ClassVar[dict[str, ModelCapabilities]] = {}
 
-    # Canonical model identifiers used for category routing.
-    PRIMARY_MODEL = "grok-4-1-fast-reasoning"
-    FALLBACK_MODEL = "grok-4"
-
     def __init__(self, api_key: str, **kwargs):
         """Initialize X.AI provider with API key."""
         # Set X.AI base URL
@@ -43,43 +39,8 @@ class XAIModelProvider(RegistryBackedProviderMixin, OpenAICompatibleProvider):
         return ProviderType.XAI
 
     def get_preferred_model(self, category: "ToolModelCategory", allowed_models: list[str]) -> Optional[str]:
-        """Get XAI's preferred model for a given category from allowed models.
-
-        Args:
-            category: The tool category requiring a model
-            allowed_models: Pre-filtered list of models allowed by restrictions
-
-        Returns:
-            Preferred model name or None
-        """
-        from tools.models import ToolModelCategory
-
-        if not allowed_models:
-            return None
-
-        if category == ToolModelCategory.EXTENDED_REASONING:
-            # Prefer Grok 4.1 Fast Reasoning for advanced tasks
-            if self.PRIMARY_MODEL in allowed_models:
-                return self.PRIMARY_MODEL
-            if self.FALLBACK_MODEL in allowed_models:
-                return self.FALLBACK_MODEL
-            return allowed_models[0]
-
-        elif category == ToolModelCategory.FAST_RESPONSE:
-            # Prefer Grok 4.1 Fast Reasoning for speed as well (latest fast SKU).
-            if self.PRIMARY_MODEL in allowed_models:
-                return self.PRIMARY_MODEL
-            if self.FALLBACK_MODEL in allowed_models:
-                return self.FALLBACK_MODEL
-            return allowed_models[0]
-
-        else:  # BALANCED or default
-            # Prefer Grok 4.1 Fast Reasoning for balanced use.
-            if self.PRIMARY_MODEL in allowed_models:
-                return self.PRIMARY_MODEL
-            if self.FALLBACK_MODEL in allowed_models:
-                return self.FALLBACK_MODEL
-            return allowed_models[0]
+        """Select the best X.AI model for *category* using capability metadata."""
+        return self.select_preferred_model(category, allowed_models)
 
 
 # Load registry data at import time

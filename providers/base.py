@@ -141,6 +141,63 @@ class ModelProvider(ABC):
         )
 
     # ------------------------------------------------------------------
+    # Capability-based model selection
+    # ------------------------------------------------------------------
+
+    # Name patterns that indicate fast-tier models
+    _FAST_TIER_PATTERNS = ("flash", "mini", "lite", "fast", "nano")
+
+    def select_preferred_model(
+        self,
+        category: "ToolModelCategory",
+        allowed_models: list[str],
+    ) -> Optional[str]:
+        """Select the best model from *allowed_models* for a tool category.
+
+        Uses ``intelligence_score`` and capability flags from
+        :class:`ModelCapabilities` instead of hardcoded preference lists.
+
+        Subclasses can override ``get_preferred_model`` if truly custom
+        logic is needed, but the default implementation delegates here.
+        """
+        from tools.models import ToolModelCategory
+
+        if not allowed_models:
+            return None
+
+        if len(allowed_models) == 1:
+            return allowed_models[0]
+
+        caps_map = self.get_all_model_capabilities()
+
+        def _score(model: str) -> int:
+            cap = caps_map.get(model)
+            return cap.intelligence_score if cap else 0
+
+        def _has_thinking(model: str) -> bool:
+            cap = caps_map.get(model)
+            return bool(cap and cap.supports_extended_thinking)
+
+        def _is_fast_tier(model: str) -> bool:
+            name = model.lower()
+            return any(p in name for p in self._FAST_TIER_PATTERNS)
+
+        if category == ToolModelCategory.EXTENDED_REASONING:
+            thinking = [m for m in allowed_models if _has_thinking(m)]
+            pool = thinking if thinking else allowed_models
+            return max(pool, key=lambda m: (_score(m), m))
+
+        if category == ToolModelCategory.FAST_RESPONSE:
+            fast = [m for m in allowed_models if _is_fast_tier(m)]
+            if fast:
+                return max(fast, key=lambda m: (_score(m), m))
+            # No fast-tier → pick the lowest-scored (cheapest) model
+            return min(allowed_models, key=lambda m: (_score(m), m))
+
+        # BALANCED or default — highest intelligence_score
+        return max(allowed_models, key=lambda m: (_score(m), m))
+
+    # ------------------------------------------------------------------
     # Request execution
     # ------------------------------------------------------------------
     @abstractmethod
