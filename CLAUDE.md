@@ -259,13 +259,19 @@ python -m pytest tests/ -v
 6. Restart Claude session to use updated code
 
 #### Before Committing/PR
-1. Final quality check: `./code_quality_checks.sh`
-2. Run integration tests: `./run_integration_tests.sh`
-3. Run quick test mode: `python communication_simulator_test.py --quick`
-4. Run full simulator test suite (optional): `./run_integration_tests.sh --with-simulator`
-5. Verify all tests pass 100%
-6. **Update `CHANGELOG.md`** under the `[Unreleased]` section for any notable code changes (new features, bug fixes, breaking changes, deprecations, security fixes). Follow the [Keep a Changelog](https://keepachangelog.com/) format using the categories: Added, Changed, Deprecated, Removed, Fixed, Security.
-7. **Update `README.md`** for any substantial feature releases — specifically the "Differences from PAL MCP" table and the "Key Features" section. Keep these in sync with actual capabilities.
+
+> **MANDATORY: Update CHANGELOG.md and README.md BEFORE committing.**
+> A pre-commit hook enforces this — commits with staged `.py` files will be
+> **rejected** if `CHANGELOG.md` is not also staged. Do not bypass with `--no-verify`
+> unless the commit is purely non-code (docs, config, CI).
+
+1. **Update `CHANGELOG.md`** under the `[Unreleased]` section for ANY code changes. Use [Keep a Changelog](https://keepachangelog.com/) categories: Added, Changed, Deprecated, Removed, Fixed, Security. This is not optional.
+2. **Update `README.md`** for substantial feature releases — specifically the "Differences from PAL MCP" table and the "Key Features" section. Skip only for internal refactors with no user-facing change.
+3. Final quality check: `./code_quality_checks.sh`
+4. Run integration tests: `./run_integration_tests.sh`
+5. Run quick test mode: `python communication_simulator_test.py --quick`
+6. Run full simulator test suite (optional): `./run_integration_tests.sh --with-simulator`
+7. Verify all tests pass 100%
 
 ### Common Troubleshooting
 
