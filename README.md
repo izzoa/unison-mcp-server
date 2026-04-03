@@ -1,6 +1,6 @@
-# Unison - Providers Together
-
 <div align="center">
+
+# Unison - Providers Together
 
   <em>Unison - Providers Together</em><br />
   <sub><a href="docs/name-change.md">Formerly known as Zen MCP</a></sub>
