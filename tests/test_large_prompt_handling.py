@@ -483,9 +483,7 @@ class TestLargePromptHandling:
                     "absolute_file_paths": [str(large_file)],
                     "model": "flash",
                     "working_directory_absolute_path": str(tmp_path),
-                    "_context": ToolExecutionContext(
-                        model_context=dummy_context, resolved_model_name="flash"
-                    ),
+                    "_context": ToolExecutionContext(model_context=dummy_context, resolved_model_name="flash"),
                 }
             )
 

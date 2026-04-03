@@ -216,9 +216,9 @@ def disable_force_env_override(monkeypatch):
     import sys
 
     import config
-    import utils.conversation_store as conversation_store
     import utils.context_reconstructor as context_reconstructor
     import utils.conversation_memory as conversation_memory
+    import utils.conversation_store as conversation_store
 
     importlib.reload(config)
     importlib.reload(conversation_store)

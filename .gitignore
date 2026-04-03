@@ -190,5 +190,16 @@ logs/
 test_simulation_files/
 .mcp.json
 
+# IDE / agent skill directories (auto-generated per tool)
+.agent/
+.augment/
+.cursor/
+.crush/
+.factory/
+.gemini/
+.kilocode/
+.kiro/
+.opencode/
+
 # OpenSpec workflow artifacts (local development only)
 openspec/

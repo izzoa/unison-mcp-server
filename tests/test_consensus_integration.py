@@ -134,48 +134,27 @@ async def test_consensus_multi_model_consultations(monkeypatch, openai_model):
         assert step1_response and step1_response[0].type == "text"
         step1_data = json.loads(step1_response[0].text)
 
-        assert step1_data["status"] == "analysis_and_first_model_consulted"
-        assert step1_data["model_consulted"] == openai_model
-        assert step1_data["model_response"]["status"] == "success"
-        assert step1_data["model_response"]["metadata"]["provider"] == "openai"
-        assert step1_data["model_response"]["verdict"]
+        # With concurrent dispatch, step 1 returns all model responses at once
+        assert step1_data["status"] == "consensus_workflow_complete"
+        assert step1_data["consensus_complete"] is True
 
-        continuation_offer = step1_data.get("continuation_offer")
-        assert continuation_offer is not None
-        continuation_id = continuation_offer["continuation_id"]
+        # Verify all models were consulted
+        accumulated = step1_data.get("accumulated_responses", [])
+        assert len(accumulated) == 2
 
-        # Prepare step 2 inputs using the first model's response summary
-        summary_for_step2 = step1_data["model_response"]["verdict"][:200]
+        # Verify successful model responses contain expected fields
+        successful = [r for r in accumulated if r.get("status") == "success"]
+        assert len(successful) >= 1  # At least one model should succeed
 
-        step2_arguments = {
-            "step": f"Incorporated {openai_model} perspective: {summary_for_step2}",
-            "step_number": 2,
-            "total_steps": len(models_to_consult),
-            "next_step_required": False,
-            "findings": "Ready to gather opposing stance before synthesis.",
-            "continuation_id": continuation_id,
-            "current_model_index": step1_data.get("current_model_index", 1),
-            "model_responses": step1_data.get("model_responses", []),
-        }
+        # Verify complete_consensus structure
+        consensus = step1_data.get("complete_consensus", {})
+        assert consensus.get("total_responses") >= 1
+        assert consensus.get("initial_prompt")
 
-        step2_response = await tool.execute(step2_arguments)
+    assert step1_data["consensus_complete"] is True
 
-    assert step2_response and step2_response[0].type == "text"
-    step2_data = json.loads(step2_response[0].text)
-
-    assert step2_data["status"] == "consensus_workflow_complete"
-    assert step2_data["model_consulted"] == "gemini-2.5-flash"
-    assert step2_data["model_response"]["metadata"]["provider"] == "google"
-    assert step2_data["model_response"]["verdict"]
-    assert step2_data["complete_consensus"]["models_consulted"] == [
-        f"{openai_model}:for",
-        "gemini-2.5-flash:against",
-    ]
-    assert step2_data["consensus_complete"] is True
-
-    continuation_offer_final = step2_data.get("continuation_offer")
+    continuation_offer_final = step1_data.get("continuation_offer")
     assert continuation_offer_final is not None
-    assert continuation_offer_final["continuation_id"] == continuation_id
 
     # Ensure Gemini replay session is flushed to disk before verification
     gemini_provider = ModelProviderRegistry.get_provider_for_model("gemini-2.5-flash")
@@ -256,41 +235,27 @@ async def test_consensus_auto_mode_with_openrouter_and_gemini(monkeypatch):
             "models": models_to_consult,
         }
 
-        step1_output = await server.handle_call_tool("consensus", step1_args)
-        assert step1_output and step1_output[0].type == "text"
-        step1_payload = json.loads(step1_output[0].text)
-
-        assert step1_payload["status"] == "analysis_and_first_model_consulted"
-        assert step1_payload["model_consulted"] == "claude-3-5-flash-20241022"
-        assert step1_payload["model_response"]["status"] == "error"
-        assert "claude-3-5-flash-20241022" in step1_payload["model_response"]["error"]
-
-        continuation_offer = step1_payload.get("continuation_offer")
-        assert continuation_offer is not None
-        continuation_id = continuation_offer["continuation_id"]
-
-        step2_args = {
-            "step": "Continue consultation sequence.",
-            "step_number": 2,
-            "total_steps": len(models_to_consult),
-            "next_step_required": False,
-            "findings": "Ready for next model.",
-            "continuation_id": continuation_id,
-            "models": models_to_consult,
-        }
-
         try:
-            step2_output = await server.handle_call_tool("consensus", step2_args)
+            step1_output = await server.handle_call_tool("consensus", step1_args)
         finally:
             # Reset provider registry regardless of outcome to avoid cross-test bleed
             ModelProviderRegistry.reset_for_testing()
 
-    assert step2_output and step2_output[0].type == "text"
-    step2_payload = json.loads(step2_output[0].text)
+        assert step1_output and step1_output[0].type == "text"
+        step1_payload = json.loads(step1_output[0].text)
 
-    serialized = json.dumps(step2_payload)
-    assert "auto" not in serialized.lower(), "Auto model leakage should be resolved"
-    assert "gpt-5-mini" in serialized or "claude-3-5-flash-20241022" in serialized
+        # With concurrent dispatch, step 1 returns all model responses at once.
+        # Both models will fail (dummy keys), so we get all_providers_unavailable
+        # or consensus_workflow_complete depending on whether any succeed.
+        assert step1_payload["status"] in (
+            "consensus_workflow_complete",
+            "all_providers_unavailable",
+        )
+
+        # Verify the response references the actual model names (no 'auto' leakage)
+        serialized = json.dumps(step1_payload)
+        assert "auto" not in serialized.lower(), "Auto model leakage should be resolved"
+        assert "gpt-5-mini" in serialized or "claude-3-5-flash-20241022" in serialized
 
     # Restore server module to reflect original configuration for other tests
     import importlib

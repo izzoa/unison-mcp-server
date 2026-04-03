@@ -493,3 +493,15 @@ class ModelProviderRegistry:
         instance = cls()
         instance._providers.pop(provider_type, None)
         instance._initialized_providers.pop(provider_type, None)
+
+    @classmethod
+    def get_all_health_status(cls) -> list[dict]:
+        """Collect health status from all initialised provider instances."""
+        instance = cls()
+        statuses = []
+        for provider_type, provider in instance._initialized_providers.items():
+            try:
+                statuses.append(provider.get_health_status())
+            except Exception:
+                logging.debug("Failed to get health status for %s", provider_type, exc_info=True)
+        return statuses

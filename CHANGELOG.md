@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Provider circuit breaker (`utils/circuit_breaker.py`) — three-state pattern (Closed/Open/Half-Open) that detects sustained provider failures and short-circuits requests, avoiding full retry×timeout waits when a provider is hard-down. Configurable via `CIRCUIT_FAILURE_THRESHOLD`, `CIRCUIT_RESET_TIMEOUT_SECONDS`, and `CIRCUIT_HALF_OPEN_MAX_CALLS` environment variables
+- `ProviderUnavailable` exception for callers to distinguish circuit-open from transient API errors
+- `ModelProvider.get_health_status()` and `ModelProviderRegistry.get_all_health_status()` for provider health diagnostics
+- Consensus tool graceful degradation: skips providers with open circuit breakers and synthesizes from available results; returns clear error when all providers are unavailable
+- Async provider interface: `ModelProvider.async_generate_content()` wraps the sync method via `asyncio.to_thread()` by default; providers may override with native async. Includes `_run_with_retries_async()` for async retry semantics
+- Concurrent consensus dispatch: all model consultations now run in parallel via `asyncio.gather()` on step 1, reducing wall-clock time from sum-of-latencies to max-of-latencies. Per-model 120s timeout and error isolation ensure one slow/failed provider does not block others
 - `ToolExecutionContext` dataclass (`utils/tool_execution_context.py`) replacing four ad-hoc underscore-prefixed keys in the tool arguments dict with a single typed `_context` object — makes the server-to-tool contract explicit and IDE-discoverable
 - Coverage gate in CI and local quality checks via `pytest-cov` with 44% threshold — prevents silent test coverage regression
 - Provider-aware token counting: `ModelProvider.count_tokens()` now uses a three-tier fallback (provider-specific tokenizer → litellm → content-aware heuristic) for accurate token budgeting

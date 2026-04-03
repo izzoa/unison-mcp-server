@@ -3,8 +3,6 @@
 import warnings
 from unittest.mock import MagicMock, Mock, patch
 
-import pytest
-
 
 class TestModelProviderCountTokens:
     """Test ModelProvider.count_tokens() base class."""

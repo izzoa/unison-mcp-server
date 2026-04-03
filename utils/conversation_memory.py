@@ -25,21 +25,21 @@ For the original architecture documentation, see the module docstrings in
 
 import uuid  # noqa: F401, I001 — re-exported for backward compat (tests access conversation_memory.uuid)
 
+from utils.context_reconstructor import _default_turn_formatting  # noqa: F401
+from utils.context_reconstructor import _get_tool_formatted_content  # noqa: F401
+from utils.context_reconstructor import _plan_file_inclusion_by_size  # noqa: F401
 from utils.context_reconstructor import (  # noqa: E402
-    _default_turn_formatting,  # noqa: F401
-    _get_tool_formatted_content,  # noqa: F401
-    _plan_file_inclusion_by_size,  # noqa: F401
     build_conversation_history,
     get_conversation_file_list,
     get_conversation_image_list,
 )
+from utils.conversation_store import _is_valid_uuid  # noqa: F401
 from utils.conversation_store import (  # noqa: E402
     CONVERSATION_TIMEOUT_HOURS,
     CONVERSATION_TIMEOUT_SECONDS,
     MAX_CONVERSATION_TURNS,
     ConversationTurn,
     ThreadContext,
-    _is_valid_uuid,  # noqa: F401
     add_turn,
     create_thread,
     get_storage,

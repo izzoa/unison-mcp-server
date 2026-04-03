@@ -15,6 +15,7 @@ Key features:
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from typing import TYPE_CHECKING, Any
@@ -29,6 +30,7 @@ from mcp.types import TextContent
 from config import TEMPERATURE_ANALYTICAL
 from systemprompts import CONSENSUS_PROMPT
 from tools.shared.base_models import ConsolidatedFindings, WorkflowRequest
+from utils.circuit_breaker import ProviderUnavailable
 from utils.conversation_memory import MAX_CONVERSATION_TURNS, create_thread, get_thread
 
 from .workflow.base import WorkflowTool
@@ -458,90 +460,92 @@ of the evidence, even when it strongly points in one direction.""",
             self.store_initial_issue(request.step)
             self.initial_request = request.step
             self.models_to_consult = request.models or []
-            self.accumulated_responses = []
-            # Set total steps: len(models) (each step includes consultation + response)
-            request.total_steps = len(self.models_to_consult)
 
-        # For all steps (1 through total_steps), consult the corresponding model
-        if request.step_number <= request.total_steps:
-            # Calculate which model to consult for this step
-            model_idx = request.step_number - 1  # 0-based index
+            # Batch-dispatch all model consultations concurrently on step 1
+            self.accumulated_responses = await self._consult_models_concurrently(self.models_to_consult, request)
 
-            if model_idx < len(self.models_to_consult):
-                # Track workflow state for conversation memory
-                step_data = self.prepare_step_data(request)
-                self.work_history.append(step_data)
-                self._update_consolidated_findings(step_data)
+            # All API calls complete on step 1; total_steps=1 for the dispatch step
+            request.total_steps = 1
 
-                # Consult the model for this step
-                model_response = await self._consult_model(self.models_to_consult[model_idx], request)
+        # Step 1: concurrent dispatch complete — return all responses at once
+        if request.step_number == 1:
+            step_data = self.prepare_step_data(request)
+            self.work_history.append(step_data)
+            self._update_consolidated_findings(step_data)
 
-                # Add to accumulated responses
-                self.accumulated_responses.append(model_response)
+            successful = [r for r in self.accumulated_responses if r.get("status") == "success"]
+            failed = [r for r in self.accumulated_responses if r.get("status") != "success"]
+            unavailable = [r for r in self.accumulated_responses if r.get("error") == "provider_unavailable"]
+            skipped_names = [r["model"] for r in unavailable]
 
-                # Include the model response in the step data
+            if not successful:
                 response_data = {
-                    "status": "model_consulted",
-                    "step_number": request.step_number,
-                    "total_steps": request.total_steps,
-                    "model_consulted": model_response["model"],
-                    "model_stance": model_response.get("stance", "neutral"),
-                    "model_response": model_response,
-                    "current_model_index": model_idx + 1,
-                    "next_step_required": request.step_number < request.total_steps,
+                    "status": "all_providers_unavailable",
+                    "step_number": 1,
+                    "total_steps": 1,
+                    "consensus_complete": True,
+                    "accumulated_responses": self.accumulated_responses,
+                    "error": (
+                        "No providers are currently available. "
+                        f"All {len(self.accumulated_responses)} provider(s) failed: "
+                        f"{', '.join(r['model'] for r in self.accumulated_responses)}. Try again later."
+                    ),
+                    "next_steps": (
+                        "All providers are currently unavailable. "
+                        "No consensus can be formed. Inform the user and suggest retrying later."
+                    ),
                 }
-
-                # Add CLAI Agent's analysis to step 1
-                if request.step_number == 1:
-                    response_data["agent_analysis"] = {
+            else:
+                response_data = {
+                    "status": "consensus_workflow_complete",
+                    "step_number": 1,
+                    "total_steps": 1,
+                    "consensus_complete": True,
+                    "accumulated_responses": self.accumulated_responses,
+                    "agent_analysis": {
                         "initial_analysis": request.step,
                         "findings": request.findings,
-                    }
-                    response_data["status"] = "analysis_and_first_model_consulted"
-
-                # Check if this is the final step
-                if request.step_number == request.total_steps:
-                    response_data["status"] = "consensus_workflow_complete"
-                    response_data["consensus_complete"] = True
-                    response_data["complete_consensus"] = {
+                    },
+                    "complete_consensus": {
                         "initial_prompt": self.original_proposal if self.original_proposal else self.initial_prompt,
-                        "models_consulted": [
-                            f"{m['model']}:{m.get('stance', 'neutral')}" for m in self.accumulated_responses
-                        ],
-                        "total_responses": len(self.accumulated_responses),
-                        "consensus_confidence": "high",
-                    }
-                    response_data["next_steps"] = (
-                        "CONSENSUS GATHERING IS COMPLETE. Synthesize all perspectives and present:\n"
-                        "1. Key points of AGREEMENT across models\n"
-                        "2. Key points of DISAGREEMENT and why they differ\n"
-                        "3. Your final consolidated recommendation\n"
-                        "4. Specific, actionable next steps for implementation\n"
-                        "5. Critical risks or concerns that must be addressed"
+                        "models_consulted": [f"{m['model']}:{m.get('stance', 'neutral')}" for m in successful],
+                        "total_responses": len(successful),
+                        "consensus_confidence": "high" if not failed else "reduced",
+                    },
+                }
+                if skipped_names:
+                    response_data["complete_consensus"]["skipped_providers"] = skipped_names
+                    response_data["complete_consensus"]["skipped_reason"] = "provider_unavailable"
+                synthesis_steps = (
+                    "CONSENSUS GATHERING IS COMPLETE. All models were consulted concurrently. "
+                    "Synthesize all perspectives and present:\n"
+                    "1. Key points of AGREEMENT across models\n"
+                    "2. Key points of DISAGREEMENT and why they differ\n"
+                    "3. Your final consolidated recommendation\n"
+                    "4. Specific, actionable next steps for implementation\n"
+                    "5. Critical risks or concerns that must be addressed"
+                )
+                if skipped_names:
+                    synthesis_steps += (
+                        f"\n\nNOTE: {len(skipped_names)} provider(s) were unavailable "
+                        f"({', '.join(skipped_names)}) and skipped. "
+                        "Synthesize from available results only."
                     )
-                else:
-                    response_data["next_steps"] = (
-                        f"Model {model_response['model']} has provided its {model_response.get('stance', 'neutral')} "
-                        f"perspective. Please analyze this response and call {self.get_name()} again with:\n"
-                        f"- step_number: {request.step_number + 1}\n"
-                        f"- findings: Summarize key points from this model's response"
-                    )
+                response_data["next_steps"] = synthesis_steps
 
-                # Add continuation information and workflow customization
-                response_data = self.customize_workflow_response(response_data, request)
+            # Add continuation information and workflow customization
+            response_data = self.customize_workflow_response(response_data, request)
+            self._add_workflow_metadata(response_data, arguments)
 
-                # Ensure consensus-specific metadata is attached
-                self._add_workflow_metadata(response_data, arguments)
+            if continuation_id:
+                self.store_conversation_turn(continuation_id, response_data, request)
+                continuation_offer = self._build_continuation_offer(continuation_id)
+                if continuation_offer:
+                    response_data["continuation_offer"] = continuation_offer
 
-                if continuation_id:
-                    self.store_conversation_turn(continuation_id, response_data, request)
-                    continuation_offer = self._build_continuation_offer(continuation_id)
-                    if continuation_offer:
-                        response_data["continuation_offer"] = continuation_offer
+            return [TextContent(type="text", text=json.dumps(response_data, indent=2, ensure_ascii=False))]
 
-                return [TextContent(type="text", text=json.dumps(response_data, indent=2, ensure_ascii=False))]
-
-        # Otherwise, use standard workflow execution
+        # Steps 2+: no additional API calls — drive CLI agent synthesis workflow
         return await super().execute_workflow(arguments)
 
     def _build_continuation_offer(self, continuation_id: str) -> dict[str, Any] | None:
@@ -570,6 +574,50 @@ of the evidence, even when it strongly points in one direction.""",
             return continuation_offer.model_dump()
         except Exception:
             return None
+
+    async def _consult_models_concurrently(self, model_configs: list[dict], request) -> list[dict]:
+        """Dispatch all model consultations concurrently via asyncio.gather.
+
+        Each model call is wrapped in a per-model timeout (120s default).
+        Failures are isolated — one model's error does not cancel the others.
+        """
+        per_model_timeout = 120.0
+
+        async def _consult_with_timeout(config: dict) -> dict:
+            try:
+                return await asyncio.wait_for(
+                    self._consult_model(config, request),
+                    timeout=per_model_timeout,
+                )
+            except asyncio.TimeoutError:
+                model_name = config.get("model", "unknown")
+                logger.warning("Model %s timed out after %ss", model_name, per_model_timeout)
+                return {
+                    "model": model_name,
+                    "stance": config.get("stance", "neutral"),
+                    "status": "error",
+                    "error": f"timeout after {per_model_timeout}s",
+                }
+
+        tasks = [_consult_with_timeout(config) for config in model_configs]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        responses = []
+        for i, result in enumerate(results):
+            if isinstance(result, Exception):
+                model_name = model_configs[i].get("model", "unknown")
+                logger.exception("Unexpected error consulting model %s", model_name, exc_info=result)
+                responses.append(
+                    {
+                        "model": model_name,
+                        "stance": model_configs[i].get("stance", "neutral"),
+                        "status": "error",
+                        "error": str(result),
+                    }
+                )
+            else:
+                responses.append(result)
+        return responses
 
     async def _consult_model(self, model_config: dict, request) -> dict:
         """Consult a single model and return its response."""
@@ -614,8 +662,8 @@ of the evidence, even when it strongly points in one direction.""",
             for warning in temp_warnings:
                 logger.warning(warning)
 
-            # Call the model with validated temperature
-            response = provider.generate_content(
+            # Call the model with validated temperature (async path for concurrent dispatch)
+            response = await provider.async_generate_content(
                 prompt=prompt,
                 model_name=model_name,
                 system_prompt=system_prompt,
@@ -635,6 +683,19 @@ of the evidence, even when it strongly points in one direction.""",
                 },
             }
 
+        except ProviderUnavailable as e:
+            logger.warning(
+                "Provider unavailable for model %s: %s",
+                model_config.get("model", "unknown"),
+                e,
+            )
+            return {
+                "model": model_config.get("model", "unknown"),
+                "stance": model_config.get("stance", "neutral"),
+                "status": "error",
+                "error": "provider_unavailable",
+                "message": str(e),
+            }
         except Exception as e:
             logger.exception("Error consulting model %s", model_config)
             return {

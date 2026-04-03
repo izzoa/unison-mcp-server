@@ -18,12 +18,7 @@ import logging
 import os
 from typing import Callable, Optional
 
-from utils.conversation_store import (
-    MAX_CONVERSATION_TURNS,
-    ConversationTurn,
-    ThreadContext,
-    get_thread_chain,
-)
+from utils.conversation_store import MAX_CONVERSATION_TURNS, ConversationTurn, ThreadContext, get_thread_chain
 
 logger = logging.getLogger(__name__)
 

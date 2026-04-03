@@ -7,8 +7,6 @@ chain traversal, and UUID validation.
 
 from unittest.mock import Mock, patch
 
-import pytest
-
 from utils.conversation_store import (
     CONVERSATION_TIMEOUT_SECONDS,
     MAX_CONVERSATION_TURNS,
@@ -17,7 +15,6 @@ from utils.conversation_store import (
     _is_valid_uuid,
     add_turn,
     create_thread,
-    get_storage,
     get_thread,
     get_thread_chain,
 )

@@ -220,6 +220,8 @@ cd unison-mcp-server
 
 Unison activates any provider that has credentials in your `.env`. See `.env.example` for deeper customization.
 
+**Circuit Breaker** — Each provider has a built-in circuit breaker that detects sustained failures (outages, revoked keys, quota exhaustion) and fails fast instead of waiting through the full retry cycle. When a provider fails `CIRCUIT_FAILURE_THRESHOLD` consecutive times (default 5), its circuit opens and requests return immediately for `CIRCUIT_RESET_TIMEOUT_SECONDS` (default 60s) before probing recovery. The consensus tool automatically skips unavailable providers and synthesizes from the rest. See `.env.example` for configuration options.
+
 ## Core Tools
 
 > **Note:** Each tool comes with its own multi-step workflow, parameters, and descriptions that consume valuable context window space even when not in use. To optimize performance, some tools are disabled by default. See [Tool Configuration](#tool-configuration) below to enable them.

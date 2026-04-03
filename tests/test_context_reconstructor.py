@@ -5,17 +5,15 @@ Tests file/image collection, token-budget history building,
 and tool-specific formatting via callback.
 """
 
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock
 
-import pytest
-
-from utils.conversation_store import ConversationTurn, ThreadContext
 from utils.context_reconstructor import (
     _default_turn_formatting,
     _get_tool_formatted_content,
     get_conversation_file_list,
     get_conversation_image_list,
 )
+from utils.conversation_store import ConversationTurn, ThreadContext
 
 
 def _make_context(turns=None, thread_id="test-id", tool_name="chat"):

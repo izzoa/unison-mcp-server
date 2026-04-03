@@ -56,16 +56,15 @@ class TestModelResolutionBug:
         mock_response = Mock()
         mock_response.content = "Test response"
         mock_response.usage = None
-        mock_provider.generate_content.return_value = mock_response
 
-        # Track the model name passed to generate_content
+        # Track the model name passed to async_generate_content
         received_model_names = []
 
-        def track_generate_content(*args, **kwargs):
+        async def track_async_generate_content(*args, **kwargs):
             received_model_names.append(kwargs.get("model_name", args[1] if len(args) > 1 else "unknown"))
             return mock_response
 
-        mock_provider.generate_content.side_effect = track_generate_content
+        mock_provider.async_generate_content = Mock(side_effect=track_async_generate_content)
 
         # Mock the get_model_provider to return our mock
         with patch.object(self.consensus_tool, "get_model_provider", return_value=mock_provider):
@@ -81,7 +80,7 @@ class TestModelResolutionBug:
             # Test model consultation directly
             result = asyncio.run(self.consensus_tool._consult_model({"model": "gemini", "stance": "neutral"}, request))
 
-            # Verify that generate_content was called
+            # Verify that async_generate_content was called
             assert len(received_model_names) == 1
 
             # The consensus tool should pass the original alias "gemini"

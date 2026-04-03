@@ -2,8 +2,6 @@
 
 from unittest.mock import MagicMock
 
-import pytest
-
 
 class TestStorageBackendProtocol:
     """Tests for StorageBackend protocol and reset/injection functions."""
@@ -18,10 +16,7 @@ class TestStorageBackendProtocol:
 
     def test_reset_storage_backend_clears_singleton(self):
         """reset_storage_backend() should clear the global singleton."""
-        from utils.storage_backend import (
-            get_storage_backend,
-            reset_storage_backend,
-        )
+        from utils.storage_backend import get_storage_backend, reset_storage_backend
 
         # Get a backend (creates singleton)
         backend1 = get_storage_backend()
@@ -36,10 +31,7 @@ class TestStorageBackendProtocol:
 
     def test_get_storage_backend_with_custom_backend(self):
         """get_storage_backend(backend=mock) should install and return the mock."""
-        from utils.storage_backend import (
-            get_storage_backend,
-            reset_storage_backend,
-        )
+        from utils.storage_backend import get_storage_backend, reset_storage_backend
 
         reset_storage_backend()
         mock_backend = MagicMock()

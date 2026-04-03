@@ -1,5 +1,6 @@
 """Base interfaces and common behaviour for model providers."""
 
+import asyncio
 import logging
 import time
 from abc import ABC, abstractmethod
@@ -7,6 +8,8 @@ from typing import TYPE_CHECKING, Any, Callable, Optional
 
 if TYPE_CHECKING:
     from tools.models import ToolModelCategory
+
+from utils.circuit_breaker import CircuitBreaker, CircuitState, ProviderUnavailable
 
 from .shared import ModelCapabilities, ModelResponse, ProviderType
 
@@ -58,6 +61,48 @@ class ModelProvider(ABC):
         self.api_key = api_key
         self.config = kwargs
         self._sorted_capabilities_cache: Optional[list[tuple[str, ModelCapabilities]]] = None
+        self._circuit_breaker = self._create_circuit_breaker()
+
+    def _create_circuit_breaker(self) -> CircuitBreaker:
+        """Create a circuit breaker with env-var-configurable thresholds."""
+        import os
+
+        def _env_int(key: str, default: int) -> int:
+            raw = os.environ.get(key)
+            if raw is None:
+                return default
+            try:
+                return int(raw)
+            except ValueError:
+                logger.warning(
+                    "Invalid value '%s' for %s, using default %d",
+                    raw,
+                    key,
+                    default,
+                )
+                return default
+
+        def _env_float(key: str, default: float) -> float:
+            raw = os.environ.get(key)
+            if raw is None:
+                return default
+            try:
+                return float(raw)
+            except ValueError:
+                logger.warning(
+                    "Invalid value '%s' for %s, using default %s",
+                    raw,
+                    key,
+                    default,
+                )
+                return default
+
+        return CircuitBreaker(
+            failure_threshold=_env_int("CIRCUIT_FAILURE_THRESHOLD", 5),
+            reset_timeout_seconds=_env_float("CIRCUIT_RESET_TIMEOUT_SECONDS", 60.0),
+            half_open_max_calls=_env_int("CIRCUIT_HALF_OPEN_MAX_CALLS", 1),
+            provider_name=self.__class__.__name__,
+        )
 
     # ------------------------------------------------------------------
     # Provider identity & capability surface
@@ -257,6 +302,36 @@ class ModelProvider(ABC):
             RuntimeError: If the API call fails after retries
         """
 
+    async def async_generate_content(
+        self,
+        prompt: str,
+        model_name: str,
+        system_prompt: Optional[str] = None,
+        temperature: float = 0.3,
+        max_output_tokens: Optional[int] = None,
+        **kwargs,
+    ) -> ModelResponse:
+        """Async wrapper for content generation.
+
+        Default implementation delegates to the synchronous ``generate_content()``
+        via ``asyncio.to_thread()`` so the event loop is not blocked.  Concrete
+        providers MAY override this with a native async implementation when their
+        SDK provides an async client.
+
+        Thread-safety note: providers used with the async path (e.g. concurrent
+        consensus) MUST have thread-safe SDK clients because multiple calls may
+        execute concurrently in the default thread-pool executor.
+        """
+        return await asyncio.to_thread(
+            self.generate_content,
+            prompt,
+            model_name,
+            system_prompt=system_prompt,
+            temperature=temperature,
+            max_output_tokens=max_output_tokens,
+            **kwargs,
+        )
+
     def count_tokens(self, text: str, model_name: str) -> int:
         """Count tokens using the best available method for this provider.
 
@@ -303,13 +378,28 @@ class ModelProvider(ABC):
         else:
             estimated = max(1, len(text) // 4)
 
-        logger.debug("Estimating %s tokens for model %s via character heuristic (code_density=%.3f)", estimated, resolved_model, code_density)
+        logger.debug(
+            "Estimating %s tokens for model %s via character heuristic (code_density=%.3f)",
+            estimated,
+            resolved_model,
+            code_density,
+        )
         return estimated
 
     def close(self) -> None:
         """Clean up any resources held by the provider."""
 
         return
+
+    # ------------------------------------------------------------------
+    # Circuit breaker health
+    # ------------------------------------------------------------------
+    def get_health_status(self) -> dict:
+        """Return diagnostic health info including circuit breaker state."""
+        status = self._circuit_breaker.health_status()
+        status["provider_type"] = self.get_provider_type().value
+        status["healthy"] = self._circuit_breaker.state is CircuitState.CLOSED
+        return status
 
     # ------------------------------------------------------------------
     # Retry helpers
@@ -385,7 +475,11 @@ class ModelProvider(ABC):
         delays: Optional[list[float]] = None,
         log_prefix: str = "",
     ):
-        """Execute ``operation`` with retry semantics.
+        """Execute ``operation`` with circuit breaker and retry semantics.
+
+        The circuit breaker is checked before entering the retry loop.
+        On success (even after retries), the breaker records success.
+        When all retries are exhausted, the breaker records a failure.
 
         Args:
             operation: Callable returning the provider result.
@@ -397,8 +491,16 @@ class ModelProvider(ABC):
             Whatever ``operation`` returns.
 
         Raises:
+            ProviderUnavailable: If the circuit breaker is open.
             The last exception when all retries fail or the error is not retryable.
         """
+
+        # Circuit breaker check — fail fast if the provider is known-down
+        if not self._circuit_breaker.allow_request():
+            raise ProviderUnavailable(
+                provider_name=self._circuit_breaker._provider_name,
+                circuit_state=self._circuit_breaker.state.value,
+            )
 
         if max_attempts < 1:
             raise ValueError("max_attempts must be >= 1")
@@ -409,7 +511,9 @@ class ModelProvider(ABC):
 
         for attempt_index in range(attempts):
             try:
-                return operation()
+                result = operation()
+                self._circuit_breaker.record_success()
+                return result
             except Exception as exc:  # noqa: BLE001 - bubble exact provider errors
                 last_exc = exc
                 attempt_number = attempt_index + 1
@@ -417,6 +521,7 @@ class ModelProvider(ABC):
                 # Decide whether to retry based on subclass hook
                 retryable = self._is_error_retryable(exc)
                 if not retryable or attempt_number >= attempts:
+                    self._circuit_breaker.record_failure()
                     raise
 
                 delay_idx = min(attempt_index, len(delays) - 1) if delays else -1
@@ -442,6 +547,78 @@ class ModelProvider(ABC):
                     )
 
         # Should never reach here because loop either returns or raises
+        self._circuit_breaker.record_failure()
+        raise last_exc if last_exc else RuntimeError("Retry loop exited without result")
+
+    async def _run_with_retries_async(
+        self,
+        operation: Callable[[], Any],
+        *,
+        max_attempts: int,
+        delays: Optional[list[float]] = None,
+        log_prefix: str = "",
+    ):
+        """Async counterpart of ``_run_with_retries()``.
+
+        Accepts an **async** callable and uses ``asyncio.sleep()`` for
+        inter-attempt delays so the event loop is not blocked.  Intended for
+        providers that override ``async_generate_content()`` with a native
+        async implementation — the default thread-wrapped path uses the sync
+        ``_run_with_retries()`` inside the thread where blocking is fine.
+
+        Thread-safety note: this helper shares the same circuit-breaker
+        instance as the sync variant.  Providers must ensure their async
+        client is safe for concurrent access.
+        """
+        if not self._circuit_breaker.allow_request():
+            raise ProviderUnavailable(
+                provider_name=self._circuit_breaker._provider_name,
+                circuit_state=self._circuit_breaker.state.value,
+            )
+
+        if max_attempts < 1:
+            raise ValueError("max_attempts must be >= 1")
+
+        delays = delays or []
+        last_exc: Optional[Exception] = None
+
+        for attempt_index in range(max_attempts):
+            try:
+                result = await operation()
+                self._circuit_breaker.record_success()
+                return result
+            except Exception as exc:  # noqa: BLE001
+                last_exc = exc
+                attempt_number = attempt_index + 1
+
+                retryable = self._is_error_retryable(exc)
+                if not retryable or attempt_number >= max_attempts:
+                    self._circuit_breaker.record_failure()
+                    raise
+
+                delay_idx = min(attempt_index, len(delays) - 1) if delays else -1
+                delay = delays[delay_idx] if delay_idx >= 0 else 0.0
+
+                if delay > 0:
+                    logger.warning(
+                        "%s retryable error (attempt %s/%s): %s. Retrying in %ss...",
+                        log_prefix or self.__class__.__name__,
+                        attempt_number,
+                        max_attempts,
+                        exc,
+                        delay,
+                    )
+                    await asyncio.sleep(delay)
+                else:
+                    logger.warning(
+                        "%s retryable error (attempt %s/%s): %s. Retrying...",
+                        log_prefix or self.__class__.__name__,
+                        attempt_number,
+                        max_attempts,
+                        exc,
+                    )
+
+        self._circuit_breaker.record_failure()
         raise last_exc if last_exc else RuntimeError("Retry loop exited without result")
 
     # ------------------------------------------------------------------

@@ -163,7 +163,9 @@ class TestWorkflowMetadata:
             arguments = {
                 "step": "Test step",
                 "step_number": "invalid",  # This should cause an error during validation
-                "_context": ToolExecutionContext(model_context=ModelContext(model_name), resolved_model_name=model_name),
+                "_context": ToolExecutionContext(
+                    model_context=ModelContext(model_name), resolved_model_name=model_name
+                ),
             }
 
             # Execute the workflow tool - should fail gracefully
