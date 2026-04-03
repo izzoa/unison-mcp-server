@@ -81,23 +81,25 @@ $RUFF check --exclude test_simulation_files --exclude .unison_venv
 echo "✅ Step 1 Complete: All linting and formatting checks passed!"
 echo ""
 
-# Step 2: Unit Tests
-echo "🧪 Step 2: Running Complete Unit Test Suite"
-echo "---------------------------------------------"
+# Step 2: Unit Tests with Coverage
+echo "🧪 Step 2: Running Complete Unit Test Suite with Coverage"
+echo "---------------------------------------------------------"
 
-echo "🏃 Running unit tests (excluding integration tests)..."
-$PYTHON_CMD -m pytest tests/ -v -x -m "not integration"
+echo "🏃 Running unit tests with coverage (excluding integration tests)..."
+$PYTHON_CMD -m pytest tests/ -v -x -m "not integration" \
+    --cov=. --cov-report=term-missing --cov-fail-under=44
 
-echo "✅ Step 2 Complete: All unit tests passed!"
+echo "✅ Step 2 Complete: All unit tests passed with coverage above threshold!"
 echo ""
 
 # Step 3: Final Summary
 echo "🎉 All Code Quality Checks Passed!"
 echo "=================================="
 echo "✅ Linting (ruff): PASSED"
-echo "✅ Formatting (black): PASSED" 
+echo "✅ Formatting (black): PASSED"
 echo "✅ Import sorting (isort): PASSED"
 echo "✅ Unit tests: PASSED"
+echo "✅ Coverage: PASSED (threshold: 44%)"
 echo ""
 echo "🚀 Your code is ready for commit and GitHub Actions!"
 echo "💡 Remember to add simulator tests if you modified tools"

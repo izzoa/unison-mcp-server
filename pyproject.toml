@@ -127,6 +127,32 @@ patch_tags = ["fix", "perf"]
 [tool.semantic_release.remote.token]
 env = "GH_TOKEN"
 
+[tool.coverage.run]
+source = ["."]
+omit = [
+    "tests/*",
+    "simulator_tests/*",
+    "communication_simulator_test.py",
+    "venv/*",
+    ".unison_venv/*",
+    "__pycache__/*",
+    "setup.py",
+    "conftest.py",
+    "tests/conftest.py",
+]
+
+[tool.coverage.report]
+show_missing = true
+skip_empty = true
+exclude_lines = [
+    "pragma: no cover",
+    "if __name__ == .__main__.",
+    "raise NotImplementedError",
+]
+
+[tool.coverage.html]
+directory = "htmlcov"
+
 [build-system]
 requires = ["setuptools>=45", "wheel", "setuptools_scm[toml]>=6.2"]
 build-backend = "setuptools.build_meta"

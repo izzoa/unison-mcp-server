@@ -199,9 +199,18 @@ python -m pytest tests/test_refactor.py -v
 # Run specific test function
 python -m pytest tests/test_refactor.py::TestRefactorTool::test_format_response -v
 
-# Run tests with coverage
+# Run tests with coverage (enforces 44% minimum threshold)
+python -m pytest tests/ --cov=. --cov-report=term-missing --cov-fail-under=44 -m "not integration"
+
+# Generate HTML coverage report (browse htmlcov/index.html)
 python -m pytest tests/ --cov=. --cov-report=html -m "not integration"
 ```
+
+**Coverage Notes:**
+- Baseline coverage is ~46%, threshold set to 44% to prevent regression
+- `--cov-report=term-missing` shows uncovered line numbers in terminal output
+- HTML report in `htmlcov/` provides line-by-line colour-coded coverage view
+- CI uploads coverage reports as downloadable artifacts on each PR
 
 #### Run Integration Tests (Uses Free Local Models)
 

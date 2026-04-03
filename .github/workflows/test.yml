@@ -25,15 +25,24 @@ jobs:
           pip install -r requirements.txt
           pip install -r requirements-dev.txt
 
-      - name: Run unit tests
+      - name: Run unit tests with coverage
         run: |
           # Run only unit tests (exclude simulation tests and integration tests)
           # Integration tests require local-llama which isn't available in CI
-          python -m pytest tests/ -v --ignore=simulator_tests/ -m "not integration"
+          python -m pytest tests/ -v --ignore=simulator_tests/ -m "not integration" \
+            --cov=. --cov-report=term-missing --cov-report=html --cov-fail-under=44
         env:
           # Ensure no API key is accidentally used in CI
           GEMINI_API_KEY: ""
           OPENAI_API_KEY: ""
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-report-${{ matrix.python-version }}
+          path: htmlcov/
+          retention-days: 30
 
   lint:
     runs-on: ubuntu-latest
