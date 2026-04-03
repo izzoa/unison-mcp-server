@@ -112,7 +112,7 @@ class TestModelSelection:
             ModelProviderRegistry.unregister_provider(provider_type)
 
         # Register only Gemini provider
-        with patch.dict(os.environ, {"GOOGLE_API_KEY": "test-key"}, clear=False):
+        with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}, clear=False):
             from providers.gemini import GeminiModelProvider
 
             ModelProviderRegistry.register_provider(ProviderType.GOOGLE, GeminiModelProvider)
@@ -151,7 +151,7 @@ class TestModelSelection:
             ModelProviderRegistry.unregister_provider(provider_type)
 
         # Register only Gemini provider
-        with patch.dict(os.environ, {"GOOGLE_API_KEY": "test-key"}, clear=False):
+        with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}, clear=False):
             from providers.gemini import GeminiModelProvider
 
             ModelProviderRegistry.register_provider(ProviderType.GOOGLE, GeminiModelProvider)
