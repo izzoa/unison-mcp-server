@@ -1,4 +1,4 @@
-# Unison MCP: Many Workflows. One Context.
+# Unison - Providers Together
 
 <div align="center">
 
@@ -447,7 +447,7 @@ DISABLED_TOOLS=
 
 ## License
 
-Apache 2.0 License - see [LICENSE](LICENSE) file for details.
+AGPL-3.0 License - see [LICENSE](LICENSE) file for details.
 
 ## Acknowledgments
 
