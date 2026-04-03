@@ -668,9 +668,12 @@ When recommending searches, be specific about what information you need and why 
             ValueError: If model resolution fails or model selection is required
         """
         # MODEL RESOLUTION NOW HAPPENS AT MCP BOUNDARY
-        # Extract pre-resolved model context from server.py
-        model_context = arguments.get("_model_context")
-        resolved_model_name = arguments.get("_resolved_model_name")
+        # Extract pre-resolved model context from server.py via ToolExecutionContext
+        from utils.tool_execution_context import ToolExecutionContext
+
+        exec_ctx = ToolExecutionContext.from_arguments(arguments)
+        model_context = exec_ctx.model_context if exec_ctx else None
+        resolved_model_name = exec_ctx.resolved_model_name if exec_ctx else None
 
         if model_context and resolved_model_name:
             # Model was already resolved at MCP boundary

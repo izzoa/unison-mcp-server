@@ -416,10 +416,14 @@ async def handle_call_tool(name: str, arguments: dict[str, Any]) -> list[TextCon
             )
             raise ToolExecutionError(error_output.model_dump_json())
 
-        # Create model context with resolved model and option
+        # Create model context and typed execution context
         model_context = ModelContext(model_name, model_option)
-        arguments["_model_context"] = model_context
-        arguments["_resolved_model_name"] = model_name
+        from utils.tool_execution_context import ToolExecutionContext
+
+        arguments["_context"] = ToolExecutionContext(
+            model_context=model_context,
+            resolved_model_name=model_name,
+        )
         logger.debug(
             f"Model context created for {model_name} with {model_context.capabilities.context_window} token capacity"
         )
@@ -599,7 +603,10 @@ async def reconstruct_thread_context(arguments: dict[str, Any]) -> dict[str, Any
                 break
 
     # Resolve an effective model for context reconstruction when DEFAULT_MODEL=auto
-    model_context = arguments.get("_model_context")
+    from utils.tool_execution_context import ToolExecutionContext
+
+    existing_ctx = ToolExecutionContext.from_arguments(arguments)
+    model_context = existing_ctx.model_context if existing_ctx else None
 
     from utils.model_resolution import resolve_fallback_model
 
@@ -607,7 +614,6 @@ async def reconstruct_thread_context(arguments: dict[str, Any]) -> dict[str, Any
         if model_context is None:
             try:
                 model_context = ModelContext.from_arguments(arguments)
-                arguments.setdefault("_resolved_model_name", model_context.model_name)
             except ValueError as exc:
                 fallback_model = resolve_fallback_model(tool, f"context reconstruction after error: {exc}")
                 logger.debug(
@@ -616,8 +622,6 @@ async def reconstruct_thread_context(arguments: dict[str, Any]) -> dict[str, Any
                     exc,
                 )
                 model_context = ModelContext(fallback_model)
-                arguments["_model_context"] = model_context
-                arguments["_resolved_model_name"] = fallback_model
 
         from providers.registry import ModelProviderRegistry
 
@@ -632,8 +636,6 @@ async def reconstruct_thread_context(arguments: dict[str, Any]) -> dict[str, Any
                 fallback_model,
             )
             model_context = ModelContext(fallback_model)
-            arguments["_model_context"] = model_context
-            arguments["_resolved_model_name"] = fallback_model
     else:
         if model_context is None:
             fallback_model = resolve_fallback_model(tool, "no available models detected for context reconstruction")
@@ -642,8 +644,6 @@ async def reconstruct_thread_context(arguments: dict[str, Any]) -> dict[str, Any
                 fallback_model,
             )
             model_context = ModelContext(fallback_model)
-            arguments["_model_context"] = model_context
-            arguments["_resolved_model_name"] = fallback_model
 
     # Build conversation history with model-specific limits
     if logger.isEnabledFor(logging.DEBUG):
@@ -697,10 +697,7 @@ async def reconstruct_thread_context(arguments: dict[str, Any]) -> dict[str, Any
 
     # Store the enhanced prompt in the prompt field
     enhanced_arguments["prompt"] = enhanced_prompt
-    # Store the original user prompt separately for size validation
-    enhanced_arguments["_original_user_prompt"] = original_prompt
     logger.debug("[CONVERSATION_DEBUG] Storing enhanced prompt in 'prompt' field")
-    logger.debug("[CONVERSATION_DEBUG] Storing original user prompt in '_original_user_prompt' field")
 
     # Calculate remaining token budget based on current model
     # (model_context was already created above for history building)
@@ -709,8 +706,14 @@ async def reconstruct_thread_context(arguments: dict[str, Any]) -> dict[str, Any
     # Calculate remaining tokens for files/new content
     # History has already consumed some of the content budget
     remaining_tokens = token_allocation.content_tokens - conversation_tokens
-    enhanced_arguments["_remaining_tokens"] = max(0, remaining_tokens)  # Ensure non-negative
-    enhanced_arguments["_model_context"] = model_context  # Pass context for use in tools
+
+    # Inject typed execution context with all server-resolved state
+    enhanced_arguments["_context"] = ToolExecutionContext(
+        model_context=model_context,
+        resolved_model_name=model_context.model_name,
+        remaining_tokens=max(0, remaining_tokens),
+        original_user_prompt=original_prompt,
+    )
 
     if logger.isEnabledFor(logging.DEBUG):
         logger.debug("[CONVERSATION_DEBUG] Token budget calculation:")

@@ -5,8 +5,11 @@ This test verifies that SimpleTool correctly validates only the original user pr
 when conversation history is embedded, rather than validating the full enhanced prompt.
 """
 
+from unittest.mock import MagicMock
+
 from tools.chat import ChatTool
 from tools.shared.base_models import ToolRequest
+from utils.tool_execution_context import ToolExecutionContext
 
 
 class TestPromptSizeLimitBugFix:
@@ -27,10 +30,15 @@ class TestPromptSizeLimitBugFix:
         # Simulate enhanced prompt with conversation history (what server.py creates)
         enhanced_prompt = f"{conversation_history}\n\n=== NEW USER INPUT ===\n{short_user_prompt}"
 
-        # Simulate server.py behavior: store original prompt in _current_arguments
+        # Simulate server.py behavior: store original prompt in _current_arguments via ToolExecutionContext
+        mock_mc = MagicMock()
         tool._current_arguments = {
             "prompt": enhanced_prompt,  # Enhanced with history
-            "_original_user_prompt": short_user_prompt,  # Original user input (our fix)
+            "_context": ToolExecutionContext(
+                model_context=mock_mc,
+                resolved_model_name="local-llama",
+                original_user_prompt=short_user_prompt,
+            ),
             "model": "local-llama",
         }
 

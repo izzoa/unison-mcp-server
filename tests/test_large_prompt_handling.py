@@ -18,6 +18,7 @@ from config import MCP_PROMPT_SIZE_LIMIT
 from tools.chat import ChatTool
 from tools.codereview import CodeReviewTool
 from tools.shared.exceptions import ToolExecutionError
+from utils.tool_execution_context import ToolExecutionContext
 
 # from tools.debug import DebugIssueTool  # Commented out - debug tool refactored
 
@@ -482,7 +483,9 @@ class TestLargePromptHandling:
                     "absolute_file_paths": [str(large_file)],
                     "model": "flash",
                     "working_directory_absolute_path": str(tmp_path),
-                    "_model_context": dummy_context,
+                    "_context": ToolExecutionContext(
+                        model_context=dummy_context, resolved_model_name="flash"
+                    ),
                 }
             )
 

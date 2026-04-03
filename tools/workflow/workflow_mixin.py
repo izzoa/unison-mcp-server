@@ -457,8 +457,11 @@ class BaseWorkflowMixin(ABC):
         is_final_step = not self.get_request_next_step_required(request)
         step_number = self.get_request_step_number(request)
 
-        # Extract model context for token budgeting
-        model_context = arguments.get("_model_context")
+        # Extract model context for token budgeting via ToolExecutionContext
+        from utils.tool_execution_context import ToolExecutionContext
+
+        _exec_ctx = ToolExecutionContext.from_arguments(arguments)
+        model_context = _exec_ctx.model_context if _exec_ctx else None
         self._model_context = model_context
 
         # Clear any previous file context to ensure clean state
@@ -539,7 +542,10 @@ class BaseWorkflowMixin(ABC):
 
             # Use the same file preparation logic as BaseTool with token budgeting
             continuation_id = self.get_request_continuation_id(request)
-            remaining_tokens = arguments.get("_remaining_tokens")
+            from utils.tool_execution_context import ToolExecutionContext
+
+            _file_exec_ctx = ToolExecutionContext.from_arguments(arguments)
+            remaining_tokens = _file_exec_ctx.remaining_tokens if _file_exec_ctx else None
 
             file_content, processed_files = self._prepare_file_content_for_prompt(
                 request_files,
@@ -695,7 +701,7 @@ class BaseWorkflowMixin(ABC):
 
             # Create thread for first step
             if not continuation_id and request.step_number == 1:
-                clean_args = {k: v for k, v in arguments.items() if k not in ["_model_context", "_resolved_model_name"]}
+                clean_args = {k: v for k, v in arguments.items() if k != "_context"}
                 continuation_id = create_thread(self.get_name(), clean_args)
                 self.initial_request = request.step
                 # Allow tools to store initial description for expert analysis
@@ -1145,9 +1151,12 @@ class BaseWorkflowMixin(ABC):
             arguments: The original arguments containing model context
         """
         try:
-            # Get model information from arguments (set by server.py)
-            resolved_model_name = arguments.get("_resolved_model_name")
-            model_context = arguments.get("_model_context")
+            # Get model information from arguments (set by server.py via ToolExecutionContext)
+            from utils.tool_execution_context import ToolExecutionContext
+
+            _exec_ctx = ToolExecutionContext.from_arguments(arguments)
+            resolved_model_name = _exec_ctx.resolved_model_name if _exec_ctx else None
+            model_context = _exec_ctx.model_context if _exec_ctx else None
 
             if resolved_model_name and model_context:
                 # Extract provider information from model context

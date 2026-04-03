@@ -14,6 +14,8 @@ from providers.registry import ModelProviderRegistry
 from providers.shared import ProviderType
 from tools.debug import DebugIssueTool
 from tools.shared.exceptions import ToolExecutionError
+from utils.model_context import ModelContext
+from utils.tool_execution_context import ToolExecutionContext
 
 
 class TestWorkflowMetadata:
@@ -89,8 +91,7 @@ class TestWorkflowMetadata:
                 "findings": "Initial findings for test",
                 "model": model_name,
                 "confidence": "high",
-                "_model_context": model_context,
-                "_resolved_model_name": model_name,
+                "_context": ToolExecutionContext(model_context=model_context, resolved_model_name=model_name),
             }
 
             # Execute the workflow tool
@@ -162,7 +163,7 @@ class TestWorkflowMetadata:
             arguments = {
                 "step": "Test step",
                 "step_number": "invalid",  # This should cause an error during validation
-                "_resolved_model_name": model_name,
+                "_context": ToolExecutionContext(model_context=ModelContext(model_name), resolved_model_name=model_name),
             }
 
             # Execute the workflow tool - should fail gracefully
@@ -297,8 +298,7 @@ class TestWorkflowMetadata:
                 "findings": "Intermediate findings",
                 "model": model_name,
                 "confidence": "medium",
-                "_model_context": model_context,
-                "_resolved_model_name": model_name,
+                "_context": ToolExecutionContext(model_context=model_context, resolved_model_name=model_name),
             }
 
             # Execute the workflow tool

@@ -90,9 +90,9 @@ async def test_conversation_history_field_mapping():
                 assert "=== NEW USER INPUT ===" in enhanced_value
                 assert test_case["original_value"] in enhanced_value
 
-                # Should have token budget
-                assert "_remaining_tokens" in enhanced_args
-                assert enhanced_args["_remaining_tokens"] > 0
+                # Should have typed execution context with token budget
+                assert "_context" in enhanced_args
+                assert enhanced_args["_context"].remaining_tokens > 0
 
 
 @pytest.mark.asyncio

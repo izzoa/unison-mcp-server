@@ -237,7 +237,10 @@ class FileProcessor:
         if remaining_budget is None:
             # Use provided arguments or fall back to empty dict (no stored state in FileProcessor)
             args_to_use = arguments or {}
-            remaining_budget = args_to_use.get("_remaining_tokens")
+            from utils.tool_execution_context import ToolExecutionContext
+
+            _fp_ctx = ToolExecutionContext.from_arguments(args_to_use)
+            remaining_budget = _fp_ctx.remaining_tokens if _fp_ctx and _fp_ctx.remaining_tokens else None
 
         # Use remaining budget if provided, otherwise fall back to max_tokens or model-specific default
         if remaining_budget is not None:

@@ -187,7 +187,10 @@ class CLinkTool(SimpleTool):
         images = self.get_request_images(request)
         continuation_id = self.get_request_continuation_id(request)
 
-        self._model_context = arguments.get("_model_context")
+        from utils.tool_execution_context import ToolExecutionContext
+
+        _exec_ctx = ToolExecutionContext.from_arguments(arguments)
+        self._model_context = _exec_ctx.model_context if _exec_ctx else None
 
         system_prompt_text = role_config.prompt_path.read_text(encoding="utf-8")
         include_system_prompt = not self._use_external_system_prompt(client_config)

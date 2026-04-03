@@ -155,10 +155,14 @@ class ConversationBaseTest(BaseSimulatorTest):
                     params["model"] = model_name
                     self.logger.debug(f"Using fallback model for testing: {model_name}")
 
-            # Create model context
+            # Create model context via ToolExecutionContext
+            from utils.tool_execution_context import ToolExecutionContext
+
             model_context = ModelContext(model_name)
-            params["_model_context"] = model_context
-            params["_resolved_model_name"] = model_name
+            params["_context"] = ToolExecutionContext(
+                model_context=model_context,
+                resolved_model_name=model_name,
+            )
 
             # Execute tool asynchronously
             try:

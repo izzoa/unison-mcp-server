@@ -313,9 +313,12 @@ class SimpleTool(BaseTool):
             # Store the current model name for later use
             self._current_model_name = model_name
 
-            # Handle model context from arguments (for in-process testing)
-            if "_model_context" in arguments:
-                self._model_context = arguments["_model_context"]
+            # Handle model context from arguments via ToolExecutionContext
+            from utils.tool_execution_context import ToolExecutionContext
+
+            _exec_ctx = ToolExecutionContext.from_arguments(arguments)
+            if _exec_ctx is not None:
+                self._model_context = _exec_ctx.model_context
                 logger.debug(f"{self.get_name()}: Using model context from arguments")
             else:
                 # Create model context if not provided
@@ -846,11 +849,12 @@ Please provide a thoughtful, comprehensive response:"""
         # Check if we have the current arguments from execute() method
         current_args = getattr(self, "_current_arguments", None)
         if current_args:
-            # If server.py embedded conversation history, it stores original prompt separately
-            original_user_prompt = current_args.get("_original_user_prompt")
-            if original_user_prompt is not None:
-                # Use original user prompt for size validation (excludes conversation history)
-                return original_user_prompt
+            # If server.py embedded conversation history, check ToolExecutionContext for original prompt
+            from utils.tool_execution_context import ToolExecutionContext
+
+            _exec_ctx = ToolExecutionContext.from_arguments(current_args)
+            if _exec_ctx is not None and _exec_ctx.original_user_prompt:
+                return _exec_ctx.original_user_prompt
 
         # Fallback to default behavior (validate full user content)
         return user_content
