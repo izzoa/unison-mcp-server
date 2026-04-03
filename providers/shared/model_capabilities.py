@@ -63,6 +63,7 @@ class ModelCapabilities:
     temperature_constraint: TemperatureConstraint = field(
         default_factory=lambda: RangeTemperatureConstraint(0.0, 2.0, 0.3)
     )
+    auto_discovered: bool = False  # True when model was discovered via LiteLLM without a JSON override
 
     def get_effective_temperature(self, requested_temperature: float) -> Optional[float]:
         """Return the temperature that should be sent to the provider.

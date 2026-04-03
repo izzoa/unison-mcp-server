@@ -28,6 +28,12 @@ import utils.env as env_config  # noqa: E402
 # Ensure tests operate with runtime environment rather than .env overrides during imports
 env_config.reload_env({"UNISON_MCP_FORCE_ENV_OVERRIDE": "false"})
 
+# Disable LiteLLM auto-discovery during tests so that only JSON-configured
+# models appear in registries.  The litellm adapter tests re-enable it locally.
+from providers.litellm_adapter import set_discovery_enabled  # noqa: E402
+
+set_discovery_enabled(False)
+
 # Set default model to a specific value for tests to avoid auto mode
 # This prevents all tests from failing due to missing model parameter
 os.environ["DEFAULT_MODEL"] = "gemini-2.5-flash"
@@ -55,6 +61,12 @@ from providers.xai import XAIModelProvider  # noqa: E402
 ModelProviderRegistry.register_provider(ProviderType.GOOGLE, GeminiModelProvider)
 ModelProviderRegistry.register_provider(ProviderType.OPENAI, OpenAIModelProvider)
 ModelProviderRegistry.register_provider(ProviderType.XAI, XAIModelProvider)
+
+# Force registry reload so providers pick up the disabled-discovery state
+# (registries may have been lazily created during import with discovery still enabled)
+GeminiModelProvider.reload_registry()
+OpenAIModelProvider.reload_registry()
+XAIModelProvider.reload_registry()
 
 # Register CUSTOM provider if CUSTOM_API_URL is available (for integration tests)
 # But only if we're actually running integration tests, not unit tests

@@ -255,6 +255,8 @@ python -m pytest tests/ -v
 3. Run quick test mode: `python communication_simulator_test.py --quick`
 4. Run full simulator test suite (optional): `./run_integration_tests.sh --with-simulator`
 5. Verify all tests pass 100%
+6. **Update `CHANGELOG.md`** under the `[Unreleased]` section for any notable code changes (new features, bug fixes, breaking changes, deprecations, security fixes). Follow the [Keep a Changelog](https://keepachangelog.com/) format using the categories: Added, Changed, Deprecated, Removed, Fixed, Security.
+7. **Update `README.md`** for any substantial feature releases — specifically the "Differences from PAL MCP" table and the "Key Features" section. Keep these in sync with actual capabilities.
 
 ### Common Troubleshooting
 

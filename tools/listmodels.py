@@ -166,9 +166,10 @@ class ListModelsTool(BaseTool):
                     else:
                         output_lines.append("\n*No models are currently allowed by restriction policy.*")
                 else:
-                    output_lines.append("\n**Models**:")
-
+                    curated = []
+                    discovered = []
                     aliases = []
+
                     for model_name, capabilities in provider.get_capabilities_by_rank():
                         try:
                             description = capabilities.description or "No description available"
@@ -187,14 +188,27 @@ class ListModelsTool(BaseTool):
                         else:
                             context_str = f"{context_window} context" if context_window > 0 else "unknown context"
 
-                        output_lines.append(f"- `{model_name}` - {context_str}")
-                        output_lines.append(f"  - {description}")
+                        entry_lines = [f"- `{model_name}` - {context_str}"]
+                        entry_lines.append(f"  - {description}")
                         if capabilities.allow_code_generation:
-                            output_lines.append("  - Supports structured code generation")
+                            entry_lines.append("  - Supports structured code generation")
+
+                        if getattr(capabilities, "auto_discovered", False):
+                            discovered.extend(entry_lines)
+                        else:
+                            curated.extend(entry_lines)
 
                         for alias in capabilities.aliases or []:
                             if alias != model_name:
                                 aliases.append(f"- `{alias}` → `{model_name}`")
+
+                    if curated:
+                        output_lines.append("\n**Models**:")
+                        output_lines.extend(curated)
+
+                    if discovered:
+                        output_lines.append("\n**Auto-discovered** *(via LiteLLM)*:")
+                        output_lines.extend(discovered)
 
                     if aliases:
                         output_lines.append("\n**Aliases**:")

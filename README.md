@@ -140,6 +140,20 @@ For best results when using [Codex CLI](https://developers.openai.com/codex/cli)
 - **Gemini 3.0 Pro** OR **GPT-5.2-Pro** - Deep thinking, additional code reviews, debugging and validations, pre-commit analysis
 </details>
 
+## Differences from PAL MCP
+
+Unison is forked from [BeehiveInnovations/pal-mcp-server](https://github.com/BeehiveInnovations/pal-mcp-server). It inherits the full PAL feature set and adds the following:
+
+| Area | PAL MCP | Unison MCP |
+|------|---------|------------|
+| **Model Discovery** | Static JSON files only — manual updates required when providers release new models | Automatic model discovery via [LiteLLM](https://github.com/BerriAI/litellm) at startup; new models appear without JSON changes |
+| **Model Catalog** | Limited to manually curated entries per provider | 2000+ models auto-discovered across all providers, with curated overrides for tuned metadata |
+| **Discovered vs Curated** | All models treated equally | `listmodels` distinguishes curated models (with hand-tuned intelligence scores, aliases) from auto-discovered ones |
+| **Changelog** | Git-log style | [Keep a Changelog](https://keepachangelog.com/) format with Unreleased section |
+| **Branding** | PAL (Provider Abstraction Layer) | Unison — Providers Together |
+
+> All core tools, providers, workflows, and conversation continuity features from PAL are fully preserved. See [docs/name-change.md](docs/name-change.md) for migration notes.
+
 ## Quick Start (5 minutes)
 
 **Prerequisites:** Python 3.10+, Git, [uv installed](https://docs.astral.sh/uv/getting-started/installation/)
@@ -383,6 +397,7 @@ DISABLED_TOOLS=
 **Model Support**
 - **Multiple providers** - Gemini, OpenAI, Azure, X.AI, OpenRouter, DIAL, Ollama
 - **Latest models** - GPT-5, Gemini 3.0 Pro, O3, Grok-4, local Llama
+- **Automatic model discovery** - New models appear at startup via [LiteLLM](https://github.com/BerriAI/litellm) integration, no manual config needed
 - **[Thinking modes](docs/advanced-usage.md#thinking-modes)** - Control reasoning depth vs cost
 - **Vision support** - Analyze images, diagrams, screenshots
 
@@ -435,6 +450,8 @@ DISABLED_TOOLS=
 Apache 2.0 License - see [LICENSE](LICENSE) file for details.
 
 ## Acknowledgments
+
+This project is based on [BeehiveInnovations/pal-mcp-server](https://github.com/BeehiveInnovations/pal-mcp-server). Full credit to the original authors for the foundation this work builds upon.
 
 Built with the power of **Multi-Model AI** collaboration 🤝
 - **A**ctual **I**ntelligence by real Humans

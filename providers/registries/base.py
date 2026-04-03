@@ -19,6 +19,21 @@ logger = logging.getLogger(__name__)
 
 CAPABILITY_FIELD_NAMES = {field.name for field in fields(ModelCapabilities)}
 
+# Fields that LiteLLM provides and is authoritative for.
+# When a model exists in both LiteLLM and JSON, LiteLLM wins for these
+# ONLY when LiteLLM provides a non-zero / non-default value.
+# Note: supports_extended_thinking is excluded — LiteLLM's "supports_reasoning"
+# has different semantics from Unison's thinking mode API.
+_LITELLM_BASE_FIELDS = frozenset(
+    {
+        "context_window",
+        "max_output_tokens",
+        "supports_images",
+        "supports_function_calling",
+        "supports_json_mode",
+    }
+)
+
 
 class CustomModelRegistryBase:
     """Load and expose capability metadata from a JSON manifest."""
@@ -36,6 +51,7 @@ class CustomModelRegistryBase:
         self._resource_package = "conf"
         self._default_path = Path(__file__).resolve().parents[3] / "conf" / default_filename
 
+        self._litellm_discovery = config_path is None  # Only discover when using default config
         if config_path:
             self.config_path = Path(config_path)
         else:
@@ -59,8 +75,109 @@ class CustomModelRegistryBase:
 
     def reload(self) -> None:
         data = self._load_config_data()
-        configs = [config for config in self._parse_models(data) if config is not None]
-        self._build_maps(configs)
+        json_configs = [config for config in self._parse_models(data) if config is not None]
+
+        if self._litellm_discovery:
+            json_configs = self._merge_with_litellm(json_configs)
+        self._build_maps(json_configs)
+
+    def _merge_with_litellm(
+        self,
+        json_configs: list[ModelCapabilities],
+    ) -> list[ModelCapabilities]:
+        """Merge JSON-parsed configs with LiteLLM-discovered models.
+
+        Strategy:
+        - Models in both: LiteLLM wins for base capacity/capability fields,
+          JSON wins for Unison-specific fields (intelligence_score, aliases, etc.)
+        - Models in LiteLLM only: auto-discovered with inferred defaults.
+        - Models in JSON only: kept as-is.
+        """
+        from ..litellm_adapter import get_models_for_provider, infer_defaults, is_available
+
+        if not is_available():
+            return json_configs
+
+        provider_type = self._provider_default()
+        litellm_models = get_models_for_provider(provider_type)
+
+        if not litellm_models:
+            return json_configs
+
+        # Index JSON configs by model name for fast lookup
+        json_by_name: dict[str, ModelCapabilities] = {}
+        for cfg in json_configs:
+            json_by_name[cfg.model_name] = cfg
+
+        merged: list[ModelCapabilities] = []
+        seen_names: set[str] = set()
+
+        # 1. Process JSON models — keep as-is (JSON is authoritative for curated models)
+        for cfg in json_configs:
+            seen_names.add(cfg.model_name)
+            merged.append(cfg)
+
+        # 2. Process LiteLLM-only models (auto-discovered)
+        # Collect existing aliases to avoid conflicts
+        existing_aliases: set[str] = set()
+        for cfg in merged:
+            existing_aliases.add(cfg.model_name.lower())
+            for alias in cfg.aliases:
+                existing_aliases.add(alias.lower())
+
+        for model_name, litellm_data in litellm_models.items():
+            if model_name in seen_names:
+                continue
+
+            defaults = infer_defaults(model_name, litellm_data, provider_type)
+
+            # Filter out aliases that conflict with existing ones
+            safe_aliases = [
+                a for a in defaults.get("aliases", []) if a.lower() not in existing_aliases
+            ]
+            for a in safe_aliases:
+                existing_aliases.add(a.lower())
+            defaults["aliases"] = safe_aliases
+
+            # Build the ModelCapabilities from merged LiteLLM + inferred data
+            cap_fields = {}
+            cap_fields["provider"] = provider_type
+            cap_fields["model_name"] = model_name
+            cap_fields["auto_discovered"] = True
+
+            # LiteLLM base fields (for auto-discovered, use all available data)
+            _AUTO_DISCOVER_FIELDS = _LITELLM_BASE_FIELDS | {
+                "supports_system_prompts",
+                "supports_streaming",
+            }
+            for field_name in _AUTO_DISCOVER_FIELDS:
+                if field_name in litellm_data:
+                    cap_fields[field_name] = litellm_data[field_name]
+
+            # Inferred defaults for Unison-specific fields
+            for key, value in defaults.items():
+                if key.startswith("_"):
+                    continue
+                if key in CAPABILITY_FIELD_NAMES:
+                    cap_fields[key] = value
+
+            # Only include fields that ModelCapabilities recognizes
+            filtered = {k: v for k, v in cap_fields.items() if k in CAPABILITY_FIELD_NAMES}
+            try:
+                cap = ModelCapabilities(**filtered)
+                merged.append(cap)
+            except Exception:
+                logger.debug("Skipping auto-discovered model %s: invalid fields", model_name)
+
+        logger.debug(
+            "LiteLLM merge for %s: %d JSON + %d auto-discovered = %d total",
+            provider_type.value,
+            len(json_configs),
+            len(merged) - len(json_configs),
+            len(merged),
+        )
+
+        return merged
 
     def list_models(self) -> list[str]:
         return list(self.model_map.keys())

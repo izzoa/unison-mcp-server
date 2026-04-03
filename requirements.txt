@@ -3,6 +3,7 @@ google-genai>=1.19.0
 openai>=1.55.2  # Minimum version for httpx 0.28.0 compatibility
 pydantic>=2.0.0
 python-dotenv>=1.0.0
+litellm>=1.50.0  # Model metadata discovery (model_cost, get_model_info)
 importlib-resources>=5.0.0; python_version<"3.9"
 
 # Development dependencies (install with pip install -r requirements-dev.txt)
