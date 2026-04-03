@@ -149,10 +149,14 @@ Unison is forked from [BeehiveInnovations/pal-mcp-server](https://github.com/Bee
 | **Model Discovery** | Static JSON files only — manual updates required when providers release new models | Automatic model discovery via [LiteLLM](https://github.com/BerriAI/litellm) at startup; new models appear without JSON changes |
 | **Model Catalog** | Limited to manually curated entries per provider | 2000+ models auto-discovered across all providers, with curated overrides for tuned metadata |
 | **Discovered vs Curated** | All models treated equally | `listmodels` distinguishes curated models (with hand-tuned intelligence scores, aliases) from auto-discovered ones |
+| **Model Selection** | Hardcoded preference lists per provider — go stale when models change | Data-driven selection using `intelligence_score` and capability flags; auto-mode always picks the best available model |
+| **Model Freshness** | Manual JSON updates only | Weekly CI workflow fetches the latest LiteLLM catalog and opens a PR with new/updated models for human review |
 | **Changelog** | Git-log style | [Keep a Changelog](https://keepachangelog.com/) format with Unreleased section |
 | **Branding** | PAL (Provider Abstraction Layer) | Unison — Providers Together |
 
 > All core tools, providers, workflows, and conversation continuity features from PAL are fully preserved. See [docs/name-change.md](docs/name-change.md) for migration notes.
+>
+> **How model routing works:** User-facing aliases (e.g., `"gemini"`, `"pro"`, `"flash"`) are curated in `conf/*.json` and always point to a specific model. When auto-mode selects a model (no alias specified), it uses `intelligence_score` and capability flags dynamically — so newly discovered models with high scores are preferred automatically. The weekly LiteLLM refresh PR flags new models that need alias curation.
 
 ## Quick Start (5 minutes)
 
