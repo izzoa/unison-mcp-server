@@ -435,10 +435,11 @@ class SimpleTool(BaseTool):
             )
 
             # Estimate tokens for logging
-            from utils.token_utils import estimate_tokens
-
-            estimated_tokens = estimate_tokens(prompt)
-            logger.debug(f"Prompt length: {len(prompt)} characters (~{estimated_tokens:,} tokens)")
+            try:
+                estimated_tokens = self._model_context.estimate_tokens(prompt)
+                logger.debug(f"Prompt length: {len(prompt)} characters (~{estimated_tokens:,} tokens)")
+            except (AttributeError, TypeError):
+                logger.debug(f"Prompt length: {len(prompt)} characters (~{len(prompt) // 4:,} tokens)")
 
             # Resolve model capabilities for feature gating
             supports_thinking = capabilities.supports_extended_thinking

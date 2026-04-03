@@ -258,15 +258,52 @@ class ModelProvider(ABC):
         """
 
     def count_tokens(self, text: str, model_name: str) -> int:
-        """Estimate token usage for a piece of text."""
+        """Count tokens using the best available method for this provider.
 
+        Fallback chain:
+        1. Subclass override (e.g., tiktoken for OpenAI, litellm for Gemini)
+        2. litellm.token_counter() (covers most known models)
+        3. Content-aware character heuristic (code ~3 chars/token, prose ~4 chars/token)
+        """
         resolved_model = self._resolve_model_name(model_name)
 
         if not text:
             return 0
 
-        estimated = max(1, len(text) // 4)
-        logger.debug("Estimating %s tokens for model %s via character heuristic", estimated, resolved_model)
+        # Tier 2: try litellm.token_counter as a universal fallback
+        try:
+            import litellm
+
+            count = litellm.token_counter(model=resolved_model, text=text)
+            logger.debug("Counted %s tokens for model %s via litellm", count, resolved_model)
+            return count
+        except Exception:
+            pass
+
+        # Tier 3: content-aware character heuristic
+        return self._heuristic_count_tokens(text, resolved_model)
+
+    def _heuristic_count_tokens(self, text: str, resolved_model: str) -> int:
+        """Content-aware character heuristic for token estimation.
+
+        Detects code density via simple indicator scan and adjusts the ratio:
+        - Code-heavy text: ~3 chars/token
+        - Prose: ~4 chars/token
+        """
+        # Simple code indicator scan on a sample
+        sample = text[:2000]
+        code_indicators = sum(1 for ch in sample if ch in "{}();[]")
+        indentation_lines = sum(1 for line in sample.split("\n") if line.startswith("    ") or line.startswith("\t"))
+        total_lines = max(1, sample.count("\n") + 1)
+
+        code_density = (code_indicators / max(1, len(sample))) + (indentation_lines / total_lines)
+
+        if code_density > 0.05:
+            estimated = max(1, len(text) // 3)
+        else:
+            estimated = max(1, len(text) // 4)
+
+        logger.debug("Estimating %s tokens for model %s via character heuristic (code_density=%.3f)", estimated, resolved_model, code_density)
         return estimated
 
     def close(self) -> None:

@@ -4,6 +4,7 @@ openai>=1.55.2  # Minimum version for httpx 0.28.0 compatibility
 pydantic>=2.0.0
 python-dotenv>=1.0.0
 litellm>=1.50.0  # Model metadata discovery (model_cost, get_model_info)
+tiktoken>=0.7.0  # OpenAI-compatible token counting (also available via openai SDK)
 importlib-resources>=5.0.0; python_version<"3.9"
 
 # Development dependencies (install with pip install -r requirements-dev.txt)

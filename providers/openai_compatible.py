@@ -724,20 +724,24 @@ class OpenAICompatibleProvider(ModelProvider):
 
         return usage
 
+    # Class-level cache for tiktoken encoding objects
+    _encoding_cache: dict = {}
+
     def count_tokens(self, text: str, model_name: str) -> int:
-        """Count tokens using OpenAI-compatible tokenizer tables when available."""
+        """Count tokens using tiktoken with encoding cache, falling back to base class."""
 
         resolved_model = self._resolve_model_name(model_name)
 
         try:
             import tiktoken
 
-            try:
-                encoding = tiktoken.encoding_for_model(resolved_model)
-            except KeyError:
-                encoding = tiktoken.get_encoding("cl100k_base")
+            if resolved_model not in self._encoding_cache:
+                try:
+                    self._encoding_cache[resolved_model] = tiktoken.encoding_for_model(resolved_model)
+                except KeyError:
+                    self._encoding_cache[resolved_model] = tiktoken.get_encoding("cl100k_base")
 
-            return len(encoding.encode(text))
+            return len(self._encoding_cache[resolved_model].encode(text))
 
         except (ImportError, Exception) as exc:
             logging.debug("tiktoken unavailable for %s: %s", resolved_model, exc)

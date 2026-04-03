@@ -17,6 +17,10 @@ def estimate_tokens(text: str) -> int:
     """
     Estimate token count using a character-based approximation.
 
+    .. deprecated::
+        Use ``ModelContext.estimate_tokens()`` or ``provider.count_tokens()``
+        for accurate, model-specific token counting.
+
     This uses a rough heuristic where 1 token ≈ 4 characters, which is
     a reasonable approximation for English text. The actual token count
     may vary based on:
@@ -30,6 +34,13 @@ def estimate_tokens(text: str) -> int:
     Returns:
         int: Estimated number of tokens
     """
+    import warnings
+
+    warnings.warn(
+        "estimate_tokens() is deprecated. Use ModelContext.estimate_tokens() or provider.count_tokens() instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     return len(text) // 4
 
 

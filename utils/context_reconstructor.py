@@ -676,9 +676,7 @@ def build_conversation_history(
 
     # Calculate total tokens for the complete conversation history
     complete_history = "\n".join(history_parts)
-    from utils.token_utils import estimate_tokens
-
-    total_conversation_tokens = estimate_tokens(complete_history)
+    total_conversation_tokens = model_context.estimate_tokens(complete_history)
 
     # Summary log of what was built
     user_turns = len([t for t in all_turns if t.role == "user"])

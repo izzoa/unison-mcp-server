@@ -570,9 +570,7 @@ async def reconstruct_thread_context(arguments: dict[str, Any]) -> dict[str, Any
         # Capture files referenced in this turn
         user_files = arguments.get("absolute_file_paths") or []
         logger.debug("[CONVERSATION_DEBUG] Adding user turn to thread %s", continuation_id)
-        from utils.token_utils import estimate_tokens
-
-        user_prompt_tokens = estimate_tokens(user_prompt)
+        user_prompt_tokens = len(user_prompt) // 4  # Quick heuristic for logging (model not yet resolved)
         logger.debug(
             "[CONVERSATION_DEBUG] User prompt length: %d chars (~%s tokens)",
             len(user_prompt),
@@ -677,7 +675,7 @@ async def reconstruct_thread_context(arguments: dict[str, Any]) -> dict[str, Any
     # All tools now use standardized 'prompt' field
     original_prompt = arguments.get("prompt", "")
     logger.debug("[CONVERSATION_DEBUG] Extracting user input from 'prompt' field")
-    original_prompt_tokens = estimate_tokens(original_prompt) if original_prompt else 0
+    original_prompt_tokens = model_context.estimate_tokens(original_prompt) if original_prompt else 0
     logger.debug(
         "[CONVERSATION_DEBUG] User input length: %d chars (~%s tokens)",
         len(original_prompt),

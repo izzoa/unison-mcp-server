@@ -7,7 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `ToolExecutionContext` dataclass (`utils/tool_execution_context.py`) replacing four ad-hoc underscore-prefixed keys in the tool arguments dict with a single typed `_context` object — makes the server-to-tool contract explicit and IDE-discoverable
+- Coverage gate in CI and local quality checks via `pytest-cov` with 44% threshold — prevents silent test coverage regression
+- Provider-aware token counting: `ModelProvider.count_tokens()` now uses a three-tier fallback (provider-specific tokenizer → litellm → content-aware heuristic) for accurate token budgeting
+- `GeminiModelProvider.count_tokens()` override using `litellm.token_counter()`
+- Tiktoken encoding cache in `OpenAICompatibleProvider` for faster repeated token counting
+- `tiktoken>=0.7.0` as an explicit dependency
+
 ### Changed
+
+- Decomposed `utils/conversation_memory.py` (1,108 lines) into three focused modules: `conversation_store.py` (thread lifecycle), `context_reconstructor.py` (history building), and `conversation_memory.py` (thin facade with re-exports)
+- Eliminated circular dependency: `from server import TOOLS` in conversation memory replaced with `tool_formatter_fn` callback injected by `server.py`
+- `ModelContext.estimate_tokens()` now delegates to the resolved provider's `count_tokens()` instead of using a fixed `len(text) // 3` heuristic
+- Migrated all `estimate_tokens()` callers in `server.py`, `tools/simple/base.py`, and `utils/context_reconstructor.py` to provider-aware token counting
+
+### Deprecated
+
+- `utils.token_utils.estimate_tokens()` — use `ModelContext.estimate_tokens()` or `provider.count_tokens()` instead. Emits `DeprecationWarning` when called.
+
+### Fixed
+
+- License inconsistency: SECURITY.md and Dockerfile now correctly reference AGPL-3.0 (was Apache 2.0); `pyproject.toml` gains a `license` field
+
+### Changed (infrastructure)
 
 - Renamed project from PAL to Unison
   ([`9304047`](https://github.com/izzoa/unison-mcp-server/commit/9304047))

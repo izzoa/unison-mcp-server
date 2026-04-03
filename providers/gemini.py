@@ -321,6 +321,18 @@ class GeminiModelProvider(RegistryBackedProviderMixin, ModelProvider):
         """Get the provider type."""
         return ProviderType.GOOGLE
 
+    def count_tokens(self, text: str, model_name: str) -> int:
+        """Count tokens using litellm for Gemini models, falling back to base class."""
+        resolved_model = self._resolve_model_name(model_name)
+        try:
+            import litellm
+
+            count = litellm.token_counter(model=f"gemini/{resolved_model}", text=text)
+            return count
+        except Exception:
+            pass
+        return super().count_tokens(text, model_name)
+
     def _extract_usage(self, response) -> dict[str, int]:
         """Extract token usage from Gemini response."""
         usage = {}
