@@ -1,18 +1,18 @@
 services:
-  pal-mcp:
+  unison-mcp:
     build:
       context: .
       dockerfile: Dockerfile
       target: runtime
-    image: pal-mcp-server:latest
-    container_name: pal-mcp-server
+    image: unison-mcp-server:latest
+    container_name: unison-mcp-server
     
     # Container labels for traceability
     labels:
-      - "com.pal-mcp.service=pal-mcp-server"
-      - "com.pal-mcp.version=1.0.0"
-      - "com.pal-mcp.environment=production"
-      - "com.pal-mcp.description=AI-powered Model Context Protocol server"
+      - "com.unison-mcp.service=unison-mcp-server"
+      - "com.unison-mcp.version=1.0.0"
+      - "com.unison-mcp.environment=production"
+      - "com.unison-mcp.description=AI-powered Model Context Protocol server"
     
     # Environment variables
     environment:
@@ -51,12 +51,12 @@ services:
     # Volumes for persistent data
     volumes:
       - ./logs:/app/logs
-      - pal-mcp-config:/app/conf
+      - unison-mcp-config:/app/conf
       - /etc/localtime:/etc/localtime:ro
     
     # Network configuration
     networks:
-      - pal-network
+      - unison-network
     
     # Resource limits
     deploy:
@@ -89,12 +89,12 @@ services:
 
 # Named volumes
 volumes:
-  pal-mcp-config:
+  unison-mcp-config:
     driver: local
 
 # Networks
 networks:
-  pal-network:
+  unison-network:
     driver: bridge
     ipam:
       config:

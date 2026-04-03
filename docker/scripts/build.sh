@@ -7,7 +7,7 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m'
 
-echo -e "${GREEN}=== Building PAL MCP Server Docker Image ===${NC}"
+echo -e "${GREEN}=== Building Unison MCP Server Docker Image ===${NC}"
 
 # Check if .env file exists
 if [[ ! -f .env ]]; then
@@ -26,10 +26,10 @@ echo -e "${GREEN}Building Docker image...${NC}"
 docker-compose build --no-cache
 
 # Verify the build
-if docker images | grep -q "pal-mcp-server"; then
+if docker images | grep -q "unison-mcp-server"; then
     echo -e "${GREEN}✓ Docker image built successfully${NC}"
     echo -e "${GREEN}Image details:${NC}"
-    docker images | grep pal-mcp-server
+    docker images | grep unison-mcp-server
 else
     echo -e "${RED}✗ Failed to build Docker image${NC}"
     exit 1

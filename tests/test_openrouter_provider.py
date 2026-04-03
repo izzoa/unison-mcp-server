@@ -378,7 +378,7 @@ class TestOpenRouterFunctionality:
         # Check default headers
         assert "HTTP-Referer" in provider.DEFAULT_HEADERS
         assert "X-Title" in provider.DEFAULT_HEADERS
-        assert provider.DEFAULT_HEADERS["X-Title"] == "PAL MCP Server"
+        assert provider.DEFAULT_HEADERS["X-Title"] == "Unison MCP Server"
 
     def test_openrouter_model_registry_initialized(self):
         """Test that model registry is properly initialized."""

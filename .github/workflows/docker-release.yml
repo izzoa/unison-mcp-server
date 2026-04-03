@@ -87,7 +87,7 @@ jobs:
           \`\`\`json
           {
             "mcpServers": {
-              "pal-mcp-server": {
+              "unison-mcp-server": {
                 "command": "docker",
                 "args": [
                   "run", "--rm", "-i",

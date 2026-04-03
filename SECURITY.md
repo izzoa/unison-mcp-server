@@ -9,14 +9,14 @@
 
 ## Important Disclaimer
 
-PAL MCP is an open-source Model Context Protocol (MCP) server that acts as middleware between AI clients (Claude Code, Codex CLI, Cursor, etc.) and various AI model providers.
+Unison MCP is an open-source Model Context Protocol (MCP) server that acts as middleware between AI clients (Claude Code, Codex CLI, Cursor, etc.) and various AI model providers.
 
 **Please understand the following:**
 
 - **No Warranty**: This software is provided "AS IS" under the Apache 2.0 License, without warranties of any kind. See the [LICENSE](LICENSE) file for full terms.
-- **User Responsibility**: The AI client (not PAL MCP) controls tool invocations and workflows. Users are responsible for reviewing AI-generated outputs and actions.
+- **User Responsibility**: The AI client (not Unison MCP) controls tool invocations and workflows. Users are responsible for reviewing AI-generated outputs and actions.
 - **API Key Security**: You are responsible for securing your own API keys. Never commit keys to version control or share them publicly.
-- **Third-Party Services**: PAL MCP connects to external AI providers (Google, OpenAI, Azure, etc.). Their terms of service and privacy policies apply to data sent through this server.
+- **Third-Party Services**: Unison MCP connects to external AI providers (Google, OpenAI, Azure, etc.). Their terms of service and privacy policies apply to data sent through this server.
 
 ## Reporting a Vulnerability
 
@@ -24,7 +24,7 @@ PAL MCP is an open-source Model Context Protocol (MCP) server that acts as middl
 
 ### Preferred Method
 
-Use [GitHub Security Advisories](https://github.com/BeehiveInnovations/pal-mcp-server/security/advisories/new) to report vulnerabilities privately.
+Use [GitHub Security Advisories](https://github.com/izzoa/unison-mcp-server/security/advisories/new) to report vulnerabilities privately.
 
 ### What to Include
 

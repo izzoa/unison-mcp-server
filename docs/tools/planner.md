@@ -19,7 +19,7 @@ The planner tool enables step-by-step thinking with incremental plan building:
 
 #### Pro Tip
 Claude supports `sub-tasks` where it will spawn and run separate background tasks. You can ask Claude to 
-run PAL's planner with two separate ideas. Then when it's done, use PAL's `consensus` tool to pass the entire
+run Unison's planner with two separate ideas. Then when it's done, use Unison's `consensus` tool to pass the entire
 plan and get expert perspective from two powerful AI models on which one to work on first! Like performing **AB** testing
 in one-go without the wait!
 
@@ -31,7 +31,7 @@ I implement first?
 ```
 
 ```
-Use pal's planner and show me how to add real-time notifications to our mobile app
+Use unison's planner and show me how to add real-time notifications to our mobile app
 ```
 
 ```
@@ -55,11 +55,11 @@ Using planner, plan the architecture for a new real-time chat system with 100k c
 ```
 
 ```
-Create a plan using pal for migrating our React app from JavaScript to TypeScript
+Create a plan using unison for migrating our React app from JavaScript to TypeScript
 ```
 
 ```
-Develop a plan using pal for implementing CI/CD pipelines across our development teams
+Develop a plan using unison for implementing CI/CD pipelines across our development teams
 ```
 
 ## Best Practices
@@ -73,10 +73,10 @@ Develop a plan using pal for implementing CI/CD pipelines across our development
 
 ## Continue With a New Plan
 
-Like all other tools in PAL, you can `continue` with a new plan using the output from a previous plan by simply saying
+Like all other tools in Unison, you can `continue` with a new plan using the output from a previous plan by simply saying
 
 ```
-Continue with pal's consensus tool and find out what o3:for and flash:against think of the plan 
+Continue with unison's consensus tool and find out what o3:for and flash:against think of the plan 
 ```
 
 You can mix and match and take one output and feed it into another, continuing from where you left off using a different 

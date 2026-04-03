@@ -1,6 +1,6 @@
 # Configuration Guide
 
-This guide covers all configuration options for the PAL MCP Server. The server is configured through environment variables defined in your `.env` file.
+This guide covers all configuration options for the Unison MCP Server. The server is configured through environment variables defined in your `.env` file.
 
 ## Quick Start Configuration
 
@@ -143,8 +143,8 @@ The `allow_code_generation` capability enables models to generate complete, prod
 
 **Typical Workflow:**
 1. You ask your AI agent to implement a complex new feature using `chat` with a higher-reasoning model such as **gpt-5.2-pro**
-2. GPT-5.2-Pro generates structured implementation and shares the complete implementation with PAL
-3. PAL saves the code to `pal_generated.code` and asks AI agent to implement the plan
+2. GPT-5.2-Pro generates structured implementation and shares the complete implementation with Unison
+3. Unison saves the code to `pal_generated.code` and asks AI agent to implement the plan
 4. AI agent continues from the previous context, reads the file, applies the implementation
 
 ### Thinking Mode Configuration

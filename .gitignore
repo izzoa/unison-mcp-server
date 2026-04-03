@@ -179,7 +179,7 @@ CLAUDE.local.md
 .claude/settings.local.json
 
 # Standalone mode files
-.pal_venv/
+.unison_venv/
 .docker_cleaned
 logs/
 *.backup

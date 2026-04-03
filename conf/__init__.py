@@ -1,1 +1,1 @@
-"""Configuration data for PAL MCP Server."""
+"""Configuration data for Unison MCP Server."""

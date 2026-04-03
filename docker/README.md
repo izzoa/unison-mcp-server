@@ -1,4 +1,4 @@
-# PAL MCP Server - Docker Setup
+# Unison MCP Server - Docker Setup
 
 ## Quick Start
 
@@ -22,7 +22,7 @@ nano .env
 
 ```bash
 # Build the Docker image
-docker build -t pal-mcp-server:latest .
+docker build -t unison-mcp-server:latest .
 
 # Or use the build script (Bash)
 chmod +x docker/scripts/build.sh
@@ -41,14 +41,14 @@ docker/scripts/build.ps1
 # Run with environment file
 docker run --rm -i --env-file .env \
   -v $(pwd)/logs:/app/logs \
-  pal-mcp-server:latest
+  unison-mcp-server:latest
 
 # Run with inline environment variables
 docker run --rm -i \
   -e GEMINI_API_KEY="your_key_here" \
   -e LOG_LEVEL=INFO \
   -v $(pwd)/logs:/app/logs \
-  pal-mcp-server:latest
+  unison-mcp-server:latest
 ```
 
 #### B. Docker Compose (For Development/Monitoring)
@@ -62,7 +62,7 @@ chmod +x docker/scripts/deploy.sh
 docker/scripts/deploy.ps1
 
 # Interactive stdio mode
-docker-compose exec pal-mcp python server.py
+docker-compose exec unison-mcp python server.py
 ```
 
 ## Service Management
@@ -76,8 +76,8 @@ docker ps
 # View logs from container
 docker logs <container_id>
 
-# Stop all pal-mcp containers
-docker stop $(docker ps -q --filter "ancestor=pal-mcp-server:latest")
+# Stop all unison-mcp containers
+docker stop $(docker ps -q --filter "ancestor=unison-mcp-server:latest")
 
 # Remove old containers and images
 docker container prune
@@ -88,20 +88,20 @@ docker image prune
 
 ```bash
 # View logs
-docker-compose logs -f pal-mcp
+docker-compose logs -f unison-mcp
 
 # Check status
 docker-compose ps
 
 # Restart service
-docker-compose restart pal-mcp
+docker-compose restart unison-mcp
 
 # Stop services
 docker-compose down
 
 # Rebuild and update
-docker-compose build --no-cache pal-mcp
-docker-compose up -d pal-mcp
+docker-compose build --no-cache unison-mcp
+docker-compose up -d unison-mcp
 ```
 
 ## Health Monitoring
@@ -117,19 +117,19 @@ The container includes health checks that verify:
 The Docker setup includes persistent volumes to preserve data between container runs:
 
 - **`./logs:/app/logs`** - Persistent log storage (local folder mount)
-- **`pal-mcp-config:/app/conf`** - Configuration persistence (named Docker volume)
+- **`unison-mcp-config:/app/conf`** - Configuration persistence (named Docker volume)
 - **`/etc/localtime:/etc/localtime:ro`** - Host timezone synchronization (read-only)
 
 ### How Persistent Volumes Work
 
-The `pal-mcp` service (used by `pal-docker-compose` and Docker Compose commands) mounts the named volume `pal-mcp-config` persistently. All data placed in `/app/conf` inside the container is preserved between runs thanks to this Docker volume.
+The `unison-mcp` service (used by `unison-docker-compose` and Docker Compose commands) mounts the named volume `unison-mcp-config` persistently. All data placed in `/app/conf` inside the container is preserved between runs thanks to this Docker volume.
 
 In the `docker-compose.yml` file, you will find:
 
 ```yaml
 volumes:
   - ./logs:/app/logs
-  - pal-mcp-config:/app/conf
+  - unison-mcp-config:/app/conf
   - /etc/localtime:/etc/localtime:ro
 ```
 
@@ -137,13 +137,13 @@ and the named volume definition:
 
 ```yaml
 volumes:
-  pal-mcp-config:
+  unison-mcp-config:
     driver: local
 ```
 
 ## Security
 
-- Runs as non-root user `paluser`
+- Runs as non-root user `unisonuser`
 - Read-only filesystem with tmpfs for temporary files
 - No network ports exposed (stdio communication only)
 - Secrets managed via environment variables
@@ -154,16 +154,16 @@ volumes:
 
 ```bash
 # Check if image exists
-docker images pal-mcp-server
+docker images unison-mcp-server
 
 # Test container interactively
-docker run --rm -it --env-file .env pal-mcp-server:latest bash
+docker run --rm -it --env-file .env unison-mcp-server:latest bash
 
 # Check environment variables
-docker run --rm --env-file .env pal-mcp-server:latest env | grep API
+docker run --rm --env-file .env unison-mcp-server:latest env | grep API
 
 # Test with minimal configuration
-docker run --rm -i -e GEMINI_API_KEY="test" pal-mcp-server:latest python server.py
+docker run --rm -i -e GEMINI_API_KEY="test" unison-mcp-server:latest python server.py
 ```
 
 ### MCP Connection Issues
@@ -173,7 +173,7 @@ docker run --rm -i -e GEMINI_API_KEY="test" pal-mcp-server:latest python server.
 docker run --rm hello-world
 
 # Verify container stdio
-echo '{"jsonrpc": "2.0", "method": "ping"}' | docker run --rm -i --env-file .env pal-mcp-server:latest python server.py
+echo '{"jsonrpc": "2.0", "method": "ping"}' | docker run --rm -i --env-file .env unison-mcp-server:latest python server.py
 
 # Check Claude Desktop logs for connection errors
 ```
@@ -182,10 +182,10 @@ echo '{"jsonrpc": "2.0", "method": "ping"}' | docker run --rm -i --env-file .env
 
 ```bash
 # Verify API keys are loaded
-docker run --rm --env-file .env pal-mcp-server:latest python -c "import os; print('GEMINI_API_KEY:', bool(os.getenv('GEMINI_API_KEY')))"
+docker run --rm --env-file .env unison-mcp-server:latest python -c "import os; print('GEMINI_API_KEY:', bool(os.getenv('GEMINI_API_KEY')))"
 
 # Test API connectivity
-docker run --rm --env-file .env pal-mcp-server:latest python /usr/local/bin/healthcheck.py
+docker run --rm --env-file .env unison-mcp-server:latest python /usr/local/bin/healthcheck.py
 ```
 
 ### Permission Issues
@@ -205,10 +205,10 @@ chmod 755 logs/
 docker stats
 
 # Run with memory limits
-docker run --rm -i --memory="512m" --env-file .env pal-mcp-server:latest
+docker run --rm -i --memory="512m" --env-file .env unison-mcp-server:latest
 
 # Monitor Docker logs
-docker run --rm -i --env-file .env pal-mcp-server:latest 2>&1 | tee docker.log
+docker run --rm -i --env-file .env unison-mcp-server:latest 2>&1 | tee docker.log
 ```
 
 ## MCP Integration (Claude Desktop)
@@ -218,17 +218,17 @@ docker run --rm -i --env-file .env pal-mcp-server:latest 2>&1 | tee docker.log
 ```json
 {
   "servers": {
-    "pal-docker": {
+    "unison-docker": {
       "command": "docker",
       "args": [
         "run",
         "--rm",
         "-i",
         "--env-file",
-        "/absolute/path/to/pal-mcp-server/.env",
+        "/absolute/path/to/unison-mcp-server/.env",
         "-v",
-        "/absolute/path/to/pal-mcp-server/logs:/app/logs",
-        "pal-mcp-server:latest"
+        "/absolute/path/to/unison-mcp-server/logs:/app/logs",
+        "unison-mcp-server:latest"
       ]
     }
   }
@@ -240,17 +240,17 @@ docker run --rm -i --env-file .env pal-mcp-server:latest 2>&1 | tee docker.log
 ```json
 {
   "servers": {
-    "pal-docker": {
+    "unison-docker": {
       "command": "docker",
       "args": [
         "run",
         "--rm",
         "-i",
         "--env-file",
-        "C:/Users/YourName/path/to/pal-mcp-server/.env",
+        "C:/Users/YourName/path/to/unison-mcp-server/.env",
         "-v",
-        "C:/Users/YourName/path/to/pal-mcp-server/logs:/app/logs",
-        "pal-mcp-server:latest"
+        "C:/Users/YourName/path/to/unison-mcp-server/logs:/app/logs",
+        "unison-mcp-server:latest"
       ]
     }
   }
@@ -262,14 +262,14 @@ docker run --rm -i --env-file .env pal-mcp-server:latest 2>&1 | tee docker.log
 ```json
 {
   "servers": {
-    "pal-docker": {
+    "unison-docker": {
       "command": "docker-compose",
       "args": [
         "-f",
-        "/absolute/path/to/pal-mcp-server/docker-compose.yml",
+        "/absolute/path/to/unison-mcp-server/docker-compose.yml",
         "run",
         "--rm",
-        "pal-mcp"
+        "unison-mcp"
       ]
     }
   }
@@ -304,10 +304,10 @@ CUSTOM_API_URL=
 
 ```bash
 # Test container starts correctly
-docker run --rm pal-mcp-server:latest python --version
+docker run --rm unison-mcp-server:latest python --version
 
 # Test health check
-docker run --rm -e GEMINI_API_KEY="test" pal-mcp-server:latest python /usr/local/bin/healthcheck.py
+docker run --rm -e GEMINI_API_KEY="test" unison-mcp-server:latest python /usr/local/bin/healthcheck.py
 ```
 
 ### 2. Test MCP Protocol
@@ -315,7 +315,7 @@ docker run --rm -e GEMINI_API_KEY="test" pal-mcp-server:latest python /usr/local
 ```bash
 # Test basic MCP communication
 echo '{"jsonrpc": "2.0", "method": "initialize", "params": {}}' | \
-  docker run --rm -i --env-file .env pal-mcp-server:latest python server.py
+  docker run --rm -i --env-file .env unison-mcp-server:latest python server.py
 ```
 
 ### 3. Validate Configuration
@@ -330,7 +330,7 @@ python -m json.tool .vscode/mcp.json
 
 ## Available Tools
 
-The PAL MCP Server provides these tools when properly configured:
+The Unison MCP Server provides these tools when properly configured:
 
 - **chat** - General AI conversation and collaboration
 - **thinkdeep** - Multi-stage investigation and reasoning  

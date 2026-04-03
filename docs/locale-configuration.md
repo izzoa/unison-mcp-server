@@ -1,4 +1,4 @@
-# Locale Configuration for PAL MCP Server
+# Locale Configuration for Unison MCP Server
 
 This guide explains how to configure and use the localization feature to customize the language of responses from MCP tools.
 

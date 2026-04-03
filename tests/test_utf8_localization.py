@@ -237,7 +237,7 @@ def generate_report():
 
     def test_emoji_preservation(self):
         """Test emoji preservation in JSON encoding."""
-        # Emojis used in PAL MCP tools
+        # Emojis used in Unison MCP tools
         emojis = [
             "🔴",  # Critical
             "🟠",  # High

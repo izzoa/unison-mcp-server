@@ -1,7 +1,7 @@
 """
-Configuration and constants for PAL MCP Server
+Configuration and constants for Unison MCP Server
 
-This module centralizes all configuration settings for the PAL MCP Server.
+This module centralizes all configuration settings for the Unison MCP Server.
 It defines model configurations, token limits, temperature defaults, and other
 constants used throughout the application.
 

@@ -1,6 +1,6 @@
-# PAL MCP Server Documentation
+# Unison MCP Server Documentation
 
-_Formerly known as PAL MCP. See the short [name change note](name-change.md) for context._
+_Formerly known as PAL MCP (and before that, Zen MCP). See the short [name change note](name-change.md) for context._
 
 | Document | Description |
 |----------|-------------|

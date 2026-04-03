@@ -33,7 +33,7 @@ class TestUvxEnvironmentHandling:
 
             with tempfile.NamedTemporaryFile("w", delete=False) as tmp_env:
                 temp_env_path = Path(tmp_env.name)
-                tmp_env.write("PAL_MCP_FORCE_ENV_OVERRIDE=false\n")
+                tmp_env.write("UNISON_MCP_FORCE_ENV_OVERRIDE=false\n")
 
             try:
                 importlib.reload(env_config)
@@ -82,7 +82,7 @@ class TestUvxEnvironmentHandling:
     def test_environment_variables_still_work_without_dotenv(self):
         """Test that environment variables work even when dotenv is not available."""
         # Set a test environment variable
-        test_key = "TEST_PAL_MCP_VAR"
+        test_key = "TEST_UNISON_MCP_VAR"
         test_value = "test_value_123"
 
         with mock.patch.dict(os.environ, {test_key: test_value}):
@@ -133,14 +133,14 @@ class TestUvxProjectConfiguration:
 
         # Essential fields for uvx
         assert "name" in project
-        assert project["name"] == "pal-mcp-server"
+        assert project["name"] == "unison-mcp-server"
         assert "dependencies" in project
         assert "requires-python" in project
 
         # Script entry point for uvx
         assert "scripts" in project
-        assert "pal-mcp-server" in project["scripts"]
-        assert project["scripts"]["pal-mcp-server"] == "server:run"
+        assert "unison-mcp-server" in project["scripts"]
+        assert project["scripts"]["unison-mcp-server"] == "server:run"
 
     def test_pyproject_dependencies_match_requirements(self):
         """Test that pyproject.toml dependencies align with requirements.txt."""

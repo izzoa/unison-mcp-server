@@ -335,7 +335,7 @@ Pour plus de détails sur chaque problème identifié, consultez les recommandat
 - [ ] Exécuter les tests de régression
 
 ---
-*Analyse générée automatiquement par MCP PAL* 🤖
+*Analyse générée automatiquement par MCP Unison* 🤖
 """,
             "metadata": {
                 "tool_name": "analyze",
@@ -459,13 +459,13 @@ def run_unit_tests():
 
 def main():
     """Main function."""
-    print("🇫🇷 UTF-8 Integration Test - PAL MCP Server")
+    print("🇫🇷 UTF-8 Integration Test - Unison MCP Server")
     print("=" * 60)
 
     try:
         run_utf8_integration_tests()
         print("\n🎉 SUCCESS: All UTF-8 integration tests passed!")
-        print("🚀 PAL MCP Server fully supports French localization!")
+        print("🚀 Unison MCP Server fully supports French localization!")
         return 0
 
     except AssertionError as e:

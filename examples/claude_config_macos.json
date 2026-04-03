@@ -3,9 +3,9 @@
   "comment2": "Run './run-server.sh' to set up the environment and get exact paths",
   "comment3": "Use './run-server.sh -c' to display the correct configuration",
   "mcpServers": {
-    "pal": {
-      "command": "/path/to/pal-mcp-server/.pal_venv/bin/python",
-      "args": ["/path/to/pal-mcp-server/server.py"]
+    "unison": {
+      "command": "/path/to/unison-mcp-server/.unison_venv/bin/python",
+      "args": ["/path/to/unison-mcp-server/server.py"]
     }
   }
 }

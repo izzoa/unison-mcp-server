@@ -1,11 +1,11 @@
 {
-  "comment": "Example Claude Desktop configuration for PAL MCP Server",
+  "comment": "Example Claude Desktop configuration for Unison MCP Server",
   "comment2": "Run './run-server.sh -c' to get the exact configuration for your system",
   "comment3": "For platform-specific examples, see the examples/ directory",
   "mcpServers": {
-    "pal": {
-      "command": "/path/to/pal-mcp-server/.pal_venv/bin/python",
-      "args": ["/path/to/pal-mcp-server/server.py"]
+    "unison": {
+      "command": "/path/to/unison-mcp-server/.unison_venv/bin/python",
+      "args": ["/path/to/unison-mcp-server/server.py"]
     }
   }
 }

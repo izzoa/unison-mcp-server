@@ -1,6 +1,6 @@
 # Advanced Usage Guide
 
-This guide covers advanced features, configuration options, and workflows for power users of the PAL MCP server.
+This guide covers advanced features, configuration options, and workflows for power users of the Unison MCP server.
 
 ## Table of Contents
 
@@ -151,7 +151,7 @@ These only apply to models that support customizing token usage for extended thi
 "Get o3 to do a security review of auth/ with thinking mode high"
 
 # Complex debugging, letting claude pick the best model
-"Use pal to debug this race condition with max thinking mode"
+"Use unison to debug this race condition with max thinking mode"
 
 # Architecture analysis with Gemini 3.0 Pro
 "Analyze the entire src/ directory architecture with high thinking using pro"
@@ -259,7 +259,7 @@ All tools that work with files support **both individual files and entire direct
 
 ## Context Revival: AI Memory Beyond Context Limits
 
-**The PAL MCP Server's most revolutionary feature** is its ability to maintain conversation context even after Claude's memory resets. This enables truly persistent AI collaboration across multiple sessions and context boundaries.
+**The Unison MCP Server's most revolutionary feature** is its ability to maintain conversation context even after Claude's memory resets. This enables truly persistent AI collaboration across multiple sessions and context boundaries.
 
 ### **The Breakthrough**
 
@@ -308,15 +308,15 @@ Take a look at these log files saved under subfolder/diagnostics.log there's a b
 crashes at launch. Think hard and go over each line, tallying it with corresponding code within the project. After
 you've performed initial investigation, ask gemini pro to analyze the log files and the related code where you 
 suspect lies the bug and then formulate and implement a bare minimal fix. Must not regress. Perform a precommit
-with pal in the end using gemini pro to confirm we're okay to publish the fix 
+with unison in the end using gemini pro to confirm we're okay to publish the fix 
 ```
 
 ### Refactor → Review → Implement → Test
 ```
-Use pal to analyze this legacy authentication module for decomposition opportunities. The code is getting hard to 
+Use unison to analyze this legacy authentication module for decomposition opportunities. The code is getting hard to 
 maintain and we need to break it down. Use gemini pro with high thinking mode to identify code smells and suggest 
 a modernization strategy. After reviewing the refactoring plan, implement the changes step by step and then 
-generate comprehensive tests with pal to ensure nothing breaks.
+generate comprehensive tests with unison to ensure nothing breaks.
 ```
 
 ### Tool Selection Guidance
@@ -341,7 +341,7 @@ To help choose the right tool for your needs:
 
 ## Vision Support
 
-The PAL MCP server supports vision-capable models for analyzing images, diagrams, screenshots, and visual content. Vision support works seamlessly with all tools and conversation threading.
+The Unison MCP server supports vision-capable models for analyzing images, diagrams, screenshots, and visual content. Vision support works seamlessly with all tools and conversation threading.
 
 **Supported Models:**
 - **Gemini 3.0 Pro & Flash**: Excellent for diagrams, architecture analysis, UI mockups (up to 20MB total)
@@ -352,7 +352,7 @@ The PAL MCP server supports vision-capable models for analyzing images, diagrams
 **Usage Examples:**
 ```bash
 # Debug with error screenshots
-"Use pal to debug this error with the stack trace screenshot and error.py"
+"Use unison to debug this error with the stack trace screenshot and error.py"
 
 # Architecture analysis with diagrams  
 "Analyze this system architecture diagram with gemini pro for bottlenecks"
@@ -397,7 +397,7 @@ The MCP protocol has a combined request+response limit of approximately 25K toke
 User: "Use gemini to review this code: [50,000+ character detailed analysis]"
 
 # Server detects the large prompt and responds:
-PAL MCP: "The prompt is too large for MCP's token limits (>50,000 characters). 
+Unison MCP: "The prompt is too large for MCP's token limits (>50,000 characters). 
 Please save the prompt text to a temporary file named 'prompt.txt' and resend 
 the request with an empty prompt string and the absolute file path included 
 in the absolute_file_paths parameter, along with any other files you wish to share as context."

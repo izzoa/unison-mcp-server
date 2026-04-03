@@ -1,9 +1,9 @@
 ﻿<#
 .SYNOPSIS
-    Installation, configuration, and launch script for PAL MCP server on Windows.
+    Installation, configuration, and launch script for Unison MCP server on Windows.
 
 .DESCRIPTION
-    This PowerShell script prepares the environment for the PAL MCP server:
+    This PowerShell script prepares the environment for the Unison MCP server:
     - Installs and checks Python 3.10+ (with venv or uv if available)
     - Installs required Python dependencies
     - Configures environment files (.env)
@@ -17,7 +17,7 @@
     Shows script help.
 
 .PARAMETER Version
-    Shows PAL MCP server version.
+    Shows Unison MCP server version.
 
 .PARAMETER Follow
     Follows server logs in real time.
@@ -48,7 +48,7 @@
 
 .EXAMPLE
     .\run-server.ps1
-    Prepares the environment and starts the PAL MCP server.
+    Prepares the environment and starts the Unison MCP server.
 
     .\run-server.ps1 -Follow
     Follows server logs in real time.
@@ -73,7 +73,7 @@
     Script Author      : GiGiDKR (https://github.com/GiGiDKR)
     Date               : 07-05-2025
     Version            : See config.py (__version__)
-    References         : https://github.com/BeehiveInnovations/pal-mcp-server
+    References         : https://github.com/izzoa/unison-mcp-server
 
 #>
 #Requires -Version 5.1
@@ -93,7 +93,7 @@ param(
 )
 
 # ============================================================================
-# PAL MCP Server Setup Script for Windows
+# Unison MCP Server Setup Script for Windows
 # 
 # A Windows-compatible setup script that handles environment setup, 
 # dependency installation, and configuration.
@@ -106,12 +106,12 @@ $ErrorActionPreference = "Stop"
 # Constants and Configuration  
 # ----------------------------------------------------------------------------
 
-$script:VENV_PATH = ".pal_venv"
+$script:VENV_PATH = ".unison_venv"
 $script:DOCKER_CLEANED_FLAG = ".docker_cleaned"
 $script:DESKTOP_CONFIG_FLAG = ".desktop_configured"
 $script:LOG_DIR = "logs"
 $script:LOG_FILE = "mcp_server.log"
-$script:LegacyServerNames = @("zen", "zen-mcp", "zen-mcp-server", "zen_mcp", "zen_mcp_server")
+$script:LegacyServerNames = @("zen", "zen-mcp", "zen-mcp-server", "zen_mcp", "zen_mcp_server", "pal", "pal-mcp", "pal-mcp-server", "pal_mcp", "pal_mcp_server")
 
 # ----------------------------------------------------------------------------
 # Utility Functions
@@ -408,9 +408,9 @@ function Cleanup-Docker {
     $containers = @(
         "gemini-mcp-server",
         "gemini-mcp-redis", 
-        "pal-mcp-server",
-        "pal-mcp-redis",
-        "pal-mcp-log-monitor"
+        "unison-mcp-server",
+        "unison-mcp-redis",
+        "unison-mcp-log-monitor"
     )
     
     # Remove containers
@@ -433,7 +433,7 @@ function Cleanup-Docker {
     }
     
     # Remove images
-    $images = @("gemini-mcp-server:latest", "pal-mcp-server:latest")
+    $images = @("gemini-mcp-server:latest", "unison-mcp-server:latest")
     foreach ($image in $images) {
         try {
             $exists = docker images --format "{{.Repository}}:{{.Tag}}" | Where-Object { $_ -eq $image }
@@ -812,7 +812,7 @@ function Build-DockerImage {
     
     # Check if image exists
     try {
-        $imageExists = docker images --format "{{.Repository}}:{{.Tag}}" | Where-Object { $_ -eq "pal-mcp-server:latest" }
+        $imageExists = docker images --format "{{.Repository}}:{{.Tag}}" | Where-Object { $_ -eq "unison-mcp-server:latest" }
         if ($imageExists -and !$Force) {
             Write-Success "Docker image already exists. Use -Force to rebuild."
             return $true
@@ -825,7 +825,7 @@ function Build-DockerImage {
     if ($Force -and $imageExists) {
         Write-Info "Forcing rebuild of Docker image..."
         try {
-            docker rmi pal-mcp-server:latest 2>$null
+            docker rmi unison-mcp-server:latest 2>$null
         }
         catch {
             Write-Warning "Could not remove existing image, continuing..."
@@ -840,7 +840,7 @@ function Build-DockerImage {
             Write-Info "Building with development support..."
         }
         
-        docker build -t pal-mcp-server:latest .
+        docker build -t unison-mcp-server:latest .
         if ($LASTEXITCODE -ne 0) {
             throw "Docker build failed"
         }
@@ -927,7 +927,7 @@ function Start-DockerServices {
         }
         
         # Start services
-        Write-Info "Starting PAL MCP Server with Docker Compose..."
+        Write-Info "Starting Unison MCP Server with Docker Compose..."
         if (Test-Command "docker-compose") {
             if ($Follow) {
                 docker-compose up --build
@@ -951,10 +951,10 @@ function Start-DockerServices {
         
         if (!$Follow) {
             Write-Success "Docker services started successfully"
-            Write-Info "Container name: pal-mcp-server"
+            Write-Info "Container name: unison-mcp-server"
             Write-Host ""
             Write-Host "To view logs: " -NoNewline
-            Write-Host "docker logs -f pal-mcp-server" -ForegroundColor Yellow
+            Write-Host "docker logs -f unison-mcp-server" -ForegroundColor Yellow
             Write-Host "To stop: " -NoNewline
             Write-Host "docker-compose down" -ForegroundColor Yellow
         }
@@ -970,7 +970,7 @@ function Start-DockerServices {
 # Get Docker container status
 function Get-DockerStatus {
     try {
-        $containerStatus = docker ps --filter "name=pal-mcp-server" --format "{{.Status}}"
+        $containerStatus = docker ps --filter "name=unison-mcp-server" --format "{{.Status}}"
         if ($containerStatus) {
             Write-Success "Container status: $containerStatus"
             return $true
@@ -1044,7 +1044,7 @@ $script:McpClientDefinitions = @(
         DetectionPath  = "$env:APPDATA\Claude\claude_desktop_config.json"
         DetectionType  = "Path"
         ConfigPath     = "$env:APPDATA\Claude\claude_desktop_config.json"
-        ConfigJsonPath = "mcpServers.pal"
+        ConfigJsonPath = "mcpServers.unison"
         NeedsConfigDir = $true
     },
     @{
@@ -1052,7 +1052,7 @@ $script:McpClientDefinitions = @(
         DetectionCommand = "code"
         DetectionType    = "Command"
         ConfigPath       = "$env:APPDATA\Code\User\settings.json"
-        ConfigJsonPath   = "mcp.servers.pal"
+        ConfigJsonPath   = "mcp.servers.unison"
         IsVSCode         = $true
     },
     @{
@@ -1060,7 +1060,7 @@ $script:McpClientDefinitions = @(
         DetectionCommand = "code-insiders"
         DetectionType    = "Command"
         ConfigPath       = "$env:APPDATA\Code - Insiders\User\mcp.json"
-        ConfigJsonPath   = "servers.pal"
+        ConfigJsonPath   = "servers.unison"
         IsVSCodeInsiders = $true
     },
     @{
@@ -1068,28 +1068,28 @@ $script:McpClientDefinitions = @(
         DetectionCommand = "cursor"
         DetectionType    = "Command"
         ConfigPath       = "$env:USERPROFILE\.cursor\mcp.json"
-        ConfigJsonPath   = "mcpServers.pal"
+        ConfigJsonPath   = "mcpServers.unison"
     },
     @{
         Name           = "Windsurf"
         DetectionPath  = "$env:USERPROFILE\.codeium\windsurf"
         DetectionType  = "Path"
         ConfigPath     = "$env:USERPROFILE\.codeium\windsurf\mcp_config.json"
-        ConfigJsonPath = "mcpServers.pal"
+        ConfigJsonPath = "mcpServers.unison"
     },
     @{
         Name           = "Trae"
         DetectionPath  = "$env:APPDATA\Trae"
         DetectionType  = "Path"
         ConfigPath     = "$env:APPDATA\Trae\User\mcp.json"
-        ConfigJsonPath = "mcpServers.pal"
+        ConfigJsonPath = "mcpServers.unison"
     }
 )
 
 # Docker MCP configuration template (legacy, kept for backward compatibility)
 $script:DockerMcpConfig = @{
     command = "docker"
-    args    = @("exec", "-i", "pal-mcp-server", "python", "server.py")
+    args    = @("exec", "-i", "unison-mcp-server", "python", "server.py")
     type    = "stdio"
 }
 
@@ -1102,7 +1102,7 @@ function Get-DockerMcpConfigRun {
     
     return @{
         command = "docker"
-        args    = @("run", "--rm", "-i", "--env-file", $envFile, "pal-mcp-server:latest", "python", "server.py")
+        args    = @("run", "--rm", "-i", "--env-file", $envFile, "unison-mcp-server:latest", "python", "server.py")
         type    = "stdio"
     }
 }
@@ -1129,7 +1129,7 @@ function Test-McpJsonFormat {
 function Test-VSCodeInsidersFormat {
     param([hashtable]$Client)
     
-    return $Client.IsVSCodeInsiders -eq $true -and $Client.ConfigJsonPath -eq "servers.pal"
+    return $Client.IsVSCodeInsiders -eq $true -and $Client.ConfigJsonPath -eq "servers.unison"
 }
 
 # Analyze existing MCP configuration to determine type (Python or Docker)
@@ -1159,7 +1159,7 @@ function Get-ExistingMcpConfigType {
             }
         }
         
-        # Navigate to pal configuration
+        # Navigate to unison configuration
         $pathParts = $Client.ConfigJsonPath.Split('.')
         $palKey = $pathParts[-1]
         $parentPath = $pathParts[0..($pathParts.Length - 2)]
@@ -1180,7 +1180,7 @@ function Get-ExistingMcpConfigType {
             return @{
                 Exists  = $false
                 Type    = "None"
-                Details = "PAL configuration not found"
+                Details = "Unison configuration not found"
             }
         }
         
@@ -1218,8 +1218,8 @@ function Get-ExistingMcpConfigType {
             $pythonType = "Python"
             $details = "Python virtual environment"
             
-            if ($palConfig.command.Contains(".pal_venv")) {
-                $details = "Python (pal virtual environment)"
+            if ($palConfig.command.Contains(".unison_venv")) {
+                $details = "Python (unison virtual environment)"
             }
             elseif ($palConfig.command.Contains("venv")) {
                 $details = "Python (virtual environment)"
@@ -1363,7 +1363,7 @@ function Configure-McpClient {
     $newConfigType = if ($UseDocker) { "Docker" } else { "Python" }
     
     if ($existingConfig.Exists) {
-        Write-Info "Found existing PAL MCP configuration in $($Client.Name)"
+        Write-Info "Found existing Unison MCP configuration in $($Client.Name)"
         Write-Info "  Current: $($existingConfig.Details)"
         Write-Info "  New: $newConfigType configuration"
         
@@ -1386,7 +1386,7 @@ function Configure-McpClient {
     }
     else {
         # User confirmation for new installation
-        $response = Read-Host "`nConfigure PAL MCP for $($Client.Name) (mode: $newConfigType)? (y/N)"
+        $response = Read-Host "`nConfigure Unison MCP for $($Client.Name) (mode: $newConfigType)? (y/N)"
         if ($response -ne 'y' -and $response -ne 'Y') {
             Write-Info "Skipping $($Client.Name) integration"
             return
@@ -1469,7 +1469,7 @@ function Configure-McpClient {
         # Remove legacy zen entries to avoid duplicate or broken MCP servers
         $legacyRemoved = Remove-LegacyServerKeys $targetObject
         if ($legacyRemoved) {
-            Write-Info "Removed legacy MCP entries (zen → pal)"
+            Write-Info "Removed legacy MCP entries (zen → unison)"
         }
 
         $targetObject | Add-Member -MemberType NoteProperty -Name $palKey -Value $serverConfig -Force
@@ -1526,24 +1526,24 @@ function Test-ClaudeCliIntegration {
     
     try {
         $claudeConfig = claude mcp list 2>$null
-        if ($claudeConfig -match "pal") {
-            Write-Success "Claude CLI already configured for pal server"
+        if ($claudeConfig -match "unison") {
+            Write-Success "Claude CLI already configured for unison server"
         }
         else {
-            Write-Info "To add pal server to Claude CLI, run:"
-            Write-Host "  claude mcp add -s user pal $PythonPath $ServerPath" -ForegroundColor Cyan
+            Write-Info "To add unison server to Claude CLI, run:"
+            Write-Host "  claude mcp add -s user unison $PythonPath $ServerPath" -ForegroundColor Cyan
         }
     }
     catch {
         Write-Info "To configure Claude CLI manually, run:"
-        Write-Host "  claude mcp add -s user pal $PythonPath $ServerPath" -ForegroundColor Cyan
+        Write-Host "  claude mcp add -s user unison $PythonPath $ServerPath" -ForegroundColor Cyan
     }
 }
 
 function Test-GeminiCliIntegration {
     param([string]$ScriptDir)
     
-    $palWrapper = Join-Path $ScriptDir "pal-mcp-server.cmd"
+    $palWrapper = Join-Path $ScriptDir "unison-mcp-server.cmd"
     
     # Check if Gemini settings file exists (Windows path)
     $geminiConfig = "$env:USERPROFILE\.gemini\settings.json"
@@ -1566,7 +1566,7 @@ function Test-GeminiCliIntegration {
     }
 
     $legacyRemoved = Remove-LegacyServerKeys $config.mcpServers
-    $palConfig = $config.mcpServers.pal
+    $palConfig = $config.mcpServers.unison
     $needsWrite = $legacyRemoved
 
     if ($palConfig) {
@@ -1580,13 +1580,13 @@ function Test-GeminiCliIntegration {
             @"
 @echo off
 cd /d "%~dp0"
-if exist ".pal_venv\Scripts\python.exe" (
-    .pal_venv\Scripts\python.exe server.py %*
+if exist ".unison_venv\Scripts\python.exe" (
+    .unison_venv\Scripts\python.exe server.py %*
 ) else (
     python server.py %*
 )
 "@ | Out-File -FilePath $palWrapper -Encoding ASCII
-            Write-Success "Created pal-mcp-server.cmd wrapper script"
+            Write-Success "Created unison-mcp-server.cmd wrapper script"
         }
 
         if ($needsWrite) {
@@ -1594,14 +1594,14 @@ if exist ".pal_venv\Scripts\python.exe" (
             $config | ConvertTo-Json -Depth 10 | Out-File $geminiConfig -Encoding UTF8
             Write-Success "Updated Gemini CLI configuration (cleaned legacy entries)"
             Write-Host "  Config: $geminiConfig" -ForegroundColor Gray
-            Write-Host "  Restart Gemini CLI to use PAL MCP Server" -ForegroundColor Gray
+            Write-Host "  Restart Gemini CLI to use Unison MCP Server" -ForegroundColor Gray
         }
         return
     }
 
-    # Ask user if they want to add PAL to Gemini CLI
+    # Ask user if they want to add Unison to Gemini CLI
     Write-Host ""
-    $response = Read-Host "Configure PAL for Gemini CLI? (y/N)"
+    $response = Read-Host "Configure Unison for Gemini CLI? (y/N)"
     if ($response -ne 'y' -and $response -ne 'Y') {
         Write-Info "Skipping Gemini CLI integration"
         return
@@ -1613,14 +1613,14 @@ if exist ".pal_venv\Scripts\python.exe" (
         @"
 @echo off
 cd /d "%~dp0"
-if exist ".pal_venv\Scripts\python.exe" (
-    .pal_venv\Scripts\python.exe server.py %*
+if exist ".unison_venv\Scripts\python.exe" (
+    .unison_venv\Scripts\python.exe server.py %*
 ) else (
     python server.py %*
 )
 "@ | Out-File -FilePath $palWrapper -Encoding ASCII
         
-        Write-Success "Created pal-mcp-server.cmd wrapper script"
+        Write-Success "Created unison-mcp-server.cmd wrapper script"
     }
     
     # Update Gemini settings
@@ -1635,19 +1635,19 @@ if exist ".pal_venv\Scripts\python.exe" (
             $config.mcpServers = [ordered]@{}
         }
         
-        # Add pal server
+        # Add unison server
         $palConfig = @{
             command = $palWrapper
         }
         
-        $config.mcpServers | Add-Member -MemberType NoteProperty -Name "pal" -Value $palConfig -Force
+        $config.mcpServers | Add-Member -MemberType NoteProperty -Name "unison" -Value $palConfig -Force
         
         # Write updated config
         $config | ConvertTo-Json -Depth 10 | Out-File $geminiConfig -Encoding UTF8
         
         Write-Success "Successfully configured Gemini CLI"
         Write-Host "  Config: $geminiConfig" -ForegroundColor Gray
-        Write-Host "  Restart Gemini CLI to use PAL MCP Server" -ForegroundColor Gray
+        Write-Host "  Restart Gemini CLI to use Unison MCP Server" -ForegroundColor Gray
         
     }
     catch {
@@ -1658,7 +1658,7 @@ if exist ".pal_venv\Scripts\python.exe" (
         Write-Host @"
 {
   "mcpServers": {
-    "pal": {
+    "unison": {
       "command": "$palWrapper"
     }
   }
@@ -1687,7 +1687,7 @@ function Show-QwenManualConfig {
 
         Write-Host "{" -ForegroundColor Yellow
         Write-Host "  \"mcpServers\": {" -ForegroundColor Yellow
-        Write-Host "    \"pal\": {" -ForegroundColor Yellow
+        Write-Host "    \"unison\": {" -ForegroundColor Yellow
         Write-Host "      \"command\": \"$PythonPath\"," -ForegroundColor Yellow
         Write-Host "      \"args\": [\"$ServerPath\"]," -ForegroundColor Yellow
         Write-Host "      \"cwd\": \"$ScriptDir\"," -ForegroundColor Yellow
@@ -1701,7 +1701,7 @@ function Show-QwenManualConfig {
     else {
         Write-Host "{" -ForegroundColor Yellow
         Write-Host "  \"mcpServers\": {" -ForegroundColor Yellow
-        Write-Host "    \"pal\": {" -ForegroundColor Yellow
+        Write-Host "    \"unison\": {" -ForegroundColor Yellow
         Write-Host "      \"command\": \"$PythonPath\"," -ForegroundColor Yellow
         Write-Host "      \"args\": [\"$ServerPath\"]," -ForegroundColor Yellow
         Write-Host "      \"cwd\": \"$ScriptDir\"" -ForegroundColor Yellow
@@ -1743,8 +1743,8 @@ function Test-QwenCliIntegration {
             if ($config.ContainsKey('mcpServers') -and $config['mcpServers'] -is [System.Collections.IDictionary]) {
                 $servers = $config['mcpServers']
                 $legacyRemoved = (Remove-LegacyServerKeys $servers) -or $legacyRemoved
-                if ($servers.Contains('pal') -and $servers['pal'] -is [System.Collections.IDictionary]) {
-                    $palConfig = $servers['pal']
+                if ($servers.Contains('unison') -and $servers['unison'] -is [System.Collections.IDictionary]) {
+                    $palConfig = $servers['unison']
                     $commandMatches = ($palConfig['command'] -eq $PythonPath)
 
                     $argsValue = $palConfig['args']
@@ -1810,7 +1810,7 @@ function Test-QwenCliIntegration {
         "AZURE_OPENAI_API_KEY", "AZURE_OPENAI_ENDPOINT", "AZURE_OPENAI_API_VERSION", "AZURE_OPENAI_ALLOWED_MODELS", "AZURE_MODELS_CONFIG_PATH",
         "CUSTOM_API_URL", "CUSTOM_API_KEY", "CUSTOM_MODEL_NAME", "DEFAULT_MODEL", "GOOGLE_ALLOWED_MODELS",
         "OPENAI_ALLOWED_MODELS", "OPENROUTER_ALLOWED_MODELS", "XAI_ALLOWED_MODELS", "DEFAULT_THINKING_MODE_THINKDEEP",
-        "DISABLED_TOOLS", "CONVERSATION_TIMEOUT_HOURS", "MAX_CONVERSATION_TURNS", "LOG_LEVEL", "PAL_MCP_FORCE_ENV_OVERRIDE"
+        "DISABLED_TOOLS", "CONVERSATION_TIMEOUT_HOURS", "MAX_CONVERSATION_TURNS", "LOG_LEVEL", "UNISON_MCP_FORCE_ENV_OVERRIDE"
     )
 
     foreach ($key in $extraKeys) {
@@ -1823,7 +1823,7 @@ function Test-QwenCliIntegration {
     }
 
     if ($configStatus -eq "match") {
-        Write-Success "Qwen CLI already configured for pal server"
+        Write-Success "Qwen CLI already configured for unison server"
         return
     }
 
@@ -1832,12 +1832,12 @@ function Test-QwenCliIntegration {
         $skipPrompt = $true
     }
 
-    $prompt = "Configure PAL for Qwen CLI? (y/N)"
+    $prompt = "Configure Unison for Qwen CLI? (y/N)"
     if ($configStatus -eq "cleanup") {
         $prompt = "Remove legacy Qwen MCP entries and refresh configuration? (Y/n)"
     }
     elseif ($configStatus -eq "mismatch" -or $configStatus -eq "invalid") {
-        $prompt = "Update Qwen CLI pal configuration? (y/N)"
+        $prompt = "Update Qwen CLI unison configuration? (y/N)"
     }
 
     if (-not $skipPrompt) {
@@ -1876,14 +1876,14 @@ function Test-QwenCliIntegration {
             $palConfig['env'] = $envMap
         }
 
-        $config['mcpServers']['pal'] = $palConfig
+        $config['mcpServers']['unison'] = $palConfig
 
         $json = ($config | ConvertTo-Json -Depth 20)
         Set-Content -Path $configPath -Value $json -Encoding UTF8
 
         Write-Success "Successfully configured Qwen CLI"
         Write-Host "  Config: $configPath" -ForegroundColor Gray
-        Write-Host "  Restart Qwen CLI to use PAL MCP Server" -ForegroundColor Gray
+        Write-Host "  Restart Qwen CLI to use Unison MCP Server" -ForegroundColor Gray
     }
     catch {
         Write-Error "Failed to update Qwen CLI configuration: $_"
@@ -1903,7 +1903,7 @@ function Test-QwenCliIntegration {
 # Show script help
 function Show-Help {
     Write-Host @"
-PAL MCP Server - Setup and Launch Script
+Unison MCP Server - Setup and Launch Script
 
 USAGE:
 .\run-server.ps1 [OPTIONS]
@@ -1928,17 +1928,17 @@ EXAMPLES:
 .\run-server.ps1 -Docker              # Use Docker deployment
 .\run-server.ps1 -Docker -Follow      # Docker with log following
 
-For more information, visit: https://github.com/BeehiveInnovations/pal-mcp-server
+For more information, visit: https://github.com/izzoa/unison-mcp-server
 "@ -ForegroundColor White
 }
 
 # Show version information
 function Show-Version {
     $version = Get-Version
-    Write-Host "PAL MCP Server version: $version" -ForegroundColor Green
+    Write-Host "Unison MCP Server version: $version" -ForegroundColor Green
     Write-Host "PowerShell Setup Script for Windows" -ForegroundColor Cyan
     Write-Host "Author: GiGiDKR (https://github.com/GiGiDKR)" -ForegroundColor Gray
-    Write-Host "Project: BeehiveInnovations/pal-mcp-server" -ForegroundColor Gray
+    Write-Host "Project: izzoa/unison-mcp-server" -ForegroundColor Gray
 }
 
 # Show configuration instructions
@@ -1976,7 +1976,7 @@ function Show-ConfigInstructions {
     Write-Host "✓ Qwen CLI" -ForegroundColor White
     Write-Host ""
     Write-Host "The script automatically detects and configures compatible clients." -ForegroundColor Gray
-    Write-Host "Restart your MCP clients after configuration to use the PAL MCP Server." -ForegroundColor Yellow
+    Write-Host "Restart your MCP clients after configuration to use the Unison MCP Server." -ForegroundColor Yellow
 }
 
 # Show setup instructions
@@ -1990,11 +1990,11 @@ function Show-SetupInstructions {
     Write-Step "Setup Complete"
     
     if ($UseDocker) {
-        Write-Success "PAL MCP Server is configured for Docker deployment"
-        Write-Host "Docker command: docker exec -i pal-mcp-server python server.py" -ForegroundColor Cyan
+        Write-Success "Unison MCP Server is configured for Docker deployment"
+        Write-Host "Docker command: docker exec -i unison-mcp-server python server.py" -ForegroundColor Cyan
     }
     else {
-        Write-Success "PAL MCP Server is configured for Python virtual environment"
+        Write-Success "Unison MCP Server is configured for Python virtual environment"
         Write-Host "Python: $PythonPath" -ForegroundColor Cyan
         Write-Host "Server: $ServerPath" -ForegroundColor Cyan
     }
@@ -2006,7 +2006,7 @@ function Show-SetupInstructions {
 
 # Start the server
 function Start-Server {
-    Write-Step "Starting PAL MCP Server"
+    Write-Step "Starting Unison MCP Server"
     
     $pythonPath = "$VENV_PATH\Scripts\python.exe"
     if (!(Test-Path $pythonPath)) {
@@ -2131,7 +2131,7 @@ function Import-EnvFile {
 # Docker deployment workflow
 function Invoke-DockerWorkflow {
     Write-Step "Starting Docker Workflow"
-    Write-Host "PAL MCP Server" -ForegroundColor Green
+    Write-Host "Unison MCP Server" -ForegroundColor Green
     Write-Host "=================" -ForegroundColor Cyan
     
     $version = Get-Version
@@ -2154,7 +2154,7 @@ function Invoke-DockerWorkflow {
     Show-SetupInstructions -UseDocker
     
     # Start Docker services
-    Write-Step "Starting PAL MCP Server"
+    Write-Step "Starting Unison MCP Server"
     if ($Follow) {
         Write-Info "Starting server and following logs..."
         Start-DockerServices -Follow
@@ -2164,7 +2164,7 @@ function Invoke-DockerWorkflow {
     if (!(Start-DockerServices)) { exit 1 }
     
     Write-Host ""
-    Write-Success "PAL MCP Server is running in Docker!"
+    Write-Success "Unison MCP Server is running in Docker!"
     Write-Host ""
     
     Write-Host "Next steps:" -ForegroundColor Cyan
@@ -2173,7 +2173,7 @@ function Invoke-DockerWorkflow {
     Write-Host ""
     Write-Host "Useful commands:" -ForegroundColor Cyan
     Write-Host "  View logs: " -NoNewline -ForegroundColor White
-    Write-Host "docker logs -f pal-mcp-server" -ForegroundColor Yellow
+    Write-Host "docker logs -f unison-mcp-server" -ForegroundColor Yellow
     Write-Host "  Stop server: " -NoNewline -ForegroundColor White
     Write-Host "docker-compose down" -ForegroundColor Yellow
     Write-Host "  Restart server: " -NoNewline -ForegroundColor White
@@ -2183,7 +2183,7 @@ function Invoke-DockerWorkflow {
 # Python virtual environment deployment workflow
 function Invoke-PythonWorkflow {
     Write-Step "Starting Python Virtual Environment Workflow"
-    Write-Host "PAL MCP Server" -ForegroundColor Green
+    Write-Host "Unison MCP Server" -ForegroundColor Green
     Write-Host "=================" -ForegroundColor Cyan
     
     $version = Get-Version

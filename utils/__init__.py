@@ -1,5 +1,5 @@
 """
-Utility functions for PAL MCP Server
+Utility functions for Unison MCP Server
 """
 
 from .file_types import CODE_EXTENSIONS, FILE_CATEGORIES, PROGRAMMING_EXTENSIONS, TEXT_EXTENSIONS

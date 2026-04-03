@@ -1,6 +1,6 @@
 # WSL (Windows Subsystem for Linux) Setup Guide
 
-This guide provides detailed instructions for setting up PAL MCP Server on Windows using WSL.
+This guide provides detailed instructions for setting up Unison MCP Server on Windows using WSL.
 
 ## Prerequisites for WSL
 
@@ -27,8 +27,8 @@ npm install -g @anthropic-ai/claude-code
    cd ~
    
    # Clone the repository
-   git clone https://github.com/BeehiveInnovations/pal-mcp-server.git
-   cd pal-mcp-server
+   git clone https://github.com/izzoa/unison-mcp-server.git
+   cd unison-mcp-server
    ```
 
 2. **Run the setup script**:
@@ -43,7 +43,7 @@ npm install -g @anthropic-ai/claude-code
    # List configured MCP servers
    claude mcp list
    
-   # You should see 'pal' listed in the output
+   # You should see 'unison' listed in the output
    # If not, the setup script will provide the correct configuration
    ```
 
@@ -61,19 +61,19 @@ python3 -m pip install --upgrade pip
 
 ### Path Issues
 
-- Always use the full WSL path for MCP configuration (e.g., `/home/YourName/pal-mcp-server/`)
+- Always use the full WSL path for MCP configuration (e.g., `/home/YourName/unison-mcp-server/`)
 - The setup script automatically detects WSL and configures the correct paths
 
 ### Claude Code Connection Issues
 
 ```bash
 # If Claude Code can't connect to the MCP server, check the configuration
-cat ~/.claude.json | grep -A 10 "pal"
+cat ~/.claude.json | grep -A 10 "unison"
 
 # The configuration should show the correct WSL path to the Python executable
-# Example: "/home/YourName/pal-mcp-server/.pal_venv/bin/python"
+# Example: "/home/YourName/unison-mcp-server/.unison_venv/bin/python"
 ```
 
 ### Performance Tip
 
-For best performance, keep your pal-mcp-server directory in the WSL filesystem (e.g., `~/pal-mcp-server`) rather than in the Windows filesystem (`/mnt/c/...`).
+For best performance, keep your unison-mcp-server directory in the WSL filesystem (e.g., `~/unison-mcp-server`) rather than in the Windows filesystem (`/mnt/c/...`).

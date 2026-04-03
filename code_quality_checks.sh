@@ -1,18 +1,18 @@
 #!/bin/bash
 
-# PAL MCP Server - Code Quality Checks
+# Unison MCP Server - Code Quality Checks
 # This script runs all required linting and testing checks before committing changes.
 # ALL checks must pass 100% for CI/CD to succeed.
 
 set -e  # Exit on any error
 
-echo "🔍 Running Code Quality Checks for PAL MCP Server"
+echo "🔍 Running Code Quality Checks for Unison MCP Server"
 echo "================================================="
 
 # Determine Python command
-if [[ -f ".pal_venv/bin/python" ]]; then
-    PYTHON_CMD=".pal_venv/bin/python"
-    PIP_CMD=".pal_venv/bin/pip"
+if [[ -f ".unison_venv/bin/python" ]]; then
+    PYTHON_CMD=".unison_venv/bin/python"
+    PIP_CMD=".unison_venv/bin/pip"
     echo "✅ Using venv"
 elif [[ -n "$VIRTUAL_ENV" ]]; then
     PYTHON_CMD="python"
@@ -32,7 +32,7 @@ DEV_DEPS_NEEDED=false
 # Check each dev dependency
 for tool in ruff black isort pytest; do
     # Check if tool exists in venv or in PATH
-    if [[ -f ".pal_venv/bin/$tool" ]] || command -v $tool &> /dev/null; then
+    if [[ -f ".unison_venv/bin/$tool" ]] || command -v $tool &> /dev/null; then
         continue
     else
         DEV_DEPS_NEEDED=true
@@ -49,11 +49,11 @@ else
 fi
 
 # Set tool paths
-if [[ -f ".pal_venv/bin/ruff" ]]; then
-    RUFF=".pal_venv/bin/ruff"
-    BLACK=".pal_venv/bin/black"
-    ISORT=".pal_venv/bin/isort"
-    PYTEST=".pal_venv/bin/pytest"
+if [[ -f ".unison_venv/bin/ruff" ]]; then
+    RUFF=".unison_venv/bin/ruff"
+    BLACK=".unison_venv/bin/black"
+    ISORT=".unison_venv/bin/isort"
+    PYTEST=".unison_venv/bin/pytest"
 else
     RUFF="ruff"
     BLACK="black"
@@ -67,16 +67,16 @@ echo "📋 Step 1: Running Linting and Formatting Checks"
 echo "--------------------------------------------------"
 
 echo "🔧 Running ruff linting with auto-fix..."
-$RUFF check --fix --exclude test_simulation_files --exclude .pal_venv
+$RUFF check --fix --exclude test_simulation_files --exclude .unison_venv
 
 echo "🎨 Running black code formatting..."
-$BLACK . --exclude="test_simulation_files/" --exclude=".pal_venv/"
+$BLACK . --exclude="test_simulation_files/" --exclude=".unison_venv/"
 
 echo "📦 Running import sorting with isort..."
-$ISORT . --skip-glob=".pal_venv/*" --skip-glob="test_simulation_files/*"
+$ISORT . --skip-glob=".unison_venv/*" --skip-glob="test_simulation_files/*"
 
 echo "✅ Verifying all linting passes..."
-$RUFF check --exclude test_simulation_files --exclude .pal_venv
+$RUFF check --exclude test_simulation_files --exclude .unison_venv
 
 echo "✅ Step 1 Complete: All linting and formatting checks passed!"
 echo ""

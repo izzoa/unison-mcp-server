@@ -1,5 +1,5 @@
 """
-Custom exceptions for PAL MCP tools.
+Custom exceptions for Unison MCP tools.
 
 These exceptions allow tools to signal protocol-level errors that should be surfaced
 to MCP clients using the `isError` flag on `CallToolResult`. Raising one of these

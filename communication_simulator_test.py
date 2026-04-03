@@ -1,7 +1,7 @@
 """
-Communication Simulator Test for PAL MCP Server
+Communication Simulator Test for Unison MCP Server
 
-This script provides comprehensive end-to-end testing of the PAL MCP Server
+This script provides comprehensive end-to-end testing of the Unison MCP Server
 by simulating real Claude CLI communications and validating conversation
 continuity, file handling, deduplication features, and clarification scenarios.
 
@@ -145,10 +145,10 @@ class CommunicationSimulator:
         if os.path.exists(venv_python):
             return venv_python
 
-        # Try .pal_venv as fallback
-        pal_venv_python = os.path.join(current_dir, ".pal_venv", "bin", "python")
-        if os.path.exists(pal_venv_python):
-            return pal_venv_python
+        # Try .unison_venv as fallback
+        unison_venv_python = os.path.join(current_dir, ".unison_venv", "bin", "python")
+        if os.path.exists(unison_venv_python):
+            return unison_venv_python
 
         # Fallback to system python if venv doesn't exist
         self.logger.warning("Virtual environment not found, using system python")
@@ -361,7 +361,7 @@ class CommunicationSimulator:
     def print_test_summary(self):
         """Print comprehensive test results summary"""
         self.logger.info("\n" + "=" * 70)
-        self.logger.info("PAL MCP COMMUNICATION SIMULATOR - TEST RESULTS SUMMARY")
+        self.logger.info("UNISON MCP COMMUNICATION SIMULATOR - TEST RESULTS SUMMARY")
         self.logger.info("=" * 70)
 
         passed_count = sum(1 for result in self.test_results.values() if result)
@@ -388,7 +388,7 @@ class CommunicationSimulator:
     def run_full_test_suite(self) -> bool:
         """Run the complete test suite"""
         try:
-            self.logger.info("Starting PAL MCP Communication Simulator Test Suite")
+            self.logger.info("Starting Unison MCP Communication Simulator Test Suite")
 
             # Setup
             if not self.setup_test_environment():
@@ -450,7 +450,7 @@ class CommunicationSimulator:
 
 def parse_arguments():
     """Parse and validate command line arguments"""
-    parser = argparse.ArgumentParser(description="PAL MCP Communication Simulator Test")
+    parser = argparse.ArgumentParser(description="Unison MCP Communication Simulator Test")
     parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose logging")
     parser.add_argument("--keep-logs", action="store_true", help="Keep logs for inspection after test completion")
     parser.add_argument("--tests", "-t", nargs="+", help="Specific tests to run (space-separated)")

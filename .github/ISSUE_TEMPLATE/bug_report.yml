@@ -29,7 +29,7 @@ body:
     id: logs
     attributes:
       label: Relevant Log Output
-      description: "Please copy and paste any relevant log output. Logs are stored under the `logs` folder in the pal folder. You an also use `./run-server.sh -f` to see logs"
+      description: "Please copy and paste any relevant log output. Logs are stored under the `logs` folder in the project folder. You can also use `./run-server.sh -f` to see logs"
       render: shell
 
   - type: dropdown

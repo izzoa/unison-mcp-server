@@ -1,9 +1,9 @@
 <#
 .SYNOPSIS
-    Integration test runner script for the PAL MCP server on Windows.
+    Integration test runner script for the Unison MCP server on Windows.
 
 .DESCRIPTION
-    This PowerShell script prepares and runs integration tests for the PAL MCP server:
+    This PowerShell script prepares and runs integration tests for the Unison MCP server:
     - Sets up the test environment
     - Installs required dependencies
     - Runs automated integration tests
@@ -25,7 +25,7 @@
     Script Author       : GiGiDKR (https://github.com/GiGiDKR)
     Date                : 07-05-2025
     Version             : See config.py (__version__)
-    References          : https://github.com/BeehiveInnovations/pal-mcp-server
+    References          : https://github.com/izzoa/unison-mcp-server
 #>
 #Requires -Version 5.1
 [CmdletBinding()]
@@ -64,13 +64,13 @@ function Write-Emoji {
     Write-ColorText $Text -Color $Color
 }
 
-Write-Emoji "🧪" "Running Integration Tests for PAL MCP Server" -Color Cyan
+Write-Emoji "🧪" "Running Integration Tests for Unison MCP Server" -Color Cyan
 Write-ColorText "==============================================" -Color Cyan
 Write-ColorText "These tests use real API calls with your configured keys"
 Write-Host ""
 
 # Check for virtual environment
-$venvPath = ".pal_venv"
+$venvPath = ".unison_venv"
 $activateScript = if ($IsWindows -or $env:OS -eq "Windows_NT") {
     "$venvPath\Scripts\Activate.ps1"
 } else {

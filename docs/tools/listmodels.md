@@ -7,7 +7,7 @@ The `listmodels` tool shows which providers are configured, available models, th
 ## Usage
 
 ```
-"Use pal to list available models"
+"Use unison to list available models"
 ```
 
 ## Key Features

@@ -101,12 +101,12 @@ Then it shared the changes and relevant code with Gemini 3.0 Pro - the following
   - Fix Required: Apply the same defensive pattern to the missed location
 ```
 
-A subtle but critical issue spotted by Gemini that both Claude + O3 missed. This is the power of running these workflows with PAL.
+A subtle but critical issue spotted by Gemini that both Claude + O3 missed. This is the power of running these workflows with Unison.
 
 ## Example Prompts
 
 ```
-Use pal and perform a thorough precommit ensuring there aren't any new regressions or bugs introduced
+Use unison and perform a thorough precommit ensuring there aren't any new regressions or bugs introduced
 ```
 
 ## Key Features
@@ -155,7 +155,7 @@ Use pal and perform a thorough precommit ensuring there aren't any new regressio
 
 **Basic Pre-commit Validation:**
 ```
-"Use pal precommit to validate my changes before committing"
+"Use unison precommit to validate my changes before committing"
 ```
 
 **Security-Focused Validation:**
