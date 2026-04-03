@@ -173,7 +173,9 @@ def helper_function():
         }
 
         # Mock to capture file filtering behavior
-        original_filter_new_files = tool.filter_new_files
+        # Patch on the FileProcessor component since _prepare_file_content_for_prompt
+        # delegates to self._file_processor which calls its own filter_new_files.
+        original_filter_new_files = tool._file_processor.filter_new_files
         filtered_files = None
 
         def capture_filtering_mock(requested_files, continuation_id):
@@ -181,7 +183,7 @@ def helper_function():
             filtered_files = original_filter_new_files(requested_files, continuation_id)
             return filtered_files
 
-        with patch.object(tool, "filter_new_files", side_effect=capture_filtering_mock):
+        with patch.object(tool._file_processor, "filter_new_files", side_effect=capture_filtering_mock):
             # Execute continuation - this should not re-embed the same files
             result = await tool.execute(continuation_args)
 

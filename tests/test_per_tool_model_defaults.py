@@ -291,7 +291,7 @@ class TestAutoModeErrorMessages:
     def teardown_method(self):
         """Clean up after each test to prevent state pollution."""
         # Clear provider registry singleton
-        ModelProviderRegistry._instance = None
+        ModelProviderRegistry.reset_for_testing()
 
     @pytest.mark.asyncio
     async def test_chat_auto_error_message(self):
@@ -411,7 +411,7 @@ class TestRuntimeModelSelection:
     def teardown_method(self):
         """Clean up after each test to prevent state pollution."""
         # Clear provider registry singleton
-        ModelProviderRegistry._instance = None
+        ModelProviderRegistry.reset_for_testing()
 
     @pytest.mark.asyncio
     async def test_explicit_auto_in_request(self):

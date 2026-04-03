@@ -19,14 +19,8 @@ as defined by the MCP protocol.
 """
 
 import asyncio
-import atexit
 import logging
-import os
-import sys
-import time
-from logging.handlers import RotatingFileHandler
-from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from mcp.server import Server  # noqa: E402
 from mcp.server.models import InitializationOptions  # noqa: E402
@@ -43,10 +37,9 @@ from mcp.types import (  # noqa: E402
     ToolsCapability,
 )
 
-from config import (  # noqa: E402
-    DEFAULT_MODEL,
-    __version__,
-)
+from conf.prompt_templates import PROMPT_TEMPLATES  # noqa: E402
+from config import DEFAULT_MODEL, __version__  # noqa: E402
+from providers.configure import configure_providers  # noqa: E402
 from tools import (  # noqa: E402
     AnalyzeTool,
     ChallengeTool,
@@ -70,85 +63,13 @@ from tools import (  # noqa: E402
 from tools.models import ToolOutput  # noqa: E402
 from tools.shared.exceptions import ToolExecutionError  # noqa: E402
 from utils.env import env_override_enabled, get_env  # noqa: E402
+from utils.logging_setup import configure_logging  # noqa: E402
+from utils.model_resolution import parse_model_option  # noqa: E402
+from utils.request_helpers import get_follow_up_instructions  # noqa: E402
 
 # Configure logging for server operations
-# Can be controlled via LOG_LEVEL environment variable (DEBUG, INFO, WARNING, ERROR)
 log_level = (get_env("LOG_LEVEL", "DEBUG") or "DEBUG").upper()
-
-# Create timezone-aware formatter
-
-
-class LocalTimeFormatter(logging.Formatter):
-    def formatTime(self, record, datefmt=None):
-        """Override to use local timezone instead of UTC"""
-        ct = self.converter(record.created)
-        if datefmt:
-            s = time.strftime(datefmt, ct)
-        else:
-            t = time.strftime("%Y-%m-%d %H:%M:%S", ct)
-            s = f"{t},{record.msecs:03.0f}"
-        return s
-
-
-# Configure both console and file logging
-log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-
-# Clear any existing handlers first
-root_logger = logging.getLogger()
-root_logger.handlers.clear()
-
-# Create and configure stderr handler explicitly
-stderr_handler = logging.StreamHandler(sys.stderr)
-stderr_handler.setLevel(getattr(logging, log_level, logging.INFO))
-stderr_handler.setFormatter(LocalTimeFormatter(log_format))
-root_logger.addHandler(stderr_handler)
-
-# Note: MCP stdio_server interferes with stderr during tool execution
-# All logs are properly written to logs/mcp_server.log for monitoring
-
-# Set root logger level
-root_logger.setLevel(getattr(logging, log_level, logging.INFO))
-
-# Add rotating file handler for local log monitoring
-
-try:
-    # Create logs directory in project root
-    log_dir = Path(__file__).parent / "logs"
-    log_dir.mkdir(exist_ok=True)
-
-    # Main server log with size-based rotation (20MB max per file)
-    # This ensures logs don't grow indefinitely and are properly managed
-    file_handler = RotatingFileHandler(
-        log_dir / "mcp_server.log",
-        maxBytes=20 * 1024 * 1024,  # 20MB max file size
-        backupCount=5,  # Keep 10 rotated files (100MB total)
-        encoding="utf-8",
-    )
-    file_handler.setLevel(getattr(logging, log_level, logging.INFO))
-    file_handler.setFormatter(LocalTimeFormatter(log_format))
-    logging.getLogger().addHandler(file_handler)
-
-    # Create a special logger for MCP activity tracking with size-based rotation
-    mcp_logger = logging.getLogger("mcp_activity")
-    mcp_file_handler = RotatingFileHandler(
-        log_dir / "mcp_activity.log",
-        maxBytes=10 * 1024 * 1024,  # 20MB max file size
-        backupCount=2,  # Keep 5 rotated files (20MB total)
-        encoding="utf-8",
-    )
-    mcp_file_handler.setLevel(logging.INFO)
-    mcp_file_handler.setFormatter(LocalTimeFormatter("%(asctime)s - %(message)s"))
-    mcp_logger.addHandler(mcp_file_handler)
-    mcp_logger.setLevel(logging.INFO)
-    # Ensure MCP activity also goes to stderr
-    mcp_logger.propagate = True
-
-    # Log setup info directly to root logger since logger isn't defined yet
-    logging.info(f"Logging to: {log_dir / 'mcp_server.log'}")
-    logging.info(f"Process PID: {os.getpid()}")
-
-except Exception as e:
-    print(f"Warning: Could not set up file logging: {e}", file=sys.stderr)
+_, _mcp_activity_logger = configure_logging(log_level)
 
 logger = logging.getLogger(__name__)
 
@@ -279,352 +200,6 @@ TOOLS = {
     "version": VersionTool(),  # Display server version and system information
 }
 TOOLS = filter_disabled_tools(TOOLS)
-
-# Rich prompt templates for all tools
-PROMPT_TEMPLATES = {
-    "chat": {
-        "name": "chat",
-        "description": "Chat and brainstorm ideas",
-        "template": "Chat with {model} about this",
-    },
-    "clink": {
-        "name": "clink",
-        "description": "Forward a request to a configured AI CLI (e.g., Gemini)",
-        "template": "Use clink with cli_name=<cli> to run this prompt",
-    },
-    "thinkdeep": {
-        "name": "thinkdeeper",
-        "description": "Step-by-step deep thinking workflow with expert analysis",
-        "template": "Start comprehensive deep thinking workflow with {model} using {thinking_mode} thinking mode",
-    },
-    "planner": {
-        "name": "planner",
-        "description": "Break down complex ideas, problems, or projects into multiple manageable steps",
-        "template": "Create a detailed plan with {model}",
-    },
-    "consensus": {
-        "name": "consensus",
-        "description": "Step-by-step consensus workflow with multi-model analysis",
-        "template": "Start comprehensive consensus workflow with {model}",
-    },
-    "codereview": {
-        "name": "review",
-        "description": "Perform a comprehensive code review",
-        "template": "Perform a comprehensive code review with {model}",
-    },
-    "precommit": {
-        "name": "precommit",
-        "description": "Step-by-step pre-commit validation workflow",
-        "template": "Start comprehensive pre-commit validation workflow with {model}",
-    },
-    "debug": {
-        "name": "debug",
-        "description": "Debug an issue or error",
-        "template": "Help debug this issue with {model}",
-    },
-    "secaudit": {
-        "name": "secaudit",
-        "description": "Comprehensive security audit with OWASP Top 10 coverage",
-        "template": "Perform comprehensive security audit with {model}",
-    },
-    "docgen": {
-        "name": "docgen",
-        "description": "Generate comprehensive code documentation with complexity analysis",
-        "template": "Generate comprehensive documentation with {model}",
-    },
-    "analyze": {
-        "name": "analyze",
-        "description": "Analyze files and code structure",
-        "template": "Analyze these files with {model}",
-    },
-    "refactor": {
-        "name": "refactor",
-        "description": "Refactor and improve code structure",
-        "template": "Refactor this code with {model}",
-    },
-    "tracer": {
-        "name": "tracer",
-        "description": "Trace code execution paths",
-        "template": "Generate tracer analysis with {model}",
-    },
-    "testgen": {
-        "name": "testgen",
-        "description": "Generate comprehensive tests",
-        "template": "Generate comprehensive tests with {model}",
-    },
-    "challenge": {
-        "name": "challenge",
-        "description": "Challenge a statement critically without automatic agreement",
-        "template": "Challenge this statement critically",
-    },
-    "apilookup": {
-        "name": "apilookup",
-        "description": "Look up the latest API or SDK information",
-        "template": "Lookup latest API docs for {model}",
-    },
-    "listmodels": {
-        "name": "listmodels",
-        "description": "List available AI models",
-        "template": "List all available models",
-    },
-    "version": {
-        "name": "version",
-        "description": "Show server version and system information",
-        "template": "Show Unison MCP Server version",
-    },
-}
-
-
-def configure_providers():
-    """
-    Configure and validate AI providers based on available API keys.
-
-    This function checks for API keys and registers the appropriate providers.
-    At least one valid API key (Gemini or OpenAI) is required.
-
-    Raises:
-        ValueError: If no valid API keys are found or conflicting configurations detected
-    """
-    # Log environment variable status for debugging
-    logger.debug("Checking environment variables for API keys...")
-    api_keys_to_check = ["OPENAI_API_KEY", "OPENROUTER_API_KEY", "GEMINI_API_KEY", "XAI_API_KEY", "CUSTOM_API_URL"]
-    for key in api_keys_to_check:
-        value = get_env(key)
-        logger.debug(f"  {key}: {'[PRESENT]' if value else '[MISSING]'}")
-    from providers import ModelProviderRegistry
-    from providers.azure_openai import AzureOpenAIProvider
-    from providers.custom import CustomProvider
-    from providers.dial import DIALModelProvider
-    from providers.gemini import GeminiModelProvider
-    from providers.openai import OpenAIModelProvider
-    from providers.openrouter import OpenRouterProvider
-    from providers.shared import ProviderType
-    from providers.xai import XAIModelProvider
-    from utils.model_restrictions import get_restriction_service
-
-    valid_providers = []
-    has_native_apis = False
-    has_openrouter = False
-    has_custom = False
-
-    # Check for Gemini API key
-    gemini_key = get_env("GEMINI_API_KEY")
-    if gemini_key and gemini_key != "your_gemini_api_key_here":
-        valid_providers.append("Gemini")
-        has_native_apis = True
-        logger.info("Gemini API key found - Gemini models available")
-
-    # Check for OpenAI API key
-    openai_key = get_env("OPENAI_API_KEY")
-    logger.debug(f"OpenAI key check: key={'[PRESENT]' if openai_key else '[MISSING]'}")
-    if openai_key and openai_key != "your_openai_api_key_here":
-        valid_providers.append("OpenAI")
-        has_native_apis = True
-        logger.info("OpenAI API key found")
-    else:
-        if not openai_key:
-            logger.debug("OpenAI API key not found in environment")
-        else:
-            logger.debug("OpenAI API key is placeholder value")
-
-    # Check for Azure OpenAI configuration
-    azure_key = get_env("AZURE_OPENAI_API_KEY")
-    azure_endpoint = get_env("AZURE_OPENAI_ENDPOINT")
-    azure_models_available = False
-    if azure_key and azure_key != "your_azure_openai_key_here" and azure_endpoint:
-        try:
-            from providers.registries.azure import AzureModelRegistry
-
-            azure_registry = AzureModelRegistry()
-            if azure_registry.list_models():
-                valid_providers.append("Azure OpenAI")
-                has_native_apis = True
-                azure_models_available = True
-                logger.info("Azure OpenAI configuration detected")
-            else:
-                logger.warning(
-                    "Azure OpenAI models configuration is empty. Populate conf/azure_models.json or set AZURE_MODELS_CONFIG_PATH."
-                )
-        except Exception as exc:
-            logger.warning(f"Failed to load Azure OpenAI models: {exc}")
-
-    # Check for X.AI API key
-    xai_key = get_env("XAI_API_KEY")
-    if xai_key and xai_key != "your_xai_api_key_here":
-        valid_providers.append("X.AI (GROK)")
-        has_native_apis = True
-        logger.info("X.AI API key found - GROK models available")
-
-    # Check for DIAL API key
-    dial_key = get_env("DIAL_API_KEY")
-    if dial_key and dial_key != "your_dial_api_key_here":
-        valid_providers.append("DIAL")
-        has_native_apis = True
-        logger.info("DIAL API key found - DIAL models available")
-
-    # Check for OpenRouter API key
-    openrouter_key = get_env("OPENROUTER_API_KEY")
-    logger.debug(f"OpenRouter key check: key={'[PRESENT]' if openrouter_key else '[MISSING]'}")
-    if openrouter_key and openrouter_key != "your_openrouter_api_key_here":
-        valid_providers.append("OpenRouter")
-        has_openrouter = True
-        logger.info("OpenRouter API key found - Multiple models available via OpenRouter")
-    else:
-        if not openrouter_key:
-            logger.debug("OpenRouter API key not found in environment")
-        else:
-            logger.debug("OpenRouter API key is placeholder value")
-
-    # Check for custom API endpoint (Ollama, vLLM, etc.)
-    custom_url = get_env("CUSTOM_API_URL")
-    if custom_url:
-        # IMPORTANT: Always read CUSTOM_API_KEY even if empty
-        # - Some providers (vLLM, LM Studio, enterprise APIs) require authentication
-        # - Others (Ollama) work without authentication (empty key)
-        # - DO NOT remove this variable - it's needed for provider factory function
-        custom_key = get_env("CUSTOM_API_KEY", "") or ""  # Default to empty (Ollama doesn't need auth)
-        custom_model = get_env("CUSTOM_MODEL_NAME", "llama3.2") or "llama3.2"
-        valid_providers.append(f"Custom API ({custom_url})")
-        has_custom = True
-        logger.info(f"Custom API endpoint found: {custom_url} with model {custom_model}")
-        if custom_key:
-            logger.debug("Custom API key provided for authentication")
-        else:
-            logger.debug("No custom API key provided (using unauthenticated access)")
-
-    # Register providers in priority order:
-    # 1. Native APIs first (most direct and efficient)
-    registered_providers = []
-
-    if has_native_apis:
-        if gemini_key and gemini_key != "your_gemini_api_key_here":
-            ModelProviderRegistry.register_provider(ProviderType.GOOGLE, GeminiModelProvider)
-            registered_providers.append(ProviderType.GOOGLE.value)
-            logger.debug(f"Registered provider: {ProviderType.GOOGLE.value}")
-        if openai_key and openai_key != "your_openai_api_key_here":
-            ModelProviderRegistry.register_provider(ProviderType.OPENAI, OpenAIModelProvider)
-            registered_providers.append(ProviderType.OPENAI.value)
-            logger.debug(f"Registered provider: {ProviderType.OPENAI.value}")
-        if azure_models_available:
-            ModelProviderRegistry.register_provider(ProviderType.AZURE, AzureOpenAIProvider)
-            registered_providers.append(ProviderType.AZURE.value)
-            logger.debug(f"Registered provider: {ProviderType.AZURE.value}")
-        if xai_key and xai_key != "your_xai_api_key_here":
-            ModelProviderRegistry.register_provider(ProviderType.XAI, XAIModelProvider)
-            registered_providers.append(ProviderType.XAI.value)
-            logger.debug(f"Registered provider: {ProviderType.XAI.value}")
-        if dial_key and dial_key != "your_dial_api_key_here":
-            ModelProviderRegistry.register_provider(ProviderType.DIAL, DIALModelProvider)
-            registered_providers.append(ProviderType.DIAL.value)
-            logger.debug(f"Registered provider: {ProviderType.DIAL.value}")
-
-    # 2. Custom provider second (for local/private models)
-    if has_custom:
-        # Factory function that creates CustomProvider with proper parameters
-        def custom_provider_factory(api_key=None):
-            # api_key is CUSTOM_API_KEY (can be empty for Ollama), base_url from CUSTOM_API_URL
-            base_url = get_env("CUSTOM_API_URL", "") or ""
-            return CustomProvider(api_key=api_key or "", base_url=base_url)  # Use provided API key or empty string
-
-        ModelProviderRegistry.register_provider(ProviderType.CUSTOM, custom_provider_factory)
-        registered_providers.append(ProviderType.CUSTOM.value)
-        logger.debug(f"Registered provider: {ProviderType.CUSTOM.value}")
-
-    # 3. OpenRouter last (catch-all for everything else)
-    if has_openrouter:
-        ModelProviderRegistry.register_provider(ProviderType.OPENROUTER, OpenRouterProvider)
-        registered_providers.append(ProviderType.OPENROUTER.value)
-        logger.debug(f"Registered provider: {ProviderType.OPENROUTER.value}")
-
-    # Log all registered providers
-    if registered_providers:
-        logger.info(f"Registered providers: {', '.join(registered_providers)}")
-
-    # Require at least one valid provider
-    if not valid_providers:
-        raise ValueError(
-            "At least one API configuration is required. Please set either:\n"
-            "- GEMINI_API_KEY for Gemini models\n"
-            "- OPENAI_API_KEY for OpenAI models\n"
-            "- XAI_API_KEY for X.AI GROK models\n"
-            "- DIAL_API_KEY for DIAL models\n"
-            "- OPENROUTER_API_KEY for OpenRouter (multiple models)\n"
-            "- CUSTOM_API_URL for local models (Ollama, vLLM, etc.)"
-        )
-
-    logger.info(f"Available providers: {', '.join(valid_providers)}")
-
-    # Log provider priority
-    priority_info = []
-    if has_native_apis:
-        priority_info.append("Native APIs (Gemini, OpenAI)")
-    if has_custom:
-        priority_info.append("Custom endpoints")
-    if has_openrouter:
-        priority_info.append("OpenRouter (catch-all)")
-
-    if len(priority_info) > 1:
-        logger.info(f"Provider priority: {' → '.join(priority_info)}")
-
-    # Register cleanup function for providers
-    def cleanup_providers():
-        """Clean up all registered providers on shutdown."""
-        try:
-            registry = ModelProviderRegistry()
-            if hasattr(registry, "_initialized_providers"):
-                # Iterate over provider instances (values), not (type, instance) tuples
-                for provider in list(registry._initialized_providers.values()):
-                    try:
-                        if provider and hasattr(provider, "close"):
-                            provider.close()
-                    except Exception:
-                        # Logger might be closed during shutdown
-                        pass
-        except Exception:
-            # Silently ignore any errors during cleanup
-            pass
-
-    atexit.register(cleanup_providers)
-
-    # Check and log model restrictions
-    restriction_service = get_restriction_service()
-    restrictions = restriction_service.get_restriction_summary()
-
-    if restrictions:
-        logger.info("Model restrictions configured:")
-        for provider_name, allowed_models in restrictions.items():
-            if isinstance(allowed_models, list):
-                logger.info(f"  {provider_name}: {', '.join(allowed_models)}")
-            else:
-                logger.info(f"  {provider_name}: {allowed_models}")
-
-        # Validate restrictions against known models
-        provider_instances = {}
-        provider_types_to_validate = [ProviderType.GOOGLE, ProviderType.OPENAI, ProviderType.XAI, ProviderType.DIAL]
-        for provider_type in provider_types_to_validate:
-            provider = ModelProviderRegistry.get_provider(provider_type)
-            if provider:
-                provider_instances[provider_type] = provider
-
-        if provider_instances:
-            restriction_service.validate_against_known_models(provider_instances)
-    else:
-        logger.info("No model restrictions configured - all models allowed")
-
-    # Check if auto mode has any models available after restrictions
-    from config import IS_AUTO_MODE
-
-    if IS_AUTO_MODE:
-        available_models = ModelProviderRegistry.get_available_models(respect_restrictions=True)
-        if not available_models:
-            logger.error(
-                "Auto mode is enabled but no models are available after applying restrictions. "
-                "Please check your OPENAI_ALLOWED_MODELS and GOOGLE_ALLOWED_MODELS settings."
-            )
-            raise ValueError(
-                "No models available for auto mode due to restrictions. "
-                "Please adjust your allowed model settings or disable auto mode."
-            )
 
 
 @server.list_tools()
@@ -878,93 +453,6 @@ async def handle_call_tool(name: str, arguments: dict[str, Any]) -> list[TextCon
         return [TextContent(type="text", text=f"Unknown tool: {name}")]
 
 
-def parse_model_option(model_string: str) -> tuple[str, Optional[str]]:
-    """
-    Parse model:option format into model name and option.
-
-    Handles different formats:
-    - OpenRouter models: preserve :free, :beta, :preview suffixes as part of model name
-    - Ollama/Custom models: split on : to extract tags like :latest
-    - Consensus stance: extract options like :for, :against
-
-    Args:
-        model_string: String that may contain "model:option" format
-
-    Returns:
-        tuple: (model_name, option) where option may be None
-    """
-    if ":" in model_string and not model_string.startswith("http"):  # Avoid parsing URLs
-        # Check if this looks like an OpenRouter model (contains /)
-        if "/" in model_string and model_string.count(":") == 1:
-            # Could be openai/gpt-4:something - check what comes after colon
-            parts = model_string.split(":", 1)
-            suffix = parts[1].strip().lower()
-
-            # Known OpenRouter suffixes to preserve
-            if suffix in ["free", "beta", "preview"]:
-                return model_string.strip(), None
-
-        # For other patterns (Ollama tags, consensus stances), split normally
-        parts = model_string.split(":", 1)
-        model_name = parts[0].strip()
-        model_option = parts[1].strip() if len(parts) > 1 else None
-        return model_name, model_option
-    return model_string.strip(), None
-
-
-def get_follow_up_instructions(current_turn_count: int, max_turns: int = None) -> str:
-    """
-    Generate dynamic follow-up instructions based on conversation turn count.
-
-    Args:
-        current_turn_count: Current number of turns in the conversation
-        max_turns: Maximum allowed turns before conversation ends (defaults to MAX_CONVERSATION_TURNS)
-
-    Returns:
-        Follow-up instructions to append to the tool prompt
-    """
-    if max_turns is None:
-        from utils.conversation_memory import MAX_CONVERSATION_TURNS
-
-        max_turns = MAX_CONVERSATION_TURNS
-
-    if current_turn_count >= max_turns - 1:
-        # We're at or approaching the turn limit - no more follow-ups
-        return """
-IMPORTANT: This is approaching the final exchange in this conversation thread.
-Do NOT include any follow-up questions in your response. Provide your complete
-final analysis and recommendations."""
-    else:
-        # Normal follow-up instructions
-        remaining_turns = max_turns - current_turn_count - 1
-        return f"""
-
-CONVERSATION CONTINUATION: You can continue this discussion with the agent! ({remaining_turns} exchanges remaining)
-
-Feel free to ask clarifying questions or suggest areas for deeper exploration naturally within your response.
-If something needs clarification or you'd benefit from additional context, simply mention it conversationally.
-
-IMPORTANT: When you suggest follow-ups or ask questions, you MUST explicitly instruct the agent to use the continuation_id
-to respond. Use clear, direct language based on urgency:
-
-For optional follow-ups: "Please continue this conversation using the continuation_id from this response if you'd "
-"like to explore this further."
-
-For needed responses: "Please respond using the continuation_id from this response - your input is needed to proceed."
-
-For essential/critical responses: "RESPONSE REQUIRED: Please immediately continue using the continuation_id from "
-"this response. Cannot proceed without your clarification/input."
-
-This ensures the agent knows both HOW to maintain the conversation thread AND whether a response is optional, "
-"needed, or essential.
-
-The tool will automatically provide a continuation_id in the structured response that the agent can use in subsequent
-tool calls to maintain full conversation context across multiple exchanges.
-
-Remember: Only suggest follow-ups when they would genuinely add value to the discussion, and always instruct "
-"The agent to use the continuation_id when you do."""
-
-
 async def reconstruct_thread_context(arguments: dict[str, Any]) -> dict[str, Any]:
     """
     Reconstruct conversation context for stateless-to-stateful thread continuation.
@@ -1049,11 +537,11 @@ async def reconstruct_thread_context(arguments: dict[str, Any]) -> dict[str, Any
     continuation_id = arguments["continuation_id"]
 
     # Get thread context from storage
-    logger.debug(f"[CONVERSATION_DEBUG] Looking up thread {continuation_id} in storage")
+    logger.debug("[CONVERSATION_DEBUG] Looking up thread %s in storage", continuation_id)
     context = get_thread(continuation_id)
     if not context:
         logger.warning(f"Thread not found: {continuation_id}")
-        logger.debug(f"[CONVERSATION_DEBUG] Thread {continuation_id} not found in storage or expired")
+        logger.debug("[CONVERSATION_DEBUG] Thread %s not found in storage or expired", continuation_id)
 
         # Log to activity file for monitoring
         try:
@@ -1077,20 +565,22 @@ async def reconstruct_thread_context(arguments: dict[str, Any]) -> dict[str, Any
     if user_prompt:
         # Capture files referenced in this turn
         user_files = arguments.get("absolute_file_paths") or []
-        logger.debug(f"[CONVERSATION_DEBUG] Adding user turn to thread {continuation_id}")
+        logger.debug("[CONVERSATION_DEBUG] Adding user turn to thread %s", continuation_id)
         from utils.token_utils import estimate_tokens
 
         user_prompt_tokens = estimate_tokens(user_prompt)
         logger.debug(
-            f"[CONVERSATION_DEBUG] User prompt length: {len(user_prompt)} chars (~{user_prompt_tokens:,} tokens)"
+            "[CONVERSATION_DEBUG] User prompt length: %d chars (~%s tokens)",
+            len(user_prompt),
+            f"{user_prompt_tokens:,}",
         )
-        logger.debug(f"[CONVERSATION_DEBUG] User files: {user_files}")
+        logger.debug("[CONVERSATION_DEBUG] User files: %s", user_files)
         success = add_turn(continuation_id, "user", user_prompt, files=user_files)
         if not success:
             logger.warning(f"Failed to add user turn to thread {continuation_id}")
             logger.debug("[CONVERSATION_DEBUG] Failed to add user turn - thread may be at turn limit or expired")
         else:
-            logger.debug(f"[CONVERSATION_DEBUG] Successfully added user turn to thread {continuation_id}")
+            logger.debug("[CONVERSATION_DEBUG] Successfully added user turn to thread %s", continuation_id)
 
     # Create model context early to use for history building
     from utils.model_context import ModelContext
@@ -1105,11 +595,13 @@ async def reconstruct_thread_context(arguments: dict[str, Any]) -> dict[str, Any
         for turn in reversed(context.turns):
             if turn.role == "assistant" and turn.model_name:
                 arguments["model"] = turn.model_name
-                logger.debug(f"[CONVERSATION_DEBUG] Using model from previous turn: {turn.model_name}")
+                logger.debug("[CONVERSATION_DEBUG] Using model from previous turn: %s", turn.model_name)
                 break
 
     # Resolve an effective model for context reconstruction when DEFAULT_MODEL=auto
     model_context = arguments.get("_model_context")
+
+    from utils.model_resolution import resolve_fallback_model
 
     if requires_model:
         if model_context is None:
@@ -1117,27 +609,11 @@ async def reconstruct_thread_context(arguments: dict[str, Any]) -> dict[str, Any
                 model_context = ModelContext.from_arguments(arguments)
                 arguments.setdefault("_resolved_model_name", model_context.model_name)
             except ValueError as exc:
-                from providers.registry import ModelProviderRegistry
-
-                fallback_model = None
-                if tool is not None:
-                    try:
-                        fallback_model = ModelProviderRegistry.get_preferred_fallback_model(tool.get_model_category())
-                    except Exception as fallback_exc:  # pragma: no cover - defensive log
-                        logger.debug(
-                            f"[CONVERSATION_DEBUG] Unable to resolve fallback model for {context.tool_name}: {fallback_exc}"
-                        )
-
-                if fallback_model is None:
-                    available_models = ModelProviderRegistry.get_available_model_names()
-                    if available_models:
-                        fallback_model = available_models[0]
-
-                if fallback_model is None:
-                    raise
-
+                fallback_model = resolve_fallback_model(tool, f"context reconstruction after error: {exc}")
                 logger.debug(
-                    f"[CONVERSATION_DEBUG] Falling back to model '{fallback_model}' for context reconstruction after error: {exc}"
+                    "[CONVERSATION_DEBUG] Falling back to model '%s' for context reconstruction after error: %s",
+                    fallback_model,
+                    exc,
                 )
                 model_context = ModelContext(fallback_model)
                 arguments["_model_context"] = model_context
@@ -1147,81 +623,53 @@ async def reconstruct_thread_context(arguments: dict[str, Any]) -> dict[str, Any
 
         provider = ModelProviderRegistry.get_provider_for_model(model_context.model_name)
         if provider is None:
-            fallback_model = None
-            if tool is not None:
-                try:
-                    fallback_model = ModelProviderRegistry.get_preferred_fallback_model(tool.get_model_category())
-                except Exception as fallback_exc:  # pragma: no cover - defensive log
-                    logger.debug(
-                        f"[CONVERSATION_DEBUG] Unable to resolve fallback model for {context.tool_name}: {fallback_exc}"
-                    )
-
-            if fallback_model is None:
-                available_models = ModelProviderRegistry.get_available_model_names()
-                if available_models:
-                    fallback_model = available_models[0]
-
-            if fallback_model is None:
-                raise ValueError(
-                    f"Conversation continuation failed: model '{model_context.model_name}' is not available with current API keys."
-                )
-
+            fallback_model = resolve_fallback_model(
+                tool, f"model '{model_context.model_name}' is not available with current API keys"
+            )
             logger.debug(
-                f"[CONVERSATION_DEBUG] Model '{model_context.model_name}' unavailable; swapping to '{fallback_model}' for context reconstruction"
+                "[CONVERSATION_DEBUG] Model '%s' unavailable; swapping to '%s' for context reconstruction",
+                model_context.model_name,
+                fallback_model,
             )
             model_context = ModelContext(fallback_model)
             arguments["_model_context"] = model_context
             arguments["_resolved_model_name"] = fallback_model
     else:
         if model_context is None:
-            from providers.registry import ModelProviderRegistry
-
-            fallback_model = None
-            if tool is not None:
-                try:
-                    fallback_model = ModelProviderRegistry.get_preferred_fallback_model(tool.get_model_category())
-                except Exception as fallback_exc:  # pragma: no cover - defensive log
-                    logger.debug(
-                        f"[CONVERSATION_DEBUG] Unable to resolve fallback model for {context.tool_name}: {fallback_exc}"
-                    )
-
-            if fallback_model is None:
-                available_models = ModelProviderRegistry.get_available_model_names()
-                if available_models:
-                    fallback_model = available_models[0]
-
-            if fallback_model is None:
-                raise ValueError(
-                    "Conversation continuation failed: no available models detected for context reconstruction."
-                )
-
+            fallback_model = resolve_fallback_model(tool, "no available models detected for context reconstruction")
             logger.debug(
-                f"[CONVERSATION_DEBUG] Using fallback model '{fallback_model}' for context reconstruction of tool without model requirement"
+                "[CONVERSATION_DEBUG] Using fallback model '%s' for context reconstruction of tool without model requirement",
+                fallback_model,
             )
             model_context = ModelContext(fallback_model)
             arguments["_model_context"] = model_context
             arguments["_resolved_model_name"] = fallback_model
 
     # Build conversation history with model-specific limits
-    logger.debug(f"[CONVERSATION_DEBUG] Building conversation history for thread {continuation_id}")
-    logger.debug(f"[CONVERSATION_DEBUG] Thread has {len(context.turns)} turns, tool: {context.tool_name}")
-    logger.debug(f"[CONVERSATION_DEBUG] Using model: {model_context.model_name}")
+    if logger.isEnabledFor(logging.DEBUG):
+        logger.debug("[CONVERSATION_DEBUG] Building conversation history for thread %s", continuation_id)
+        logger.debug("[CONVERSATION_DEBUG] Thread has %d turns, tool: %s", len(context.turns), context.tool_name)
+        logger.debug("[CONVERSATION_DEBUG] Using model: %s", model_context.model_name)
     conversation_history, conversation_tokens = build_conversation_history(context, model_context)
-    logger.debug(f"[CONVERSATION_DEBUG] Conversation history built: {conversation_tokens:,} tokens")
+    logger.debug("[CONVERSATION_DEBUG] Conversation history built: %s tokens", f"{conversation_tokens:,}")
     logger.debug(
-        f"[CONVERSATION_DEBUG] Conversation history length: {len(conversation_history)} chars (~{conversation_tokens:,} tokens)"
+        "[CONVERSATION_DEBUG] Conversation history length: %d chars (~%s tokens)",
+        len(conversation_history),
+        f"{conversation_tokens:,}",
     )
 
     # Add dynamic follow-up instructions based on turn count
     follow_up_instructions = get_follow_up_instructions(len(context.turns))
-    logger.debug(f"[CONVERSATION_DEBUG] Follow-up instructions added for turn {len(context.turns)}")
+    logger.debug("[CONVERSATION_DEBUG] Follow-up instructions added for turn %d", len(context.turns))
 
     # All tools now use standardized 'prompt' field
     original_prompt = arguments.get("prompt", "")
     logger.debug("[CONVERSATION_DEBUG] Extracting user input from 'prompt' field")
     original_prompt_tokens = estimate_tokens(original_prompt) if original_prompt else 0
     logger.debug(
-        f"[CONVERSATION_DEBUG] User input length: {len(original_prompt)} chars (~{original_prompt_tokens:,} tokens)"
+        "[CONVERSATION_DEBUG] User input length: %d chars (~%s tokens)",
+        len(original_prompt),
+        f"{original_prompt_tokens:,}",
     )
 
     # Merge original context with new prompt and follow-up instructions
@@ -1252,27 +700,29 @@ async def reconstruct_thread_context(arguments: dict[str, Any]) -> dict[str, Any
     enhanced_arguments["_remaining_tokens"] = max(0, remaining_tokens)  # Ensure non-negative
     enhanced_arguments["_model_context"] = model_context  # Pass context for use in tools
 
-    logger.debug("[CONVERSATION_DEBUG] Token budget calculation:")
-    logger.debug(f"[CONVERSATION_DEBUG]   Model: {model_context.model_name}")
-    logger.debug(f"[CONVERSATION_DEBUG]   Total capacity: {token_allocation.total_tokens:,}")
-    logger.debug(f"[CONVERSATION_DEBUG]   Content allocation: {token_allocation.content_tokens:,}")
-    logger.debug(f"[CONVERSATION_DEBUG]   Conversation tokens: {conversation_tokens:,}")
-    logger.debug(f"[CONVERSATION_DEBUG]   Remaining tokens: {remaining_tokens:,}")
+    if logger.isEnabledFor(logging.DEBUG):
+        logger.debug("[CONVERSATION_DEBUG] Token budget calculation:")
+        logger.debug("[CONVERSATION_DEBUG]   Model: %s", model_context.model_name)
+        logger.debug("[CONVERSATION_DEBUG]   Total capacity: %s", f"{token_allocation.total_tokens:,}")
+        logger.debug("[CONVERSATION_DEBUG]   Content allocation: %s", f"{token_allocation.content_tokens:,}")
+        logger.debug("[CONVERSATION_DEBUG]   Conversation tokens: %s", f"{conversation_tokens:,}")
+        logger.debug("[CONVERSATION_DEBUG]   Remaining tokens: %s", f"{remaining_tokens:,}")
 
     # Merge original context parameters (files, etc.) with new request
     if context.initial_context:
-        logger.debug(f"[CONVERSATION_DEBUG] Merging initial context with {len(context.initial_context)} parameters")
+        logger.debug("[CONVERSATION_DEBUG] Merging initial context with %d parameters", len(context.initial_context))
         for key, value in context.initial_context.items():
             if key not in enhanced_arguments and key not in ["temperature", "thinking_mode", "model"]:
                 enhanced_arguments[key] = value
-                logger.debug(f"[CONVERSATION_DEBUG] Merged initial context param: {key}")
+                logger.debug("[CONVERSATION_DEBUG] Merged initial context param: %s", key)
 
     logger.info(f"Reconstructed context for thread {continuation_id} (turn {len(context.turns)})")
-    logger.debug(f"[CONVERSATION_DEBUG] Final enhanced arguments keys: {list(enhanced_arguments.keys())}")
+    logger.debug("[CONVERSATION_DEBUG] Final enhanced arguments keys: %s", list(enhanced_arguments.keys()))
 
     if "absolute_file_paths" in enhanced_arguments:
         logger.debug(
-            f"[CONVERSATION_DEBUG] Final files in enhanced arguments: {enhanced_arguments['absolute_file_paths']}"
+            "[CONVERSATION_DEBUG] Final files in enhanced arguments: %s",
+            enhanced_arguments["absolute_file_paths"],
         )
 
     # Log to activity file for monitoring

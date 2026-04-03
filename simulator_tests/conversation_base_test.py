@@ -87,7 +87,8 @@ class ConversationBaseTest(BaseSimulatorTest):
                 sys.path.insert(0, project_root)
 
             # Import and configure providers first (this is what main() does)
-            from server import TOOLS, configure_providers
+            from providers.configure import configure_providers
+            from server import TOOLS
 
             configure_providers()
 

@@ -1,6 +1,6 @@
 """Tests for parse_model_option function."""
 
-from server import parse_model_option
+from utils.model_resolution import parse_model_option
 
 
 class TestParseModelOption:

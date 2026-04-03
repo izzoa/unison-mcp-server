@@ -9,12 +9,7 @@ from providers import ModelProviderRegistry, ModelResponse
 from providers.gemini import GeminiModelProvider
 from providers.openai import OpenAIModelProvider
 from providers.shared import ProviderType
-from tests.model_test_helpers import (
-    get_all_model_names,
-    get_flash_model,
-    get_model_with_thinking,
-    is_valid_model,
-)
+from tests.model_test_helpers import get_all_model_names, get_flash_model, get_model_with_thinking, is_valid_model
 
 
 class TestModelProviderRegistry:
@@ -227,9 +222,7 @@ class TestOpenAIProvider:
 
         # All canonical names should validate
         for model_name in get_all_model_names(ProviderType.OPENAI):
-            assert provider.validate_model_name(model_name), (
-                f"Canonical model '{model_name}' should be valid"
-            )
+            assert provider.validate_model_name(model_name), f"Canonical model '{model_name}' should be valid"
 
         # Well-known aliases
         for alias in ["o3min", "o4mini"]:

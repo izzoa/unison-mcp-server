@@ -47,7 +47,7 @@ class TestServerTools:
             importlib.reload(config)
             from providers.registry import ModelProviderRegistry
 
-            ModelProviderRegistry._instance = None
+            ModelProviderRegistry.reset_for_testing()
 
             # Test with real provider resolution
             try:
@@ -84,7 +84,7 @@ class TestServerTools:
 
             # Reload config and clear registry
             importlib.reload(config)
-            ModelProviderRegistry._instance = None
+            ModelProviderRegistry.reset_for_testing()
 
     @pytest.mark.asyncio
     async def test_handle_version(self):

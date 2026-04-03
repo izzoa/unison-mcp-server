@@ -64,7 +64,7 @@ class TestThinkDeepTool:
             importlib.reload(config)
             from providers.registry import ModelProviderRegistry
 
-            ModelProviderRegistry._instance = None
+            ModelProviderRegistry.reset_for_testing()
 
             # Test with real provider resolution
             try:
@@ -110,7 +110,7 @@ class TestThinkDeepTool:
 
             # Reload config and clear registry
             importlib.reload(config)
-            ModelProviderRegistry._instance = None
+            ModelProviderRegistry.reset_for_testing()
 
 
 class TestCodeReviewTool:
@@ -162,7 +162,7 @@ class TestCodeReviewTool:
             importlib.reload(config)
             from providers.registry import ModelProviderRegistry
 
-            ModelProviderRegistry._instance = None
+            ModelProviderRegistry.reset_for_testing()
 
             # Test with real provider resolution - expect it to fail at API level
             try:
@@ -203,7 +203,7 @@ class TestCodeReviewTool:
 
             # Reload config and clear registry
             importlib.reload(config)
-            ModelProviderRegistry._instance = None
+            ModelProviderRegistry.reset_for_testing()
 
 
 class TestAnalyzeTool:
@@ -264,7 +264,7 @@ class TestAnalyzeTool:
             importlib.reload(config)
             from providers.registry import ModelProviderRegistry
 
-            ModelProviderRegistry._instance = None
+            ModelProviderRegistry.reset_for_testing()
 
             # Test with real provider resolution - expect it to fail at API level
             try:
@@ -307,7 +307,7 @@ class TestAnalyzeTool:
 
             # Reload config and clear registry
             importlib.reload(config)
-            ModelProviderRegistry._instance = None
+            ModelProviderRegistry.reset_for_testing()
 
 
 class TestAbsolutePathValidation:
@@ -393,7 +393,7 @@ class TestAbsolutePathValidation:
             importlib.reload(config)
             from providers.registry import ModelProviderRegistry
 
-            ModelProviderRegistry._instance = None
+            ModelProviderRegistry.reset_for_testing()
 
             # Test with real provider resolution - expect it to fail at API level
             try:
@@ -434,7 +434,7 @@ class TestAbsolutePathValidation:
 
             # Reload config and clear registry
             importlib.reload(config)
-            ModelProviderRegistry._instance = None
+            ModelProviderRegistry.reset_for_testing()
 
 
 class TestSpecialStatusModels:

@@ -199,7 +199,7 @@ class TestAutoMode:
             # Clear registry singleton to force re-initialization with new environment
             from providers.registry import ModelProviderRegistry
 
-            ModelProviderRegistry._instance = None
+            ModelProviderRegistry.reset_for_testing()
 
             tool = ChatTool()
 
@@ -265,7 +265,7 @@ class TestAutoMode:
 
             # Reload config and clear registry singleton
             importlib.reload(config)
-            ModelProviderRegistry._instance = None
+            ModelProviderRegistry.reset_for_testing()
 
     def test_model_field_schema_generation(self):
         """Test the get_model_field_schema method"""

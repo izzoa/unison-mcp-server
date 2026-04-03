@@ -5,10 +5,7 @@ from unittest.mock import MagicMock, patch
 
 from providers.openai import OpenAIModelProvider
 from providers.shared import ProviderType
-from tests.model_test_helpers import (
-    get_all_model_names,
-    get_model_with_thinking,
-)
+from tests.model_test_helpers import get_all_model_names, get_model_with_thinking
 
 
 class TestOpenAIProvider:
@@ -48,19 +45,23 @@ class TestOpenAIProvider:
 
         # All canonical model names from the registry should validate
         for model_name in get_all_model_names(ProviderType.OPENAI):
-            assert provider.validate_model_name(model_name) is True, (
-                f"Canonical model '{model_name}' should be valid"
-            )
+            assert provider.validate_model_name(model_name) is True, f"Canonical model '{model_name}' should be valid"
 
         # Well-known aliases should also validate
         well_known_aliases = [
-            "mini", "o3mini", "o4mini", "gpt5", "gpt5-mini",
-            "gpt5mini", "gpt5.2", "gpt5.1", "gpt5.1-codex", "codex-mini",
+            "mini",
+            "o3mini",
+            "o4mini",
+            "gpt5",
+            "gpt5-mini",
+            "gpt5mini",
+            "gpt5.2",
+            "gpt5.1",
+            "gpt5.1-codex",
+            "codex-mini",
         ]
         for alias in well_known_aliases:
-            assert provider.validate_model_name(alias) is True, (
-                f"Alias '{alias}' should be valid"
-            )
+            assert provider.validate_model_name(alias) is True, f"Alias '{alias}' should be valid"
 
         # Test invalid model
         assert provider.validate_model_name("invalid-model") is False
@@ -73,21 +74,27 @@ class TestOpenAIProvider:
 
         # Test that aliases resolve to valid models
         aliases = [
-            "mini", "o3mini", "o4mini", "gpt5", "gpt5-mini",
-            "gpt5mini", "gpt5.2", "gpt5.1", "gpt5.1-codex", "codex-mini",
+            "mini",
+            "o3mini",
+            "o4mini",
+            "gpt5",
+            "gpt5-mini",
+            "gpt5mini",
+            "gpt5.2",
+            "gpt5.1",
+            "gpt5.1-codex",
+            "codex-mini",
         ]
         for alias in aliases:
             resolved = provider._resolve_model_name(alias)
-            assert provider.validate_model_name(resolved), (
-                f"Alias '{alias}' resolved to '{resolved}' which is not valid"
-            )
+            assert provider.validate_model_name(
+                resolved
+            ), f"Alias '{alias}' resolved to '{resolved}' which is not valid"
 
         # Test full name passthrough -- canonical names should resolve to themselves
         for model_name in get_all_model_names(ProviderType.OPENAI):
             resolved = provider._resolve_model_name(model_name)
-            assert resolved == model_name, (
-                f"Canonical name '{model_name}' should pass through, got '{resolved}'"
-            )
+            assert resolved == model_name, f"Canonical name '{model_name}' should pass through, got '{resolved}'"
 
     def test_get_capabilities_o3(self):
         """Test getting model capabilities for O3."""
@@ -221,9 +228,9 @@ class TestOpenAIProvider:
         call_kwargs = mock_client.chat.completions.create.call_args[1]
 
         # CRITICAL ASSERTION: The API should receive the resolved name, not "gpt4.1"
-        assert call_kwargs["model"] == resolved_name, (
-            f"Expected '{resolved_name}' but API received '{call_kwargs['model']}'"
-        )
+        assert (
+            call_kwargs["model"] == resolved_name
+        ), f"Expected '{resolved_name}' but API received '{call_kwargs['model']}'"
 
         # Verify other parameters
         assert call_kwargs["temperature"] == 1.0

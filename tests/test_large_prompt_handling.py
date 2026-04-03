@@ -30,7 +30,7 @@ class TestLargePromptHandling:
         # Clear provider registry singleton
         from providers.registry import ModelProviderRegistry
 
-        ModelProviderRegistry._instance = None
+        ModelProviderRegistry.reset_for_testing()
 
     @pytest.fixture
     def large_prompt(self):
@@ -161,7 +161,7 @@ class TestLargePromptHandling:
             importlib.reload(config)
             from providers.registry import ModelProviderRegistry
 
-            ModelProviderRegistry._instance = None
+            ModelProviderRegistry.reset_for_testing()
 
             # Test with real provider resolution
             try:
@@ -217,7 +217,7 @@ class TestLargePromptHandling:
 
             # Reload config and clear registry
             importlib.reload(config)
-            ModelProviderRegistry._instance = None
+            ModelProviderRegistry.reset_for_testing()
 
     # NOTE: Precommit test has been removed because the precommit tool has been
     # refactored to use a workflow-based pattern instead of accepting simple prompt/path fields.

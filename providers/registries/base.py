@@ -132,9 +132,7 @@ class CustomModelRegistryBase:
             defaults = infer_defaults(model_name, litellm_data, provider_type)
 
             # Filter out aliases that conflict with existing ones
-            safe_aliases = [
-                a for a in defaults.get("aliases", []) if a.lower() not in existing_aliases
-            ]
+            safe_aliases = [a for a in defaults.get("aliases", []) if a.lower() not in existing_aliases]
             for a in safe_aliases:
                 existing_aliases.add(a.lower())
             defaults["aliases"] = safe_aliases

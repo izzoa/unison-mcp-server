@@ -790,7 +790,7 @@ class TestAutoModeWithRestrictions:
 
         try:
             # Clear registry and register only OpenAI and Gemini providers
-            ModelProviderRegistry._instance = None
+            ModelProviderRegistry.reset_for_testing()
             from providers.gemini import GeminiModelProvider
             from providers.openai import OpenAIModelProvider
 

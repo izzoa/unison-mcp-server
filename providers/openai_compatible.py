@@ -12,11 +12,16 @@ from utils.env import get_env, suppress_env_vars
 from utils.image_utils import validate_image
 
 from .base import ModelProvider
-from .shared import (
-    ModelCapabilities,
-    ModelResponse,
-    ProviderType,
-)
+from .shared import ModelCapabilities, ModelResponse, ProviderType
+
+try:
+    from openai import APIConnectionError as _OpenAIConnectionError
+    from openai import APIStatusError as _OpenAIStatusError
+    from openai import APITimeoutError as _OpenAITimeoutError
+except ImportError:
+    _OpenAIStatusError = None
+    _OpenAITimeoutError = None
+    _OpenAIConnectionError = None
 
 
 class OpenAICompatibleProvider(ModelProvider):
@@ -811,24 +816,21 @@ class OpenAICompatibleProvider(ModelProvider):
                 logging.debug(f"Retryable 429: rate limiting (type={error_type}, code={error_code})")
                 return True
 
-        # For non-429 errors, check if they're retryable
-        retryable_indicators = [
-            "timeout",
-            "connection",
-            "network",
-            "temporary",
-            "unavailable",
-            "retry",
-            "408",  # Request timeout
-            "500",  # Internal server error
-            "502",  # Bad gateway
-            "503",  # Service unavailable
-            "504",  # Gateway timeout
-            "ssl",  # SSL errors
-            "handshake",  # Handshake failures
-        ]
+        # Tier 1: OpenAI SDK exception classes
+        if _OpenAITimeoutError is not None and isinstance(error, _OpenAITimeoutError):
+            return True
+        if _OpenAIConnectionError is not None and isinstance(error, _OpenAIConnectionError):
+            return True
+        if _OpenAIStatusError is not None and isinstance(error, _OpenAIStatusError):
+            code = getattr(error, "status_code", None)
+            if isinstance(code, int):
+                if code in self._RETRYABLE_STATUS_CODES:
+                    return True
+                if code in self._NON_RETRYABLE_STATUS_CODES:
+                    return False
 
-        return any(indicator in error_str for indicator in retryable_indicators)
+        # Delegate to base class three-tier classification
+        return super()._is_error_retryable(error)
 
     def _process_image(self, image_path: str) -> Optional[dict]:
         """Process an image for OpenAI-compatible API."""

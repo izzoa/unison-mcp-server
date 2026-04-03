@@ -349,7 +349,7 @@ class TestCollaborationWorkflow:
         # Clear provider registry singleton
         from providers.registry import ModelProviderRegistry
 
-        ModelProviderRegistry._instance = None
+        ModelProviderRegistry.reset_for_testing()
 
     @pytest.mark.asyncio
     @patch("tools.shared.base_tool.BaseTool.get_model_provider")

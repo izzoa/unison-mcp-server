@@ -132,19 +132,21 @@ class TestMergeLogic:
         return {"_README": {"description": "Test"}, "models": models}
 
     def test_update_existing_model_capacity(self):
-        existing = self._make_existing([
-            {
-                "model_name": "gpt-5",
-                "aliases": ["gpt5"],
-                "intelligence_score": 16,
-                "description": "Curated description",
-                "context_window": 100000,
-                "max_output_tokens": 50000,
-                "supports_images": False,
-                "supports_function_calling": False,
-                "supports_json_mode": False,
-            }
-        ])
+        existing = self._make_existing(
+            [
+                {
+                    "model_name": "gpt-5",
+                    "aliases": ["gpt5"],
+                    "intelligence_score": 16,
+                    "description": "Curated description",
+                    "context_window": 100000,
+                    "max_output_tokens": 50000,
+                    "supports_images": False,
+                    "supports_function_calling": False,
+                    "supports_json_mode": False,
+                }
+            ]
+        )
         litellm_models = [
             {
                 "model_name": "gpt-5",
@@ -157,9 +159,7 @@ class TestMergeLogic:
         ]
         from providers.shared.provider_type import ProviderType
 
-        updated, result = refresh.merge_provider(
-            "openai_models.json", existing, litellm_models, ProviderType.OPENAI
-        )
+        updated, result = refresh.merge_provider("openai_models.json", existing, litellm_models, ProviderType.OPENAI)
 
         model = updated["models"][0]
         assert model["context_window"] == 400000
@@ -168,20 +168,22 @@ class TestMergeLogic:
         assert len(result.updated) == 5
 
     def test_curated_fields_preserved(self):
-        existing = self._make_existing([
-            {
-                "model_name": "gpt-5",
-                "aliases": ["gpt5", "five"],
-                "intelligence_score": 16,
-                "friendly_name": "My Custom Name",
-                "description": "My curated description",
-                "context_window": 100000,
-                "max_output_tokens": 50000,
-                "supports_images": False,
-                "supports_function_calling": False,
-                "supports_json_mode": False,
-            }
-        ])
+        existing = self._make_existing(
+            [
+                {
+                    "model_name": "gpt-5",
+                    "aliases": ["gpt5", "five"],
+                    "intelligence_score": 16,
+                    "friendly_name": "My Custom Name",
+                    "description": "My curated description",
+                    "context_window": 100000,
+                    "max_output_tokens": 50000,
+                    "supports_images": False,
+                    "supports_function_calling": False,
+                    "supports_json_mode": False,
+                }
+            ]
+        )
         litellm_models = [
             {
                 "model_name": "gpt-5",
@@ -194,9 +196,7 @@ class TestMergeLogic:
         ]
         from providers.shared.provider_type import ProviderType
 
-        updated, _ = refresh.merge_provider(
-            "openai_models.json", existing, litellm_models, ProviderType.OPENAI
-        )
+        updated, _ = refresh.merge_provider("openai_models.json", existing, litellm_models, ProviderType.OPENAI)
 
         model = updated["models"][0]
         assert model["aliases"] == ["gpt5", "five"]
@@ -220,9 +220,7 @@ class TestMergeLogic:
         ]
         from providers.shared.provider_type import ProviderType
 
-        updated, result = refresh.merge_provider(
-            "openai_models.json", existing, litellm_models, ProviderType.OPENAI
-        )
+        updated, result = refresh.merge_provider("openai_models.json", existing, litellm_models, ProviderType.OPENAI)
 
         assert len(updated["models"]) == 1
         assert result.added == ["gpt-99-turbo"]
@@ -233,21 +231,21 @@ class TestMergeLogic:
         assert new_model["friendly_name"] == "OpenAI (gpt-99-turbo)"
 
     def test_missing_from_litellm_flagged(self):
-        existing = self._make_existing([
-            {
-                "model_name": "custom-internal",
-                "context_window": 8192,
-                "max_output_tokens": 4096,
-                "supports_images": False,
-                "supports_function_calling": False,
-                "supports_json_mode": False,
-            }
-        ])
+        existing = self._make_existing(
+            [
+                {
+                    "model_name": "custom-internal",
+                    "context_window": 8192,
+                    "max_output_tokens": 4096,
+                    "supports_images": False,
+                    "supports_function_calling": False,
+                    "supports_json_mode": False,
+                }
+            ]
+        )
         from providers.shared.provider_type import ProviderType
 
-        _, result = refresh.merge_provider(
-            "openai_models.json", existing, [], ProviderType.OPENAI
-        )
+        _, result = refresh.merge_provider("openai_models.json", existing, [], ProviderType.OPENAI)
 
         assert result.not_in_litellm == ["custom-internal"]
 
@@ -256,9 +254,7 @@ class TestMergeLogic:
         existing = {"_README": readme, "models": []}
         from providers.shared.provider_type import ProviderType
 
-        updated, _ = refresh.merge_provider(
-            "openai_models.json", existing, [], ProviderType.OPENAI
-        )
+        updated, _ = refresh.merge_provider("openai_models.json", existing, [], ProviderType.OPENAI)
 
         assert updated["_README"] == readme
 

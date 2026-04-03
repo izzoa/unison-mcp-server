@@ -32,7 +32,7 @@ class TestModelEnumeration:
         }
 
         # Clear provider registry
-        ModelProviderRegistry._instance = None
+        ModelProviderRegistry.reset_for_testing()
 
     def teardown_method(self):
         """Clean up after each test."""
@@ -49,7 +49,7 @@ class TestModelEnumeration:
         importlib.reload(config)
 
         # Clear provider registry
-        ModelProviderRegistry._instance = None
+        ModelProviderRegistry.reset_for_testing()
 
     def _setup_environment(self, provider_config):
         """Helper to set up environment variables for testing."""
@@ -211,7 +211,7 @@ class TestModelEnumeration:
         monkeypatch.setattr(OpenRouterProvider, "_registry", None, raising=False)
 
         # Rebuild the provider registry with OpenRouter registered
-        ModelProviderRegistry._instance = None
+        ModelProviderRegistry.reset_for_testing()
         from providers.shared import ProviderType
 
         ModelProviderRegistry.register_provider(ProviderType.OPENROUTER, OpenRouterProvider)

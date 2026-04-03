@@ -35,7 +35,7 @@ class TestAutoModeCustomProviderOnly:
         utils.model_restrictions._restriction_service = None
 
         # Clear provider registry by resetting singleton instance
-        ModelProviderRegistry._instance = None
+        ModelProviderRegistry.reset_for_testing()
 
     def teardown_method(self):
         """Clean up after each test."""
@@ -57,7 +57,7 @@ class TestAutoModeCustomProviderOnly:
         utils.model_restrictions._restriction_service = None
 
         # Clear provider registry by resetting singleton instance
-        ModelProviderRegistry._instance = None
+        ModelProviderRegistry.reset_for_testing()
 
     def test_reproduce_auto_mode_custom_provider_only_issue(self):
         """Test the fix for auto mode failing when only custom provider is configured."""

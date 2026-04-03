@@ -24,7 +24,7 @@ class TestIntelligentFallback:
         self._original_initialized = registry._initialized_providers.copy()
 
         # Clear registry completely
-        ModelProviderRegistry._instance = None
+        ModelProviderRegistry.reset_for_testing()
 
     def teardown_method(self):
         """Cleanup after each test - restore original providers"""
@@ -96,7 +96,7 @@ class TestIntelligentFallback:
 
         with patch.dict(os.environ, {"OPENAI_API_KEY": "sk-test-key", "GEMINI_API_KEY": ""}, clear=False):
             # Clear and register providers
-            ModelProviderRegistry._instance = None
+            ModelProviderRegistry.reset_for_testing()
             ModelProviderRegistry.register_provider(ProviderType.OPENAI, OpenAIModelProvider)
             ModelProviderRegistry.register_provider(ProviderType.GOOGLE, GeminiModelProvider)
 
@@ -106,7 +106,7 @@ class TestIntelligentFallback:
 
         with patch.dict(os.environ, {"OPENAI_API_KEY": "", "GEMINI_API_KEY": "test-key"}, clear=False):
             # Clear and register providers
-            ModelProviderRegistry._instance = None
+            ModelProviderRegistry.reset_for_testing()
             ModelProviderRegistry.register_provider(ProviderType.OPENAI, OpenAIModelProvider)
             ModelProviderRegistry.register_provider(ProviderType.GOOGLE, GeminiModelProvider)
 

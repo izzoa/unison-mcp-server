@@ -16,12 +16,7 @@ from clink.constants import (
     USER_CONFIG_DIR,
     CLIInternalDefaults,
 )
-from clink.models import (
-    CLIClientConfig,
-    CLIRoleConfig,
-    ResolvedCLIClient,
-    ResolvedCLIRole,
-)
+from clink.models import CLIClientConfig, CLIRoleConfig, ResolvedCLIClient, ResolvedCLIRole
 from utils.env import get_env
 from utils.file_utils import read_json_file
 

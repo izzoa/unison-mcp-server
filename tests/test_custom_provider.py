@@ -242,7 +242,7 @@ class TestConfigureProvidersFunction:
 
     def test_configure_providers_custom_only(self):
         """Test configure_providers with only custom URL set."""
-        from server import configure_providers
+        from providers.configure import configure_providers
 
         with patch.dict(
             os.environ,
@@ -265,7 +265,7 @@ class TestConfigureProvidersFunction:
 
     def test_configure_providers_openrouter_only(self):
         """Test configure_providers with only OpenRouter key set."""
-        from server import configure_providers
+        from providers.configure import configure_providers
 
         with patch.dict(
             os.environ,
@@ -287,7 +287,7 @@ class TestConfigureProvidersFunction:
 
     def test_configure_providers_dual_setup(self):
         """Test configure_providers with both OpenRouter and Custom configured."""
-        from server import configure_providers
+        from providers.configure import configure_providers
 
         with patch.dict(
             os.environ,
@@ -310,7 +310,7 @@ class TestConfigureProvidersFunction:
 
     def test_configure_providers_no_valid_keys(self):
         """Test configure_providers raises error when no valid API keys."""
-        from server import configure_providers
+        from providers.configure import configure_providers
 
         with patch.dict(
             os.environ,

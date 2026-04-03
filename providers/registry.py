@@ -53,6 +53,7 @@ class ModelProviderRegistry:
             # Initialize instance dictionaries on first creation
             cls._instance._providers = {}
             cls._instance._initialized_providers = {}
+            cls._instance._config = None
             logging.debug(f"REGISTRY: Created instance {cls._instance}")
         return cls._instance
 
@@ -104,7 +105,7 @@ class ModelProviderRegistry:
                 provider = provider_class(api_key=api_key)
             else:
                 # Regular class - need to handle URL requirement
-                custom_url = get_env("CUSTOM_API_URL", "") or ""
+                custom_url = (instance._config or {}).get("CUSTOM_API_URL") or get_env("CUSTOM_API_URL", "") or ""
                 if not custom_url:
                     if api_key:  # Key is set but URL is missing
                         logging.warning("CUSTOM_API_KEY set but CUSTOM_API_URL missing – skipping Custom provider")
@@ -118,7 +119,7 @@ class ModelProviderRegistry:
             # For Gemini, check if custom base URL is configured
             if not api_key:
                 return None
-            gemini_base_url = get_env("GEMINI_BASE_URL")
+            gemini_base_url = (instance._config or {}).get("GEMINI_BASE_URL") or get_env("GEMINI_BASE_URL")
             provider_kwargs = {"api_key": api_key}
             if gemini_base_url:
                 provider_kwargs["base_url"] = gemini_base_url
@@ -128,12 +129,14 @@ class ModelProviderRegistry:
             if not api_key:
                 return None
 
-            azure_endpoint = get_env("AZURE_OPENAI_ENDPOINT")
+            azure_endpoint = (instance._config or {}).get("AZURE_OPENAI_ENDPOINT") or get_env("AZURE_OPENAI_ENDPOINT")
             if not azure_endpoint:
                 logging.warning("AZURE_OPENAI_ENDPOINT missing – skipping Azure OpenAI provider")
                 return None
 
-            azure_version = get_env("AZURE_OPENAI_API_VERSION")
+            azure_version = (instance._config or {}).get("AZURE_OPENAI_API_VERSION") or get_env(
+                "AZURE_OPENAI_API_VERSION"
+            )
             provider = provider_class(
                 api_key=api_key,
                 azure_endpoint=azure_endpoint,
@@ -323,7 +326,7 @@ class ModelProviderRegistry:
 
     @classmethod
     def _get_api_key_for_provider(cls, provider_type: ProviderType) -> Optional[str]:
-        """Get API key for a provider from environment variables.
+        """Get API key for a provider from config dict or environment variables.
 
         Args:
             provider_type: Provider type to get API key for
@@ -331,6 +334,7 @@ class ModelProviderRegistry:
         Returns:
             API key string or None if not found
         """
+        instance = cls()
         key_mapping = {
             ProviderType.GOOGLE: "GEMINI_API_KEY",
             ProviderType.OPENAI: "OPENAI_API_KEY",
@@ -345,7 +349,7 @@ class ModelProviderRegistry:
         if not env_var:
             return None
 
-        return get_env(env_var)
+        return (instance._config or {}).get(env_var) or get_env(env_var)
 
     @classmethod
     def _get_allowed_models_for_provider(cls, provider: ModelProvider, provider_type: ProviderType) -> list[str]:
@@ -461,6 +465,27 @@ class ModelProviderRegistry:
         cls._instance = None
         if hasattr(cls, "_providers"):
             cls._providers = {}
+        cls._config = None
+
+    @classmethod
+    def create_for_testing(cls, config: dict[str, str]) -> "ModelProviderRegistry":
+        """Create a fresh registry instance pre-loaded with the given config.
+
+        This is the preferred entry point for tests that need to inject API keys
+        or endpoint URLs without touching real environment variables.
+
+        Args:
+            config: Mapping of environment-variable names to values
+                    (e.g. ``{"GEMINI_API_KEY": "test-key"}``).
+
+        Returns:
+            A freshly initialised :class:`ModelProviderRegistry` singleton whose
+            ``_config`` dict will be consulted before the real environment.
+        """
+        cls.reset_for_testing()
+        instance = cls()
+        instance._config = config
+        return instance
 
     @classmethod
     def unregister_provider(cls, provider_type: ProviderType) -> None:

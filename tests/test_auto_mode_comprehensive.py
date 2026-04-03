@@ -36,7 +36,7 @@ class TestAutoModeComprehensive:
         utils.model_restrictions._restriction_service = None
 
         # Clear provider registry by resetting singleton instance
-        ModelProviderRegistry._instance = None
+        ModelProviderRegistry.reset_for_testing()
 
     def teardown_method(self):
         """Clean up after each test."""
@@ -61,7 +61,7 @@ class TestAutoModeComprehensive:
         utils.model_restrictions._restriction_service = None
 
         # Clear provider registry by resetting singleton instance
-        ModelProviderRegistry._instance = None
+        ModelProviderRegistry.reset_for_testing()
 
         # Re-register providers for subsequent tests (like conftest.py does)
         ModelProviderRegistry.register_provider(ProviderType.GOOGLE, GeminiModelProvider)
@@ -183,9 +183,7 @@ class TestAutoModeComprehensive:
 
                 # Validate the model is valid for the expected provider
                 provider = ModelProviderRegistry.get_provider(checks["provider"])
-                assert provider is not None, (
-                    f"Provider {checks['provider']} not available for config {provider_config}"
-                )
+                assert provider is not None, f"Provider {checks['provider']} not available for config {provider_config}"
                 assert provider.validate_model_name(fallback_model), (
                     f"Provider config {provider_config}: "
                     f"Model '{fallback_model}' not valid for {checks['provider']} in {category_name}"
@@ -199,9 +197,7 @@ class TestAutoModeComprehensive:
                         f"Expected thinking model for {category_name}, got {fallback_model}"
                     )
                 if checks.get("fast_tier"):
-                    assert any(
-                        p in fallback_model.lower() for p in ("flash", "mini", "lite", "fast", "nano")
-                    ), (
+                    assert any(p in fallback_model.lower() for p in ("flash", "mini", "lite", "fast", "nano")), (
                         f"Provider config {provider_config}: "
                         f"Expected fast-tier model for {category_name}, got {fallback_model}"
                     )

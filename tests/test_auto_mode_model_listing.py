@@ -78,7 +78,9 @@ def test_error_listing_respects_env_restrictions(monkeypatch, reset_registry):
     try:
         import dotenv
 
-        monkeypatch.setattr(dotenv, "dotenv_values", lambda *_args, **_kwargs: {"UNISON_MCP_FORCE_ENV_OVERRIDE": "false"})
+        monkeypatch.setattr(
+            dotenv, "dotenv_values", lambda *_args, **_kwargs: {"UNISON_MCP_FORCE_ENV_OVERRIDE": "false"}
+        )
     except ModuleNotFoundError:
         pass
 
@@ -166,7 +168,9 @@ def test_error_listing_without_restrictions_shows_full_catalog(monkeypatch, rese
     try:
         import dotenv
 
-        monkeypatch.setattr(dotenv, "dotenv_values", lambda *_args, **_kwargs: {"UNISON_MCP_FORCE_ENV_OVERRIDE": "false"})
+        monkeypatch.setattr(
+            dotenv, "dotenv_values", lambda *_args, **_kwargs: {"UNISON_MCP_FORCE_ENV_OVERRIDE": "false"}
+        )
     except ModuleNotFoundError:
         pass
 

@@ -10,6 +10,17 @@ if TYPE_CHECKING:
 
 from .shared import ModelCapabilities, ModelResponse, ProviderType
 
+try:
+    import httpx
+
+    _HttpxTimeoutException = httpx.TimeoutException
+    _HttpxConnectError = httpx.ConnectError
+    _HttpxHTTPStatusError = httpx.HTTPStatusError
+except ImportError:
+    _HttpxTimeoutException = None
+    _HttpxConnectError = None
+    _HttpxHTTPStatusError = None
+
 logger = logging.getLogger(__name__)
 
 
@@ -38,6 +49,9 @@ class ModelProvider(ABC):
 
     # All concrete providers must define their supported models
     MODEL_CAPABILITIES: dict[str, Any] = {}
+
+    _RETRYABLE_STATUS_CODES = {408, 500, 502, 503, 504, 529}
+    _NON_RETRYABLE_STATUS_CODES = {400, 401, 403, 404, 422}
 
     def __init__(self, api_key: str, **kwargs):
         """Initialize the provider with API key and optional configuration."""
@@ -263,19 +277,50 @@ class ModelProvider(ABC):
     # ------------------------------------------------------------------
     # Retry helpers
     # ------------------------------------------------------------------
-    def _is_error_retryable(self, error: Exception) -> bool:
-        """Return True when an error warrants another attempt.
+    def _extract_status_code(self, error: Exception) -> Optional[int]:
+        """Extract an HTTP status code from an exception, if available."""
+        for attr in ("status_code", "code"):
+            val = getattr(error, attr, None)
+            if isinstance(val, int):
+                return val
+        resp = getattr(error, "response", None)
+        if resp is not None:
+            val = getattr(resp, "status_code", None)
+            if isinstance(val, int):
+                return val
+        return None
 
-        Subclasses with structured provider errors should override this hook.
-        The default implementation only retries obvious transient failures such
-        as timeouts or 5xx responses detected via string inspection.
-        """
+    def _is_error_retryable(self, error: Exception) -> bool:
+        """Three-tier error classification: class hierarchy -> status code -> string fallback."""
 
         error_str = str(error).lower()
 
+        # Pre-check: 429/rate-limit is never retried by this layer
         if "429" in error_str or "rate limit" in error_str:
             return False
 
+        # Tier 1: Exception class hierarchy (most reliable)
+        if _HttpxTimeoutException is not None and isinstance(error, _HttpxTimeoutException):
+            return True
+        if _HttpxConnectError is not None and isinstance(error, _HttpxConnectError):
+            return True
+        if _HttpxHTTPStatusError is not None and isinstance(error, _HttpxHTTPStatusError):
+            code = self._extract_status_code(error)
+            if code is not None:
+                if code in self._RETRYABLE_STATUS_CODES:
+                    return True
+                if code in self._NON_RETRYABLE_STATUS_CODES:
+                    return False
+
+        # Tier 2: Numeric status code from error attributes
+        code = self._extract_status_code(error)
+        if code is not None:
+            if code in self._RETRYABLE_STATUS_CODES:
+                return True
+            if code in self._NON_RETRYABLE_STATUS_CODES:
+                return False
+
+        # Tier 3: String pattern fallback (least reliable, kept for compatibility)
         retryable_indicators = [
             "timeout",
             "connection",
@@ -293,7 +338,6 @@ class ModelProvider(ABC):
             "503",
             "504",
         ]
-
         return any(indicator in error_str for indicator in retryable_indicators)
 
     def _run_with_retries(

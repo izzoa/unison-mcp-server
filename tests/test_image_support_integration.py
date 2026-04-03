@@ -271,7 +271,7 @@ class TestImageSupportIntegration:
             importlib.reload(config)
             from providers.registry import ModelProviderRegistry
 
-            ModelProviderRegistry._instance = None
+            ModelProviderRegistry.reset_for_testing()
 
             tool = ChatTool()
 
@@ -293,10 +293,21 @@ class TestImageSupportIntegration:
             assert "MagicMock" not in error_msg
             assert "'<' not supported between instances" not in error_msg
 
-            # Should be a real provider error (API key or network)
+            # Should be a real provider error (API key or network) or model unavailability
             assert any(
                 phrase in error_msg
-                for phrase in ["API", "key", "authentication", "provider", "network", "connection", "401", "403"]
+                for phrase in [
+                    "API",
+                    "key",
+                    "authentication",
+                    "provider",
+                    "network",
+                    "connection",
+                    "401",
+                    "403",
+                    "not available",
+                    "capabilities could not be determined",
+                ]
             )
 
         finally:
@@ -312,7 +323,7 @@ class TestImageSupportIntegration:
 
             # Reload config and clear registry
             importlib.reload(config)
-            ModelProviderRegistry._instance = None
+            ModelProviderRegistry.reset_for_testing()
 
     @patch("utils.conversation_memory.get_storage")
     def test_cross_tool_image_context_preservation(self, mock_storage):

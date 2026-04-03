@@ -12,6 +12,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Renamed project from PAL to Unison
   ([`9304047`](https://github.com/izzoa/unison-mcp-server/commit/9304047))
 
+## v10.0.0 (2026-04-03)
+
+### Changed
+
+- **refactor**: Decompose `server.py` from 1,526 to 962 lines — extract logging setup (`utils/logging_setup.py`), prompt templates (`conf/prompt_templates.py`), request helpers (`utils/request_helpers.py`), model resolution (`utils/model_resolution.py`), and provider configuration (`providers/configure.py`) into dedicated modules
+- **refactor**: Decompose `tools/shared/base_tool.py` from 1,606 to 753 lines — extract `FileProcessor`, `ConversationHandler`, `ResponseFormatter`, and `ModelSchemaBuilder` as composed components under `tools/shared/`
+- **refactor**: Replace 3x duplicated fallback model resolution pattern with single `resolve_fallback_model()` helper in `utils/model_resolution.py`
+- **refactor**: Convert provider registration from two-pass key validation to single-pass data-driven approach with `ProviderSpec` in `providers/configure.py`
+- **providers**: Replace string-only error classification with three-tier retry strategy: exception class hierarchy → numeric HTTP status code → string pattern fallback in `providers/base.py`
+- **providers**: Gemini and OpenAI provider `_is_error_retryable()` overrides now delegate to `super()` for common fallback instead of duplicating string lists
+- **performance**: Convert all f-string `logger.debug()` calls in `reconstruct_thread_context()` to `%s`-style lazy formatting with `isEnabledFor()` guards for clusters
+- **testing**: Replace all 41 instances of `ModelProviderRegistry._instance = None` with `reset_for_testing()` across 13 test files
+
+### Added
+
+- `utils/logging_setup.py` — encapsulated logging configuration with `configure_logging()` function
+- `conf/prompt_templates.py` — externalized prompt template definitions for all 18 tools
+- `utils/request_helpers.py` — follow-up instruction generation utilities
+- `utils/model_resolution.py` — `parse_model_option()` and `resolve_fallback_model()` helpers
+- `providers/configure.py` — data-driven provider registration with `ProviderSpec` dataclass
+- `tools/shared/file_processor.py` — file reading, deduplication, token-budget enforcement, image validation
+- `tools/shared/conversation_handler.py` — conversation turn formatting and prompt-size checks
+- `tools/shared/response_formatter.py` — response passthrough and parse hooks
+- `tools/shared/model_schema_builder.py` — model field JSON schema generation and available models enumeration
+- `StorageBackend` protocol in `utils/storage_backend.py` with `reset_storage_backend()` and injectable `get_storage_backend(backend=...)` for test isolation
+- `ModelProviderRegistry.create_for_testing(config)` classmethod for config injection without environment variables
+- Guarded `httpx`, `google.api_core.exceptions`, and `openai` SDK exception imports for structured error classification
+- `_extract_status_code()` helper and `_RETRYABLE_STATUS_CODES`/`_NON_RETRYABLE_STATUS_CODES` class constants on `ModelProvider`
+- 116 new unit tests across 5 new test files (`test_file_processor.py`, `test_conversation_handler.py`, `test_response_formatter.py`, `test_model_schema_builder.py`, `test_registry_testability.py`) plus 4 new tests in `test_rate_limit_patterns.py`
+
+### Fixed
+
+- Misleading comments in logging configuration (backupCount and maxBytes values now match actual code)
+
 ## v9.8.2 (2025-12-15)
 
 ### Fixed

@@ -18,6 +18,13 @@ from .registries.gemini import GeminiModelRegistry
 from .registry_provider_mixin import RegistryBackedProviderMixin
 from .shared import ModelCapabilities, ModelResponse, ProviderType
 
+try:
+    from google.api_core.exceptions import DeadlineExceeded, InternalServerError, ServiceUnavailable
+
+    _GEMINI_RETRYABLE_EXCEPTIONS = (ServiceUnavailable, DeadlineExceeded, InternalServerError)
+except ImportError:
+    _GEMINI_RETRYABLE_EXCEPTIONS = ()
+
 logger = logging.getLogger(__name__)
 
 
@@ -410,25 +417,12 @@ class GeminiModelProvider(RegistryBackedProviderMixin, ModelProvider):
             logger.debug(f"Retryable Gemini rate limiting error: {error_str[:100]}...")
             return True
 
-        # For non-429 errors, check if they're retryable
-        retryable_indicators = [
-            "timeout",
-            "connection",
-            "network",
-            "temporary",
-            "unavailable",
-            "retry",
-            "internal error",
-            "408",  # Request timeout
-            "500",  # Internal server error
-            "502",  # Bad gateway
-            "503",  # Service unavailable
-            "504",  # Gateway timeout
-            "ssl",  # SSL errors
-            "handshake",  # Handshake failures
-        ]
+        # Tier 1: Gemini SDK exception classes
+        if _GEMINI_RETRYABLE_EXCEPTIONS and isinstance(error, _GEMINI_RETRYABLE_EXCEPTIONS):
+            return True
 
-        return any(indicator in error_str for indicator in retryable_indicators)
+        # Delegate to base class three-tier classification
+        return super()._is_error_retryable(error)
 
     def _process_image(self, image_path: str) -> Optional[dict]:
         """Process an image for Gemini API."""

@@ -46,10 +46,7 @@ from providers.shared.provider_type import ProviderType  # noqa: E402
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
-LITELLM_URL = (
-    "https://raw.githubusercontent.com/BerriAI/litellm/main/"
-    "model_prices_and_context_window.json"
-)
+LITELLM_URL = "https://raw.githubusercontent.com/BerriAI/litellm/main/" "model_prices_and_context_window.json"
 
 CONF_DIR = REPO_ROOT / "conf"
 
@@ -144,9 +141,9 @@ def filter_models_by_provider(catalog: dict) -> dict[str, list[dict]]:
 
         # Strip provider prefix from model name
         flat_name = full_key
-        for prefix in (f"{litellm_provider}/", ):
+        for prefix in (f"{litellm_provider}/",):
             if flat_name.startswith(prefix):
-                flat_name = flat_name[len(prefix):]
+                flat_name = flat_name[len(prefix) :]
                 break
 
         model_info = {
@@ -212,12 +209,14 @@ def merge_provider(
                 continue
             old_val = model.get(field)
             if old_val != new_val:
-                result.updated.append({
-                    "model": name,
-                    "field": field,
-                    "old": old_val,
-                    "new": new_val,
-                })
+                result.updated.append(
+                    {
+                        "model": name,
+                        "field": field,
+                        "old": old_val,
+                        "new": new_val,
+                    }
+                )
                 model[field] = new_val
 
     # 2. Add new models
@@ -278,9 +277,11 @@ def generate_summary(results: list[MergeResult]) -> str:
     total_added = sum(len(r.added) for r in results)
     total_missing = sum(len(r.not_in_litellm) for r in results)
 
-    lines.append(f"**Updated fields**: {total_updated} | "
-                 f"**New models**: {total_added} | "
-                 f"**Not in LiteLLM**: {total_missing}\n")
+    lines.append(
+        f"**Updated fields**: {total_updated} | "
+        f"**New models**: {total_added} | "
+        f"**Not in LiteLLM**: {total_missing}\n"
+    )
 
     for r in results:
         if not r.updated and not r.added and not r.not_in_litellm:
@@ -328,8 +329,10 @@ def main() -> int:
 
     # Filter by provider
     provider_models = filter_models_by_provider(catalog)
-    print(f"Filtered to {sum(len(v) for v in provider_models.values())} chat models "
-          f"across {len(provider_models)} providers")
+    print(
+        f"Filtered to {sum(len(v) for v in provider_models.values())} chat models "
+        f"across {len(provider_models)} providers"
+    )
 
     # Merge each provider
     all_results: list[MergeResult] = []
@@ -344,9 +347,7 @@ def main() -> int:
         with open(conf_path) as f:
             existing_data = json.load(f)
 
-        provider_type = PROVIDER_MAP[next(
-            k for k, (_, fname) in PROVIDER_MAP.items() if fname == conf_file
-        )][0]
+        provider_type = PROVIDER_MAP[next(k for k, (_, fname) in PROVIDER_MAP.items() if fname == conf_file)][0]
 
         updated_data, result = merge_provider(conf_file, existing_data, litellm_models, provider_type)
         all_results.append(result)

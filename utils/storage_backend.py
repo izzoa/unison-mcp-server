@@ -21,11 +21,24 @@ Key Features:
 import logging
 import threading
 import time
-from typing import Optional
+from typing import Optional, Protocol, runtime_checkable
 
 from utils.env import get_env
 
 logger = logging.getLogger(__name__)
+
+
+@runtime_checkable
+class StorageBackend(Protocol):
+    """Protocol defining the interface for conversation storage backends."""
+
+    def get(self, key: str) -> Optional[str]: ...
+
+    def set_with_ttl(self, key: str, ttl_seconds: int, value: str) -> None: ...
+
+    def setex(self, key: str, ttl_seconds: int, value: str) -> None: ...
+
+    def shutdown(self) -> None: ...
 
 
 class InMemoryStorage:
@@ -103,12 +116,32 @@ _storage_instance = None
 _storage_lock = threading.Lock()
 
 
-def get_storage_backend() -> InMemoryStorage:
-    """Get the global storage instance (singleton pattern)"""
+def get_storage_backend(backend: Optional[StorageBackend] = None) -> StorageBackend:
+    """Get the global storage instance (singleton pattern).
+
+    Args:
+        backend: Optional storage backend to install as the singleton.
+                 When provided, it replaces any existing instance and is returned.
+    """
     global _storage_instance
+    if backend is not None:
+        with _storage_lock:
+            _storage_instance = backend
+        return _storage_instance
     if _storage_instance is None:
         with _storage_lock:
             if _storage_instance is None:
                 _storage_instance = InMemoryStorage()
                 logger.info("Initialized in-memory conversation storage")
     return _storage_instance
+
+
+def reset_storage_backend() -> None:
+    """Reset the global storage singleton to ``None``.
+
+    This is intended for test teardown so that subsequent calls to
+    :func:`get_storage_backend` create (or accept) a fresh instance.
+    """
+    global _storage_instance
+    with _storage_lock:
+        _storage_instance = None

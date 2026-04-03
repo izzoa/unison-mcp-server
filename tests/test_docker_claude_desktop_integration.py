@@ -132,7 +132,9 @@ class TestDockerClaudeDesktopIntegration:
         """Test validation of MCP configuration"""
         # Valid configuration
         valid_config = {
-            "mcpServers": {"unison-mcp": {"command": "docker", "args": ["run", "--rm", "-i", "unison-mcp-server:latest"]}}
+            "mcpServers": {
+                "unison-mcp": {"command": "docker", "args": ["run", "--rm", "-i", "unison-mcp-server:latest"]}
+            }
         }
 
         # Validate JSON serialization

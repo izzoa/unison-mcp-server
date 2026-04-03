@@ -210,7 +210,7 @@ def get_storage():
     Get in-memory storage backend for conversation persistence.
 
     Returns:
-        InMemoryStorage: Thread-safe in-memory storage backend
+        StorageBackend: Thread-safe storage backend
     """
     from .storage_backend import get_storage_backend
 

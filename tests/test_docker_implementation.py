@@ -80,7 +80,9 @@ class TestDockerCommands:
 
         # Simulate docker build
         subprocess.run(
-            ["docker", "build", "-t", "unison-mcp-server:latest", str(self.project_root)], capture_output=True, text=True
+            ["docker", "build", "-t", "unison-mcp-server:latest", str(self.project_root)],
+            capture_output=True,
+            text=True,
         )
 
         mock_run.assert_called_once()

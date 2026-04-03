@@ -218,20 +218,14 @@ def infer_aliases(model_name: str) -> list[str]:
     return aliases
 
 
-def infer_thinking_support(
-    model_name: str, model_info: dict[str, Any]
-) -> tuple[bool, int]:
+def infer_thinking_support(model_name: str, model_info: dict[str, Any]) -> tuple[bool, int]:
     """Return (supports_extended_thinking, max_thinking_tokens)."""
-    if model_info.get("_litellm_supports_reasoning") or model_info.get(
-        "supports_extended_thinking"
-    ):
+    if model_info.get("_litellm_supports_reasoning") or model_info.get("supports_extended_thinking"):
         return True, 32768
     return False, 0
 
 
-def infer_temperature_constraint(
-    model_name: str, model_info: dict[str, Any]
-) -> tuple[bool, TemperatureConstraint]:
+def infer_temperature_constraint(model_name: str, model_info: dict[str, Any]) -> tuple[bool, TemperatureConstraint]:
     """Return (supports_temperature, constraint)."""
     name_lower = model_name.lower()
 

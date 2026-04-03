@@ -6,11 +6,7 @@ from utils.env import get_env
 
 from .openai_compatible import OpenAICompatibleProvider
 from .registries.openrouter import OpenRouterModelRegistry
-from .shared import (
-    ModelCapabilities,
-    ProviderType,
-    RangeTemperatureConstraint,
-)
+from .shared import ModelCapabilities, ProviderType, RangeTemperatureConstraint
 
 
 class OpenRouterProvider(OpenAICompatibleProvider):

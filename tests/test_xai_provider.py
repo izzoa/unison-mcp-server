@@ -7,13 +7,13 @@ import pytest
 
 from providers.shared import ProviderType
 from providers.xai import XAIModelProvider
-from tests.model_test_helpers import (
+from tests.model_test_helpers import (  # noqa: F401 - get_any_model removed
     get_all_aliases,
     get_all_model_names,
     get_flagship_model,
     get_flash_model,
     get_model_with_thinking,
-)  # noqa: F401 - get_any_model removed
+)
 
 
 class TestXAIProvider:
@@ -53,16 +53,14 @@ class TestXAIProvider:
 
         # All canonical model names should be valid
         for model_name in get_all_model_names(ProviderType.XAI):
-            assert provider.validate_model_name(model_name) is True, (
-                f"Canonical model {model_name!r} should validate"
-            )
+            assert provider.validate_model_name(model_name) is True, f"Canonical model {model_name!r} should validate"
 
         # All aliases should be valid
         for model_name, aliases in get_all_aliases(ProviderType.XAI).items():
             for alias in aliases:
-                assert provider.validate_model_name(alias) is True, (
-                    f"Alias {alias!r} for {model_name!r} should validate"
-                )
+                assert (
+                    provider.validate_model_name(alias) is True
+                ), f"Alias {alias!r} for {model_name!r} should validate"
 
         # Non-XAI models should be invalid
         assert provider.validate_model_name("invalid-model") is False
@@ -78,9 +76,9 @@ class TestXAIProvider:
         for _model_name, aliases in get_all_aliases(ProviderType.XAI).items():
             for alias in aliases:
                 resolved = provider._resolve_model_name(alias)
-                assert resolved in all_canonical, (
-                    f"Alias {alias!r} resolved to {resolved!r} which is not a canonical model"
-                )
+                assert (
+                    resolved in all_canonical
+                ), f"Alias {alias!r} resolved to {resolved!r} which is not a canonical model"
 
         # Every canonical name should resolve to itself
         for model_name in all_canonical:
@@ -138,9 +136,9 @@ class TestXAIProvider:
                 if non_canonical_aliases:
                     alias = non_canonical_aliases[0]
                     capabilities = provider.get_capabilities(alias)
-                    assert capabilities.model_name in all_canonical, (
-                        f"Capabilities for alias {alias!r} should have a canonical model_name"
-                    )
+                    assert (
+                        capabilities.model_name in all_canonical
+                    ), f"Capabilities for alias {alias!r} should have a canonical model_name"
                     assert provider.validate_model_name(alias) is True
                     break
 
@@ -164,9 +162,9 @@ class TestXAIProvider:
             caps = provider.get_capabilities(model_name)
             if caps.supports_extended_thinking:
                 for alias in aliases:
-                    assert provider.get_capabilities(alias).supports_extended_thinking is True, (
-                        f"Alias {alias!r} of thinking model {model_name!r} should support thinking"
-                    )
+                    assert (
+                        provider.get_capabilities(alias).supports_extended_thinking is True
+                    ), f"Alias {alias!r} of thinking model {model_name!r} should support thinking"
 
     def test_provider_type(self):
         """Test provider type identification."""
@@ -233,14 +231,14 @@ class TestXAIProvider:
 
         # Every canonical model and alias should be allowed
         for model_name in get_all_model_names(ProviderType.XAI):
-            assert provider.validate_model_name(model_name) is True, (
-                f"Model {model_name!r} should be allowed with empty restrictions"
-            )
+            assert (
+                provider.validate_model_name(model_name) is True
+            ), f"Model {model_name!r} should be allowed with empty restrictions"
         for _model_name, aliases in get_all_aliases(ProviderType.XAI).items():
             for alias in aliases:
-                assert provider.validate_model_name(alias) is True, (
-                    f"Alias {alias!r} should be allowed with empty restrictions"
-                )
+                assert (
+                    provider.validate_model_name(alias) is True
+                ), f"Alias {alias!r} should be allowed with empty restrictions"
 
     def test_friendly_name(self):
         """Test friendly name constant and per-model friendly names."""
@@ -250,9 +248,9 @@ class TestXAIProvider:
         # Every model's friendly_name should start with the provider prefix
         for model_name in get_all_model_names(ProviderType.XAI):
             capabilities = provider.get_capabilities(model_name)
-            assert capabilities.friendly_name.startswith("X.AI"), (
-                f"Model {model_name!r} friendly_name should start with 'X.AI'"
-            )
+            assert capabilities.friendly_name.startswith(
+                "X.AI"
+            ), f"Model {model_name!r} friendly_name should start with 'X.AI'"
 
     def test_supported_models_structure(self):
         """Test that MODEL_CAPABILITIES has the correct structure."""
@@ -264,20 +262,14 @@ class TestXAIProvider:
 
         for model_name in all_models:
             config = provider.MODEL_CAPABILITIES[model_name]
-            assert isinstance(config, ModelCapabilities), (
-                f"Model {model_name!r} should be a ModelCapabilities instance"
-            )
+            assert isinstance(config, ModelCapabilities), f"Model {model_name!r} should be a ModelCapabilities instance"
             assert hasattr(config, "context_window")
             assert hasattr(config, "supports_extended_thinking")
             assert hasattr(config, "aliases")
-            assert config.context_window >= 100_000, (
-                f"Model {model_name!r} context_window should be at least 100K"
-            )
+            assert config.context_window >= 100_000, f"Model {model_name!r} context_window should be at least 100K"
 
             # Every model should have at least one alias
-            assert len(config.aliases) >= 1, (
-                f"Model {model_name!r} should have at least one alias"
-            )
+            assert len(config.aliases) >= 1, f"Model {model_name!r} should have at least one alias"
 
     @patch("providers.openai_compatible.OpenAI")
     def test_generate_content_resolves_alias_before_api_call(self, mock_openai_class):
@@ -325,18 +317,16 @@ class TestXAIProvider:
         provider = XAIModelProvider("test-key")
 
         # Call generate_content with the alias
-        result = provider.generate_content(
-            prompt="Test prompt", model_name=test_alias, temperature=0.7
-        )
+        result = provider.generate_content(prompt="Test prompt", model_name=test_alias, temperature=0.7)
 
         # Verify the API was called with the RESOLVED canonical name
         mock_client.chat.completions.create.assert_called_once()
         call_kwargs = mock_client.chat.completions.create.call_args[1]
 
         # CRITICAL ASSERTION: The API should receive the canonical name, not the alias
-        assert call_kwargs["model"] == expected_canonical, (
-            f"Expected canonical {expected_canonical!r} but API received {call_kwargs['model']!r}"
-        )
+        assert (
+            call_kwargs["model"] == expected_canonical
+        ), f"Expected canonical {expected_canonical!r} but API received {call_kwargs['model']!r}"
 
         # Verify other parameters
         assert call_kwargs["temperature"] == 0.7
@@ -377,6 +367,5 @@ class TestXAIProvider:
                 provider.generate_content(prompt="Test", model_name=alias, temperature=0.7)
                 call_kwargs = mock_client.chat.completions.create.call_args[1]
                 assert call_kwargs["model"] in all_canonical, (
-                    f"Alias {alias!r} should resolve to a canonical model, "
-                    f"got {call_kwargs['model']!r}"
+                    f"Alias {alias!r} should resolve to a canonical model, " f"got {call_kwargs['model']!r}"
                 )

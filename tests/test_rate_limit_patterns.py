@@ -138,3 +138,163 @@ def test_edge_cases_and_fallbacks():
 
     simple_429_error = MockSimple429Error()
     assert provider._is_error_retryable(simple_429_error), "Simple 429 without type info should be retryable"
+
+
+# ---- Three-tier classification tests ----
+
+
+def test_httpx_exception_class_hierarchy():
+    """Test that httpx exception classes are classified via isinstance (Tier 1)."""
+    from providers.base import ModelProvider
+
+    # Create a concrete subclass for testing
+    class TestProvider(ModelProvider):
+        def generate_content(self, *args, **kwargs):
+            pass
+
+        def count_tokens(self, text, model_name):
+            return len(text) // 4
+
+        def get_provider_type(self):
+            return "test"
+
+    provider = TestProvider(api_key="test-key")
+
+    try:
+        import httpx
+
+        # httpx.TimeoutException should be retryable
+        timeout_err = httpx.ReadTimeout("read timed out")
+        assert provider._is_error_retryable(timeout_err), "httpx.TimeoutException should be retryable"
+
+        # httpx.ConnectError should be retryable
+        connect_err = httpx.ConnectError("connection refused")
+        assert provider._is_error_retryable(connect_err), "httpx.ConnectError should be retryable"
+    except ImportError:
+        pass  # httpx not available, skip
+
+
+def test_numeric_status_code_extraction():
+    """Test that numeric status codes from error attributes are used (Tier 2)."""
+    from providers.base import ModelProvider
+
+    class TestProvider(ModelProvider):
+        def generate_content(self, *args, **kwargs):
+            pass
+
+        def count_tokens(self, text, model_name):
+            return len(text) // 4
+
+        def get_provider_type(self):
+            return "test"
+
+    provider = TestProvider(api_key="test-key")
+
+    # 503 status code should be retryable
+    class Mock503Error(Exception):
+        status_code = 503
+
+    assert provider._is_error_retryable(Mock503Error()), "503 status_code should be retryable"
+
+    # 401 status code should NOT be retryable
+    class Mock401Error(Exception):
+        status_code = 401
+
+    assert not provider._is_error_retryable(Mock401Error()), "401 status_code should not be retryable"
+
+    # 404 status code should NOT be retryable
+    class Mock404Error(Exception):
+        status_code = 404
+
+    assert not provider._is_error_retryable(Mock404Error()), "404 status_code should not be retryable"
+
+
+def test_false_positive_regression():
+    """Test that ambiguous error messages don't false-positive on status code strings."""
+    from providers.base import ModelProvider
+
+    class TestProvider(ModelProvider):
+        def generate_content(self, *args, **kwargs):
+            pass
+
+        def count_tokens(self, text, model_name):
+            return len(text) // 4
+
+        def get_provider_type(self):
+            return "test"
+
+    provider = TestProvider(api_key="test-key")
+
+    # "Connection pool exhausted after 500 attempts" with status_code=None
+    # should fall through to string matching (matches "connection")
+    class MockAmbiguousError(Exception):
+        status_code = None
+
+        def __init__(self):
+            super().__init__("Connection pool exhausted after 500 attempts")
+
+    assert provider._is_error_retryable(
+        MockAmbiguousError()
+    ), "Ambiguous error with status_code=None should fall to string matching"
+
+    # Same message but with status_code=200 should NOT be retryable via tier 2
+    # but tier 3 string match on "connection" will still fire
+    class MockOkStatusError(Exception):
+        status_code = 200
+
+        def __init__(self):
+            super().__init__("Connection pool exhausted after 500 attempts")
+
+    # status_code=200 is neither retryable nor non-retryable, falls to string matching
+    result = provider._is_error_retryable(MockOkStatusError())
+    # String fallback matches "connection" so this returns True
+    assert result, "status_code=200 falls through to string matching"
+
+
+def test_httpx_not_importable_fallback():
+    """Test that string fallback works when httpx sentinels are None."""
+    import providers.base as base_mod
+
+    # Save originals
+    orig_timeout = base_mod._HttpxTimeoutException
+    orig_connect = base_mod._HttpxConnectError
+    orig_status = base_mod._HttpxHTTPStatusError
+
+    try:
+        # Simulate httpx not importable
+        base_mod._HttpxTimeoutException = None
+        base_mod._HttpxConnectError = None
+        base_mod._HttpxHTTPStatusError = None
+
+        from providers.base import ModelProvider
+
+        class TestProvider(ModelProvider):
+            def generate_content(self, *args, **kwargs):
+                pass
+
+            def count_tokens(self, text, model_name):
+                return len(text) // 4
+
+            def get_provider_type(self):
+                return "test"
+
+        provider = TestProvider(api_key="test-key")
+
+        # String-based "timeout" should still work
+        class MockTimeoutError(Exception):
+            def __init__(self):
+                super().__init__("Request timeout after 30 seconds")
+
+        assert provider._is_error_retryable(MockTimeoutError()), "String fallback should catch timeout"
+
+        # String-based "503" should still work
+        class Mock503StringError(Exception):
+            def __init__(self):
+                super().__init__("503 Service Unavailable")
+
+        assert provider._is_error_retryable(Mock503StringError()), "String fallback should catch 503"
+    finally:
+        # Restore originals
+        base_mod._HttpxTimeoutException = orig_timeout
+        base_mod._HttpxConnectError = orig_connect
+        base_mod._HttpxHTTPStatusError = orig_status
