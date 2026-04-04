@@ -64,17 +64,18 @@ def resolve_fallback_model(tool: Any, error_context: str) -> str:
     Raises:
         ValueError: If no fallback model can be found
     """
-    from providers.registry import ModelProviderRegistry
+    from providers.registry import get_default_registry
 
+    registry = get_default_registry()
     fallback_model = None
     if tool is not None:
         try:
-            fallback_model = ModelProviderRegistry.get_preferred_fallback_model(tool.get_model_category())
+            fallback_model = registry.get_preferred_fallback_model(tool.get_model_category())
         except Exception as fallback_exc:
             logger.debug(f"Unable to resolve fallback model for {tool.name}: {fallback_exc}")
 
     if fallback_model is None:
-        available_models = ModelProviderRegistry.get_available_model_names()
+        available_models = registry.get_available_model_names()
         if available_models:
             fallback_model = available_models[0]
 

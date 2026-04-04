@@ -4,7 +4,7 @@ import os
 
 import pytest
 
-from providers.registry import ModelProviderRegistry
+from providers.registry import get_default_registry
 from providers.shared import ProviderType
 from tests.model_test_helpers import is_valid_model
 from tools.models import ToolModelCategory
@@ -21,8 +21,8 @@ class TestAutoModeProviderSelection:
 
         utils.model_restrictions._restriction_service = None
 
-        # Clear provider registry
-        registry = ModelProviderRegistry()
+        # Clear provider registry (conftest autouse fixture provides a fresh one)
+        registry = get_default_registry()
         registry._providers.clear()
         registry._initialized_providers.clear()
 
@@ -50,17 +50,17 @@ class TestAutoModeProviderSelection:
             # Register only Gemini provider
             from providers.gemini import GeminiModelProvider
 
-            ModelProviderRegistry.register_provider(ProviderType.GOOGLE, GeminiModelProvider)
+            get_default_registry().register_provider(ProviderType.GOOGLE, GeminiModelProvider)
 
             # Test fallback selection for different categories
-            extended_reasoning = ModelProviderRegistry.get_preferred_fallback_model(
+            extended_reasoning = get_default_registry().get_preferred_fallback_model(
                 ToolModelCategory.EXTENDED_REASONING
             )
-            fast_response = ModelProviderRegistry.get_preferred_fallback_model(ToolModelCategory.FAST_RESPONSE)
-            balanced = ModelProviderRegistry.get_preferred_fallback_model(ToolModelCategory.BALANCED)
+            fast_response = get_default_registry().get_preferred_fallback_model(ToolModelCategory.FAST_RESPONSE)
+            balanced = get_default_registry().get_preferred_fallback_model(ToolModelCategory.BALANCED)
 
             # Should select appropriate Gemini models based on capability metadata
-            provider = ModelProviderRegistry.get_provider(ProviderType.GOOGLE)
+            provider = get_default_registry().get_provider(ProviderType.GOOGLE)
             assert provider.validate_model_name(extended_reasoning)
             caps = provider.get_capabilities(extended_reasoning)
             assert caps.supports_extended_thinking
@@ -93,17 +93,17 @@ class TestAutoModeProviderSelection:
             # Register only OpenAI provider
             from providers.openai import OpenAIModelProvider
 
-            ModelProviderRegistry.register_provider(ProviderType.OPENAI, OpenAIModelProvider)
+            get_default_registry().register_provider(ProviderType.OPENAI, OpenAIModelProvider)
 
             # Test fallback selection for different categories
-            extended_reasoning = ModelProviderRegistry.get_preferred_fallback_model(
+            extended_reasoning = get_default_registry().get_preferred_fallback_model(
                 ToolModelCategory.EXTENDED_REASONING
             )
-            fast_response = ModelProviderRegistry.get_preferred_fallback_model(ToolModelCategory.FAST_RESPONSE)
-            balanced = ModelProviderRegistry.get_preferred_fallback_model(ToolModelCategory.BALANCED)
+            fast_response = get_default_registry().get_preferred_fallback_model(ToolModelCategory.FAST_RESPONSE)
+            balanced = get_default_registry().get_preferred_fallback_model(ToolModelCategory.BALANCED)
 
             # Should select appropriate OpenAI models based on capability metadata
-            provider = ModelProviderRegistry.get_provider(ProviderType.OPENAI)
+            provider = get_default_registry().get_provider(ProviderType.OPENAI)
             assert provider.validate_model_name(extended_reasoning)
             caps = provider.get_capabilities(extended_reasoning)
             assert caps.supports_extended_thinking
@@ -138,17 +138,17 @@ class TestAutoModeProviderSelection:
             from providers.gemini import GeminiModelProvider
             from providers.openai import OpenAIModelProvider
 
-            ModelProviderRegistry.register_provider(ProviderType.GOOGLE, GeminiModelProvider)
-            ModelProviderRegistry.register_provider(ProviderType.OPENAI, OpenAIModelProvider)
+            get_default_registry().register_provider(ProviderType.GOOGLE, GeminiModelProvider)
+            get_default_registry().register_provider(ProviderType.OPENAI, OpenAIModelProvider)
 
             # Test fallback selection for different categories
-            extended_reasoning = ModelProviderRegistry.get_preferred_fallback_model(
+            extended_reasoning = get_default_registry().get_preferred_fallback_model(
                 ToolModelCategory.EXTENDED_REASONING
             )
-            fast_response = ModelProviderRegistry.get_preferred_fallback_model(ToolModelCategory.FAST_RESPONSE)
+            fast_response = get_default_registry().get_preferred_fallback_model(ToolModelCategory.FAST_RESPONSE)
 
             # Should prefer Gemini now (based on provider priority: Gemini before OpenAI)
-            provider = ModelProviderRegistry.get_provider(ProviderType.GOOGLE)
+            provider = get_default_registry().get_provider(ProviderType.GOOGLE)
             assert provider.validate_model_name(extended_reasoning)
             caps = provider.get_capabilities(extended_reasoning)
             assert caps.supports_extended_thinking
@@ -182,13 +182,13 @@ class TestAutoModeProviderSelection:
             # Register only XAI provider
             from providers.xai import XAIModelProvider
 
-            ModelProviderRegistry.register_provider(ProviderType.XAI, XAIModelProvider)
+            get_default_registry().register_provider(ProviderType.XAI, XAIModelProvider)
 
             # Test fallback selection for different categories
-            extended_reasoning = ModelProviderRegistry.get_preferred_fallback_model(
+            extended_reasoning = get_default_registry().get_preferred_fallback_model(
                 ToolModelCategory.EXTENDED_REASONING
             )
-            fast_response = ModelProviderRegistry.get_preferred_fallback_model(ToolModelCategory.FAST_RESPONSE)
+            fast_response = get_default_registry().get_preferred_fallback_model(ToolModelCategory.FAST_RESPONSE)
 
             # Should fallback to available models or default fallbacks
             # Since XAI models are not explicitly handled in fallback logic,
@@ -227,11 +227,11 @@ class TestAutoModeProviderSelection:
             from providers.gemini import GeminiModelProvider
             from providers.openai import OpenAIModelProvider
 
-            ModelProviderRegistry.register_provider(ProviderType.GOOGLE, GeminiModelProvider)
-            ModelProviderRegistry.register_provider(ProviderType.OPENAI, OpenAIModelProvider)
+            get_default_registry().register_provider(ProviderType.GOOGLE, GeminiModelProvider)
+            get_default_registry().register_provider(ProviderType.OPENAI, OpenAIModelProvider)
 
             # Get available models with restrictions
-            available_models = ModelProviderRegistry.get_available_models(respect_restrictions=True)
+            available_models = get_default_registry().get_available_models(respect_restrictions=True)
 
             # Should include allowed OpenAI model
             assert "o4-mini" in available_models
@@ -276,28 +276,28 @@ class TestAutoModeProviderSelection:
             from providers.openai import OpenAIModelProvider
             from providers.xai import XAIModelProvider
 
-            ModelProviderRegistry.register_provider(ProviderType.GOOGLE, GeminiModelProvider)
-            ModelProviderRegistry.register_provider(ProviderType.OPENAI, OpenAIModelProvider)
-            ModelProviderRegistry.register_provider(ProviderType.XAI, XAIModelProvider)
+            get_default_registry().register_provider(ProviderType.GOOGLE, GeminiModelProvider)
+            get_default_registry().register_provider(ProviderType.OPENAI, OpenAIModelProvider)
+            get_default_registry().register_provider(ProviderType.XAI, XAIModelProvider)
 
             # Test model validation - each provider should handle its own models
             # Gemini models
-            gemini_provider = ModelProviderRegistry.get_provider_for_model("flash")
+            gemini_provider = get_default_registry().get_provider_for_model("flash")
             assert gemini_provider is not None
             assert gemini_provider.get_provider_type() == ProviderType.GOOGLE
 
             # OpenAI models
-            openai_provider = ModelProviderRegistry.get_provider_for_model("o3")
+            openai_provider = get_default_registry().get_provider_for_model("o3")
             assert openai_provider is not None
             assert openai_provider.get_provider_type() == ProviderType.OPENAI
 
             # XAI models
-            xai_provider = ModelProviderRegistry.get_provider_for_model("grok")
+            xai_provider = get_default_registry().get_provider_for_model("grok")
             assert xai_provider is not None
             assert xai_provider.get_provider_type() == ProviderType.XAI
 
             # Invalid model should return None
-            invalid_provider = ModelProviderRegistry.get_provider_for_model("invalid-model-name")
+            invalid_provider = get_default_registry().get_provider_for_model("invalid-model-name")
             assert invalid_provider is None
 
         finally:
@@ -327,9 +327,9 @@ class TestAutoModeProviderSelection:
             from providers.openai import OpenAIModelProvider
             from providers.xai import XAIModelProvider
 
-            ModelProviderRegistry.register_provider(ProviderType.GOOGLE, GeminiModelProvider)
-            ModelProviderRegistry.register_provider(ProviderType.OPENAI, OpenAIModelProvider)
-            ModelProviderRegistry.register_provider(ProviderType.XAI, XAIModelProvider)
+            get_default_registry().register_provider(ProviderType.GOOGLE, GeminiModelProvider)
+            get_default_registry().register_provider(ProviderType.OPENAI, OpenAIModelProvider)
+            get_default_registry().register_provider(ProviderType.XAI, XAIModelProvider)
 
             # Test that providers resolve aliases correctly -- verify resolved
             # names are valid models rather than asserting specific strings, so the
@@ -343,7 +343,7 @@ class TestAutoModeProviderSelection:
             ]
 
             for alias, expected_provider_type in test_cases:
-                provider = ModelProviderRegistry.get_provider_for_model(alias)
+                provider = get_default_registry().get_provider_for_model(alias)
                 assert provider is not None, f"No provider found for alias '{alias}'"
                 assert provider.get_provider_type() == expected_provider_type, f"Wrong provider for '{alias}'"
 

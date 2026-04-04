@@ -160,10 +160,11 @@ class TestDynamicContextRequests:
         """Test clarification request with suggested next action"""
         import importlib
 
-        from providers.registry import ModelProviderRegistry
+        from providers.registry import ModelProviderRegistry, set_default_registry
 
-        # Ensure deterministic model configuration for this test regardless of previous suites
-        ModelProviderRegistry.reset_for_testing()
+        # Start with a clean registry so expert analysis uses mocked providers
+        clean_registry = ModelProviderRegistry(config={})
+        set_default_registry(clean_registry)
 
         original_default = os.environ.get("DEFAULT_MODEL")
 
@@ -271,7 +272,6 @@ class TestDynamicContextRequests:
             import config
 
             importlib.reload(config)
-            ModelProviderRegistry.reset_for_testing()
 
     def test_tool_output_model_serialization(self):
         """Test ToolOutput model serialization"""
@@ -343,13 +343,6 @@ class TestDynamicContextRequests:
 
 class TestCollaborationWorkflow:
     """Test complete collaboration workflows"""
-
-    def teardown_method(self):
-        """Clean up after each test to prevent state pollution."""
-        # Clear provider registry singleton
-        from providers.registry import ModelProviderRegistry
-
-        ModelProviderRegistry.reset_for_testing()
 
     @pytest.mark.asyncio
     @patch("tools.shared.base_tool.BaseTool.get_model_provider")

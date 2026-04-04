@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from providers.registry import ModelProviderRegistry
+from providers.registry import ModelProviderRegistry, get_default_registry, set_default_registry
 from providers.shared import ProviderType
 from tests.transport_helpers import inject_transport
 from tools.consensus import ConsensusTool
@@ -94,7 +94,8 @@ async def test_consensus_multi_model_consultations(monkeypatch, openai_model):
         m.delenv("OPENAI_MODELS_CONFIG_PATH", raising=False)
 
         # Reset providers/restrictions and register only OpenAI & Gemini for deterministic behavior
-        ModelProviderRegistry.reset_for_testing()
+        registry = ModelProviderRegistry(config={})
+        set_default_registry(registry)
         import utils.model_restrictions as model_restrictions
 
         model_restrictions._restriction_service = None
@@ -107,8 +108,8 @@ async def test_consensus_multi_model_consultations(monkeypatch, openai_model):
         OpenAIModelProvider.reload_registry()
         assert openai_model in OpenAIModelProvider.MODEL_CAPABILITIES
 
-        ModelProviderRegistry.register_provider(ProviderType.OPENAI, OpenAIModelProvider)
-        ModelProviderRegistry.register_provider(ProviderType.GOOGLE, GeminiModelProvider)
+        registry.register_provider(ProviderType.OPENAI, OpenAIModelProvider)
+        registry.register_provider(ProviderType.GOOGLE, GeminiModelProvider)
 
         # Inject HTTP transport for OpenAI interactions
         inject_transport(monkeypatch, str(consensus_cassette_path))
@@ -157,7 +158,7 @@ async def test_consensus_multi_model_consultations(monkeypatch, openai_model):
     assert continuation_offer_final is not None
 
     # Ensure Gemini replay session is flushed to disk before verification
-    gemini_provider = ModelProviderRegistry.get_provider_for_model("gemini-2.5-flash")
+    gemini_provider = get_default_registry().get_provider_for_model("gemini-2.5-flash")
     if gemini_provider is not None:
         try:
             client = gemini_provider.client
@@ -171,8 +172,7 @@ async def test_consensus_multi_model_consultations(monkeypatch, openai_model):
     assert consensus_cassette_path.exists()
     assert GEMINI_REPLAY_PATH.exists()
 
-    # Clean up provider registry state after test
-    ModelProviderRegistry.reset_for_testing()
+    # No cleanup needed — the conftest autouse fixture handles registry reset
 
 
 @pytest.mark.asyncio
@@ -208,12 +208,13 @@ async def test_consensus_auto_mode_with_openrouter_and_gemini(monkeypatch):
         server = importlib.reload(server_module)
         m.setattr(server, "DEFAULT_MODEL", "auto", raising=False)
 
-        ModelProviderRegistry.reset_for_testing()
+        registry = ModelProviderRegistry(config={})
+        set_default_registry(registry)
         from providers.gemini import GeminiModelProvider
         from providers.openrouter import OpenRouterProvider
 
-        ModelProviderRegistry.register_provider(ProviderType.GOOGLE, GeminiModelProvider)
-        ModelProviderRegistry.register_provider(ProviderType.OPENROUTER, OpenRouterProvider)
+        registry.register_provider(ProviderType.GOOGLE, GeminiModelProvider)
+        registry.register_provider(ProviderType.OPENROUTER, OpenRouterProvider)
 
         from utils.storage_backend import get_storage_backend
 
@@ -235,11 +236,7 @@ async def test_consensus_auto_mode_with_openrouter_and_gemini(monkeypatch):
             "models": models_to_consult,
         }
 
-        try:
-            step1_output = await server.handle_call_tool("consensus", step1_args)
-        finally:
-            # Reset provider registry regardless of outcome to avoid cross-test bleed
-            ModelProviderRegistry.reset_for_testing()
+        step1_output = await server.handle_call_tool("consensus", step1_args)
 
         assert step1_output and step1_output[0].type == "text"
         step1_payload = json.loads(step1_output[0].text)

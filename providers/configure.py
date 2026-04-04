@@ -27,17 +27,24 @@ class ProviderSpec:
     is_native: bool = True
 
 
-def configure_providers():
+def configure_providers(registry=None):
     """
     Configure and validate AI providers based on available API keys.
 
     Uses a single-pass data-driven approach for standard providers,
     with special handling for Azure, Custom, and OpenRouter.
 
+    Args:
+        registry: A :class:`ModelProviderRegistry` instance to configure.
+                  If *None*, the module-level default registry is used.
+
     Raises:
         ValueError: If no valid API keys are found or conflicting configurations detected
     """
-    from providers import ModelProviderRegistry
+    from providers.registry import get_default_registry
+
+    if registry is None:
+        registry = get_default_registry()
     from providers.azure_openai import AzureOpenAIProvider
     from providers.custom import CustomProvider
     from providers.dial import DIALModelProvider
@@ -76,7 +83,7 @@ def configure_providers():
         if key and key != placeholder:
             valid_providers.append(spec.display_name)
             has_native_apis = True
-            ModelProviderRegistry.register_provider(spec.provider_type, spec.provider_class)
+            registry.register_provider(spec.provider_type, spec.provider_class)
             registered_providers.append(spec.provider_type.value)
             logger.info(f"{spec.display_name} API key found")
             logger.debug(f"Registered provider: {spec.provider_type.value}")
@@ -97,7 +104,7 @@ def configure_providers():
             if azure_registry.list_models():
                 valid_providers.append("Azure OpenAI")
                 has_native_apis = True
-                ModelProviderRegistry.register_provider(ProviderType.AZURE, AzureOpenAIProvider)
+                registry.register_provider(ProviderType.AZURE, AzureOpenAIProvider)
                 registered_providers.append(ProviderType.AZURE.value)
                 logger.info("Azure OpenAI configuration detected")
                 logger.debug(f"Registered provider: {ProviderType.AZURE.value}")
@@ -130,7 +137,7 @@ def configure_providers():
             base_url = get_env("CUSTOM_API_URL", "") or ""
             return CustomProvider(api_key=api_key or "", base_url=base_url)
 
-        ModelProviderRegistry.register_provider(ProviderType.CUSTOM, custom_provider_factory)
+        registry.register_provider(ProviderType.CUSTOM, custom_provider_factory)
         registered_providers.append(ProviderType.CUSTOM.value)
         logger.debug(f"Registered provider: {ProviderType.CUSTOM.value}")
 
@@ -140,7 +147,7 @@ def configure_providers():
     if openrouter_key and openrouter_key != "your_openrouter_api_key_here":
         valid_providers.append("OpenRouter")
         has_openrouter = True
-        ModelProviderRegistry.register_provider(ProviderType.OPENROUTER, OpenRouterProvider)
+        registry.register_provider(ProviderType.OPENROUTER, OpenRouterProvider)
         registered_providers.append(ProviderType.OPENROUTER.value)
         logger.info("OpenRouter API key found - Multiple models available via OpenRouter")
         logger.debug(f"Registered provider: {ProviderType.OPENROUTER.value}")
@@ -181,12 +188,13 @@ def configure_providers():
         logger.info(f"Provider priority: {' → '.join(priority_info)}")
 
     # Register cleanup function for providers
+    _registry_for_cleanup = registry
+
     def cleanup_providers():
         """Clean up all registered providers on shutdown."""
         try:
-            registry = ModelProviderRegistry()
-            if hasattr(registry, "_initialized_providers"):
-                for provider in list(registry._initialized_providers.values()):
+            if hasattr(_registry_for_cleanup, "_initialized_providers"):
+                for provider in list(_registry_for_cleanup._initialized_providers.values()):
                     try:
                         if provider and hasattr(provider, "close"):
                             provider.close()
@@ -213,7 +221,7 @@ def configure_providers():
         provider_instances = {}
         provider_types_to_validate = [ProviderType.GOOGLE, ProviderType.OPENAI, ProviderType.XAI, ProviderType.DIAL]
         for provider_type in provider_types_to_validate:
-            provider = ModelProviderRegistry.get_provider(provider_type)
+            provider = registry.get_provider(provider_type)
             if provider:
                 provider_instances[provider_type] = provider
 
@@ -226,7 +234,7 @@ def configure_providers():
     from config import IS_AUTO_MODE
 
     if IS_AUTO_MODE:
-        available_models = ModelProviderRegistry.get_available_models(respect_restrictions=True)
+        available_models = registry.get_available_models(respect_restrictions=True)
         if not available_models:
             logger.error(
                 "Auto mode is enabled but no models are available after applying restrictions. "

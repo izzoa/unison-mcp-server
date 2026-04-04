@@ -6,7 +6,7 @@ from unittest.mock import Mock, patch
 import pytest
 
 from providers.openrouter import OpenRouterProvider
-from providers.registry import ModelProviderRegistry
+from providers.registry import get_default_registry
 from providers.shared import ProviderType
 
 
@@ -115,13 +115,13 @@ class TestOpenRouterProvider:
         """Test OpenRouter can be registered and retrieved."""
         with patch.dict(os.environ, {"OPENROUTER_API_KEY": "test-key"}):
             # Clean up any existing registration
-            ModelProviderRegistry.unregister_provider(ProviderType.OPENROUTER)
+            get_default_registry().unregister_provider(ProviderType.OPENROUTER)
 
             # Register the provider
-            ModelProviderRegistry.register_provider(ProviderType.OPENROUTER, OpenRouterProvider)
+            get_default_registry().register_provider(ProviderType.OPENROUTER, OpenRouterProvider)
 
             # Retrieve and verify
-            provider = ModelProviderRegistry.get_provider(ProviderType.OPENROUTER)
+            provider = get_default_registry().get_provider(ProviderType.OPENROUTER)
             assert provider is not None
             assert isinstance(provider, OpenRouterProvider)
 
@@ -131,7 +131,7 @@ class TestOpenRouterAutoMode:
 
     def setup_method(self):
         """Store original state before each test."""
-        self.registry = ModelProviderRegistry()
+        self.registry = get_default_registry()
         self._original_providers = self.registry._providers.copy()
         self._original_initialized = self.registry._initialized_providers.copy()
 
@@ -186,13 +186,13 @@ class TestOpenRouterAutoMode:
 
         mock_registry.resolve.side_effect = mock_resolve
 
-        ModelProviderRegistry.register_provider(ProviderType.OPENROUTER, OpenRouterProvider)
+        get_default_registry().register_provider(ProviderType.OPENROUTER, OpenRouterProvider)
 
-        provider = ModelProviderRegistry.get_provider(ProviderType.OPENROUTER)
+        provider = get_default_registry().get_provider(ProviderType.OPENROUTER)
         assert provider is not None, "OpenRouter provider should be available with API key"
         provider._registry = mock_registry
 
-        available_models = ModelProviderRegistry.get_available_models(respect_restrictions=True)
+        available_models = get_default_registry().get_available_models(respect_restrictions=True)
 
         assert len(available_models) > 0, "Should find OpenRouter models in auto mode"
         assert all(provider_type == ProviderType.OPENROUTER for provider_type in available_models.values())
@@ -230,12 +230,12 @@ class TestOpenRouterAutoMode:
         mock_model_config.get_effective_capability_rank = Mock(return_value=50)  # Add ranking method
         mock_registry.resolve.return_value = mock_model_config
 
-        ModelProviderRegistry.register_provider(ProviderType.OPENROUTER, OpenRouterProvider)
+        get_default_registry().register_provider(ProviderType.OPENROUTER, OpenRouterProvider)
 
-        provider = ModelProviderRegistry.get_provider(ProviderType.OPENROUTER)
+        provider = get_default_registry().get_provider(ProviderType.OPENROUTER)
         provider._registry = mock_registry
 
-        available_models = ModelProviderRegistry.get_available_models(respect_restrictions=True)
+        available_models = get_default_registry().get_available_models(respect_restrictions=True)
 
         assert len(available_models) > 0, "Should have some allowed models"
 
@@ -253,7 +253,7 @@ class TestOpenRouterAutoMode:
         os.environ.pop("OPENROUTER_API_KEY", None)
         os.environ["DEFAULT_MODEL"] = "auto"
 
-        available_models = ModelProviderRegistry.get_available_models(respect_restrictions=True)
+        available_models = get_default_registry().get_available_models(respect_restrictions=True)
 
         assert len(available_models) == 0, "Should have no models when no providers are configured"
 
@@ -272,9 +272,9 @@ class TestOpenRouterAutoMode:
         mock_provider_instance.get_all_model_capabilities.return_value = {}
         mock_provider_class.return_value = mock_provider_instance
 
-        ModelProviderRegistry.register_provider(ProviderType.OPENROUTER, mock_provider_class)
+        get_default_registry().register_provider(ProviderType.OPENROUTER, mock_provider_class)
 
-        available_models = ModelProviderRegistry.get_available_models(respect_restrictions=True)
+        available_models = get_default_registry().get_available_models(respect_restrictions=True)
 
         assert len(available_models) == 0, "Should have no models when OpenRouter has no registry"
 

@@ -138,10 +138,10 @@ class TestAutoModelPlannerFix:
 
         This tests the scenario where providers don't recognize "auto" as a model.
         """
-        from providers.registry import ModelProviderRegistry
+        from providers.registry import get_default_registry
 
         # This should return None since "auto" is not a real model name
-        provider = ModelProviderRegistry.get_provider_for_model("auto")
+        provider = get_default_registry().get_provider_for_model("auto")
         assert provider is None, "Provider registry should not find a provider for literal 'auto'"
 
     @patch("config.DEFAULT_MODEL", "auto")

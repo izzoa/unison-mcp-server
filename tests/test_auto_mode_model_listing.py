@@ -11,7 +11,7 @@ import utils.model_restrictions as model_restrictions
 from providers.gemini import GeminiModelProvider
 from providers.openai import OpenAIModelProvider
 from providers.openrouter import OpenRouterProvider
-from providers.registry import ModelProviderRegistry
+from providers.registry import get_default_registry
 from providers.shared import ProviderType
 from providers.xai import XAIModelProvider
 from tools.shared.exceptions import ToolExecutionError
@@ -40,20 +40,20 @@ def _extract_available_models(message: str) -> list[str]:
 def reset_registry():
     """Ensure registry and restriction service state is isolated."""
 
-    ModelProviderRegistry.reset_for_testing()
+    # The conftest autouse fixture handles registry reset
     model_restrictions._restriction_service = None
     env_config.reload_env()
     yield
-    ModelProviderRegistry.reset_for_testing()
     model_restrictions._restriction_service = None
 
 
 def _register_core_providers(*, include_xai: bool = False):
-    ModelProviderRegistry.register_provider(ProviderType.GOOGLE, GeminiModelProvider)
-    ModelProviderRegistry.register_provider(ProviderType.OPENAI, OpenAIModelProvider)
-    ModelProviderRegistry.register_provider(ProviderType.OPENROUTER, OpenRouterProvider)
+    registry = get_default_registry()
+    registry.register_provider(ProviderType.GOOGLE, GeminiModelProvider)
+    registry.register_provider(ProviderType.OPENAI, OpenAIModelProvider)
+    registry.register_provider(ProviderType.OPENROUTER, OpenRouterProvider)
     if include_xai:
-        ModelProviderRegistry.register_provider(ProviderType.XAI, XAIModelProvider)
+        registry.register_provider(ProviderType.XAI, XAIModelProvider)
 
 
 @pytest.mark.no_mock_provider
@@ -125,7 +125,9 @@ def test_error_listing_respects_env_restrictions(monkeypatch, reset_registry):
     ):
         monkeypatch.delenv(azure_var, raising=False)
 
-    ModelProviderRegistry.reset_for_testing()
+    from providers.registry import ModelProviderRegistry, set_default_registry
+
+    set_default_registry(ModelProviderRegistry(config={}))
     model_restrictions._restriction_service = None
     server.configure_providers()
 
@@ -212,7 +214,9 @@ def test_error_listing_without_restrictions_shows_full_catalog(monkeypatch, rese
     ):
         monkeypatch.delenv(var, raising=False)
 
-    ModelProviderRegistry.reset_for_testing()
+    from providers.registry import ModelProviderRegistry, set_default_registry
+
+    set_default_registry(ModelProviderRegistry(config={}))
     model_restrictions._restriction_service = None
     server.configure_providers()
 

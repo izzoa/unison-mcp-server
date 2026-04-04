@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import pytest
 
-from providers.registry import ModelProviderRegistry
+from providers.registry import get_default_registry
 from providers.shared import ProviderType
 
 
@@ -34,8 +34,7 @@ class TestAutoModeCustomProviderOnly:
 
         utils.model_restrictions._restriction_service = None
 
-        # Clear provider registry by resetting singleton instance
-        ModelProviderRegistry.reset_for_testing()
+        # The conftest autouse fixture handles registry reset
 
     def teardown_method(self):
         """Clean up after each test."""
@@ -56,8 +55,7 @@ class TestAutoModeCustomProviderOnly:
 
         utils.model_restrictions._restriction_service = None
 
-        # Clear provider registry by resetting singleton instance
-        ModelProviderRegistry.reset_for_testing()
+        # The conftest autouse fixture handles registry reset for the next test
 
     def test_reproduce_auto_mode_custom_provider_only_issue(self):
         """Test the fix for auto mode failing when only custom provider is configured."""
@@ -86,11 +84,11 @@ class TestAutoModeCustomProviderOnly:
             # Register only the custom provider (simulating server startup)
             from providers.custom import CustomProvider
 
-            ModelProviderRegistry.register_provider(ProviderType.CUSTOM, CustomProvider)
+            get_default_registry().register_provider(ProviderType.CUSTOM, CustomProvider)
 
             # This should now work after the fix
             # The fix added support for custom provider registry system in get_available_models()
-            available_models = ModelProviderRegistry.get_available_models(respect_restrictions=True)
+            available_models = get_default_registry().get_available_models(respect_restrictions=True)
 
             # This assertion should now pass after the fix
             assert available_models, (
@@ -116,10 +114,10 @@ class TestAutoModeCustomProviderOnly:
             # Register custom provider
             from providers.custom import CustomProvider
 
-            ModelProviderRegistry.register_provider(ProviderType.CUSTOM, CustomProvider)
+            get_default_registry().register_provider(ProviderType.CUSTOM, CustomProvider)
 
             # Get the provider instance
-            custom_provider = ModelProviderRegistry.get_provider(ProviderType.CUSTOM)
+            custom_provider = get_default_registry().get_provider(ProviderType.CUSTOM)
             assert custom_provider is not None, "Custom provider should be available"
 
             # Verify it has a registry with models
@@ -150,10 +148,10 @@ class TestAutoModeCustomProviderOnly:
             # Register custom provider
             from providers.custom import CustomProvider
 
-            ModelProviderRegistry.register_provider(ProviderType.CUSTOM, CustomProvider)
+            get_default_registry().register_provider(ProviderType.CUSTOM, CustomProvider)
 
             # Get the provider instance
-            custom_provider = ModelProviderRegistry.get_provider(ProviderType.CUSTOM)
+            custom_provider = get_default_registry().get_provider(ProviderType.CUSTOM)
             assert custom_provider is not None
 
             # Test that it can validate some typical custom model names
@@ -189,14 +187,14 @@ class TestAutoModeCustomProviderOnly:
             # Register custom provider
             from providers.custom import CustomProvider
 
-            ModelProviderRegistry.register_provider(ProviderType.CUSTOM, CustomProvider)
+            get_default_registry().register_provider(ProviderType.CUSTOM, CustomProvider)
 
             # This should work and return a fallback model from custom provider
             # Currently fails because get_preferred_fallback_model doesn't consider custom models
             from tools.models import ToolModelCategory
 
             try:
-                fallback_model = ModelProviderRegistry.get_preferred_fallback_model(ToolModelCategory.FAST_RESPONSE)
+                fallback_model = get_default_registry().get_preferred_fallback_model(ToolModelCategory.FAST_RESPONSE)
                 print(f"Fallback model for FAST_RESPONSE: {fallback_model}")
 
                 # Should get a valid model name, not the hardcoded fallback

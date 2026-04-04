@@ -13,7 +13,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from providers.registry import ModelProviderRegistry
+from providers.registry import get_default_registry
 from providers.shared import ProviderType
 from tools.chat import ChatTool
 from tools.shared.base_models import ToolRequest
@@ -36,7 +36,7 @@ class TestProviderRoutingBugs:
         utils.model_restrictions._restriction_service = None
 
         # Clear provider registry
-        registry = ModelProviderRegistry()
+        registry = get_default_registry()
         registry._providers.clear()
         registry._initialized_providers.clear()
 
@@ -78,7 +78,7 @@ class TestProviderRoutingBugs:
             # Register only OpenRouter provider (like in server.py:configure_providers)
             from providers.openrouter import OpenRouterProvider
 
-            ModelProviderRegistry.register_provider(ProviderType.OPENROUTER, OpenRouterProvider)
+            get_default_registry().register_provider(ProviderType.OPENROUTER, OpenRouterProvider)
 
             # Create tool to test fallback logic
             tool = ChatTool()
@@ -152,7 +152,7 @@ class TestProviderRoutingBugs:
                 tool.get_model_provider("o3")
 
             # Verify no providers were auto-registered
-            registry = ModelProviderRegistry()
+            registry = get_default_registry()
             assert len(registry._providers) == 0, "No providers should be registered without API keys"
 
         finally:
@@ -192,9 +192,9 @@ class TestProviderRoutingBugs:
             from providers.openai import OpenAIModelProvider
             from providers.openrouter import OpenRouterProvider
 
-            ModelProviderRegistry.register_provider(ProviderType.GOOGLE, GeminiModelProvider)
-            ModelProviderRegistry.register_provider(ProviderType.OPENAI, OpenAIModelProvider)
-            ModelProviderRegistry.register_provider(ProviderType.OPENROUTER, OpenRouterProvider)
+            get_default_registry().register_provider(ProviderType.GOOGLE, GeminiModelProvider)
+            get_default_registry().register_provider(ProviderType.OPENAI, OpenAIModelProvider)
+            get_default_registry().register_provider(ProviderType.OPENROUTER, OpenRouterProvider)
 
             tool = ChatTool()
 
@@ -231,7 +231,7 @@ class TestOpenRouterAliasRestrictions:
         utils.model_restrictions._restriction_service = None
 
         # Clear provider registry
-        registry = ModelProviderRegistry()
+        registry = get_default_registry()
         registry._providers.clear()
         registry._initialized_providers.clear()
 
@@ -274,10 +274,10 @@ class TestOpenRouterAliasRestrictions:
             # Register OpenRouter provider
             from providers.openrouter import OpenRouterProvider
 
-            ModelProviderRegistry.register_provider(ProviderType.OPENROUTER, OpenRouterProvider)
+            get_default_registry().register_provider(ProviderType.OPENROUTER, OpenRouterProvider)
 
             # Test: Get available models with restrictions
-            available_models = ModelProviderRegistry.get_available_models(respect_restrictions=True)
+            available_models = get_default_registry().get_available_models(respect_restrictions=True)
 
             # ASSERTION: Should have models available, not 0
             assert len(available_models) > 0, (
@@ -343,10 +343,10 @@ class TestOpenRouterAliasRestrictions:
             # Register OpenRouter provider
             from providers.openrouter import OpenRouterProvider
 
-            ModelProviderRegistry.register_provider(ProviderType.OPENROUTER, OpenRouterProvider)
+            get_default_registry().register_provider(ProviderType.OPENROUTER, OpenRouterProvider)
 
             # Test: Get available models
-            available_models = ModelProviderRegistry.get_available_models(respect_restrictions=True)
+            available_models = get_default_registry().get_available_models(respect_restrictions=True)
 
             expected_models = {
                 "o3-mini",  # alias

@@ -439,9 +439,9 @@ def build_conversation_history(
         model_name = DEFAULT_MODEL
         if IS_AUTO_MODE and model_name.lower() == "auto":
             # Use intelligent fallback based on available API keys
-            from providers.registry import ModelProviderRegistry
+            from providers.registry import get_default_registry
 
-            model_name = ModelProviderRegistry.get_preferred_fallback_model()
+            model_name = get_default_registry().get_preferred_fallback_model()
 
         model_context = ModelContext(model_name)
 

@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from providers.registry import ModelProviderRegistry
+from providers.registry import ModelProviderRegistry, get_default_registry, set_default_registry
 from providers.shared import ProviderType
 from tests.transport_helpers import inject_transport
 from tools.chat import ChatTool
@@ -103,12 +103,13 @@ async def test_chat_cross_model_continuation(monkeypatch, tmp_path):
         for key in keys_to_clear:
             m.delenv(key, raising=False)
 
-        ModelProviderRegistry.reset_for_testing()
+        registry = ModelProviderRegistry(config={})
+        set_default_registry(registry)
         from providers.gemini import GeminiModelProvider
         from providers.openai import OpenAIModelProvider
 
-        ModelProviderRegistry.register_provider(ProviderType.OPENAI, OpenAIModelProvider)
-        ModelProviderRegistry.register_provider(ProviderType.GOOGLE, GeminiModelProvider)
+        registry.register_provider(ProviderType.OPENAI, OpenAIModelProvider)
+        registry.register_provider(ProviderType.GOOGLE, GeminiModelProvider)
 
         from utils import conversation_memory
 
@@ -140,7 +141,7 @@ async def test_chat_cross_model_continuation(monkeypatch, tmp_path):
         assert 1 <= int(chosen_number) <= 10
 
         # Ensure replay is flushed for Gemini recordings
-        gemini_provider = ModelProviderRegistry.get_provider_for_model("gemini-2.5-flash")
+        gemini_provider = get_default_registry().get_provider_for_model("gemini-2.5-flash")
         if gemini_provider is not None:
             try:
                 client = gemini_provider.client
@@ -171,12 +172,13 @@ async def test_chat_cross_model_continuation(monkeypatch, tmp_path):
         for key in keys_to_clear:
             m.delenv(key, raising=False)
 
-        ModelProviderRegistry.reset_for_testing()
+        registry = ModelProviderRegistry(config={})
+        set_default_registry(registry)
         from providers.gemini import GeminiModelProvider
         from providers.openai import OpenAIModelProvider
 
-        ModelProviderRegistry.register_provider(ProviderType.OPENAI, OpenAIModelProvider)
-        ModelProviderRegistry.register_provider(ProviderType.GOOGLE, GeminiModelProvider)
+        registry.register_provider(ProviderType.OPENAI, OpenAIModelProvider)
+        registry.register_provider(ProviderType.GOOGLE, GeminiModelProvider)
 
         inject_transport(monkeypatch, OPENAI_CASSETTE_PATH)
 
@@ -200,5 +202,3 @@ async def test_chat_cross_model_continuation(monkeypatch, tmp_path):
         assert recalled_number == chosen_number
 
     assert OPENAI_CASSETTE_PATH.exists()
-
-    ModelProviderRegistry.reset_for_testing()

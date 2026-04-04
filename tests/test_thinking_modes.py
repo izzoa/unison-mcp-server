@@ -62,9 +62,6 @@ class TestThinkingModes:
             import config
 
             importlib.reload(config)
-            from providers.registry import ModelProviderRegistry
-
-            ModelProviderRegistry.reset_for_testing()
 
             tool = AnalyzeTool()
 
@@ -116,9 +113,8 @@ class TestThinkingModes:
                 else:
                     os.environ.pop(key, None)
 
-            # Reload config and clear registry
+            # Reload config
             importlib.reload(config)
-            ModelProviderRegistry.reset_for_testing()
 
     @pytest.mark.asyncio
     async def test_thinking_mode_low(self):
@@ -145,9 +141,6 @@ class TestThinkingModes:
             import config
 
             importlib.reload(config)
-            from providers.registry import ModelProviderRegistry
-
-            ModelProviderRegistry.reset_for_testing()
 
             tool = CodeReviewTool()
 
@@ -195,9 +188,8 @@ class TestThinkingModes:
                 else:
                     os.environ.pop(key, None)
 
-            # Reload config and clear registry
+            # Reload config
             importlib.reload(config)
-            ModelProviderRegistry.reset_for_testing()
 
     @pytest.mark.asyncio
     async def test_thinking_mode_medium(self):
@@ -224,9 +216,6 @@ class TestThinkingModes:
             import config
 
             importlib.reload(config)
-            from providers.registry import ModelProviderRegistry
-
-            ModelProviderRegistry.reset_for_testing()
 
             tool = DebugIssueTool()
 
@@ -275,9 +264,8 @@ class TestThinkingModes:
                 else:
                     os.environ.pop(key, None)
 
-            # Reload config and clear registry
+            # Reload config
             importlib.reload(config)
-            ModelProviderRegistry.reset_for_testing()
 
     @pytest.mark.asyncio
     async def test_thinking_mode_high(self):
@@ -304,9 +292,6 @@ class TestThinkingModes:
             import config
 
             importlib.reload(config)
-            from providers.registry import ModelProviderRegistry
-
-            ModelProviderRegistry.reset_for_testing()
 
             tool = AnalyzeTool()
 
@@ -354,9 +339,8 @@ class TestThinkingModes:
                 else:
                     os.environ.pop(key, None)
 
-            # Reload config and clear registry
+            # Reload config
             importlib.reload(config)
-            ModelProviderRegistry.reset_for_testing()
 
     @pytest.mark.asyncio
     async def test_thinking_mode_max(self):
@@ -385,9 +369,6 @@ class TestThinkingModes:
             import config
 
             importlib.reload(config)
-            from providers.registry import ModelProviderRegistry
-
-            ModelProviderRegistry.reset_for_testing()
 
             tool = ThinkDeepTool()
 
@@ -436,6 +417,5 @@ class TestThinkingModes:
                 else:
                     os.environ.pop(key, None)
 
-            # Reload config and clear registry
+            # Reload config
             importlib.reload(config)
-            ModelProviderRegistry.reset_for_testing()

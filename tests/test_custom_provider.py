@@ -5,8 +5,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from providers import ModelProviderRegistry
 from providers.custom import CustomProvider
+from providers.registry import get_default_registry
 from providers.shared import ProviderType
 
 
@@ -134,13 +134,13 @@ class TestCustomProviderRegistration:
 
     def setup_method(self):
         """Clear registry before each test."""
-        ModelProviderRegistry.clear_cache()
-        ModelProviderRegistry.unregister_provider(ProviderType.CUSTOM)
+        get_default_registry().clear_cache()
+        get_default_registry().unregister_provider(ProviderType.CUSTOM)
 
     def teardown_method(self):
         """Clean up after each test."""
-        ModelProviderRegistry.clear_cache()
-        ModelProviderRegistry.unregister_provider(ProviderType.CUSTOM)
+        get_default_registry().clear_cache()
+        get_default_registry().unregister_provider(ProviderType.CUSTOM)
 
     def test_custom_provider_factory_registration(self):
         """Test custom provider can be registered via factory function."""
@@ -149,14 +149,14 @@ class TestCustomProviderRegistration:
             return CustomProvider(api_key="test-key", base_url="http://localhost:11434/v1")
 
         with patch.dict(os.environ, {"CUSTOM_API_PLACEHOLDER": "configured"}):
-            ModelProviderRegistry.register_provider(ProviderType.CUSTOM, custom_provider_factory)
+            get_default_registry().register_provider(ProviderType.CUSTOM, custom_provider_factory)
 
             # Verify provider is available
-            available = ModelProviderRegistry.get_available_providers()
+            available = get_default_registry().get_available_providers()
             assert ProviderType.CUSTOM in available
 
             # Verify provider can be retrieved
-            provider = ModelProviderRegistry.get_provider(ProviderType.CUSTOM)
+            provider = get_default_registry().get_provider(ProviderType.CUSTOM)
             assert provider is not None
             assert isinstance(provider, CustomProvider)
 
@@ -178,17 +178,17 @@ class TestCustomProviderRegistration:
             clear=True,
         ):
             # Register both providers
-            ModelProviderRegistry.register_provider(ProviderType.OPENROUTER, OpenRouterProvider)
-            ModelProviderRegistry.register_provider(ProviderType.CUSTOM, custom_provider_factory)
+            get_default_registry().register_provider(ProviderType.OPENROUTER, OpenRouterProvider)
+            get_default_registry().register_provider(ProviderType.CUSTOM, custom_provider_factory)
 
             # Verify both are available
-            available = ModelProviderRegistry.get_available_providers()
+            available = get_default_registry().get_available_providers()
             assert ProviderType.OPENROUTER in available
             assert ProviderType.CUSTOM in available
 
             # Verify both can be retrieved
-            openrouter_provider = ModelProviderRegistry.get_provider(ProviderType.OPENROUTER)
-            custom_provider = ModelProviderRegistry.get_provider(ProviderType.CUSTOM)
+            openrouter_provider = get_default_registry().get_provider(ProviderType.OPENROUTER)
+            custom_provider = get_default_registry().get_provider(ProviderType.CUSTOM)
 
             assert openrouter_provider is not None
             assert custom_provider is not None
@@ -226,17 +226,17 @@ class TestConfigureProvidersFunction:
     def setup_method(self):
         """Clear environment and registry before each test."""
         # Store the original providers to restore them later
-        registry = ModelProviderRegistry()
+        registry = get_default_registry()
         self._original_providers = registry._providers.copy()
-        ModelProviderRegistry.clear_cache()
+        get_default_registry().clear_cache()
         for provider_type in ProviderType:
-            ModelProviderRegistry.unregister_provider(provider_type)
+            get_default_registry().unregister_provider(provider_type)
 
     def teardown_method(self):
         """Clean up after each test."""
         # Restore the original providers that were registered in conftest.py
-        registry = ModelProviderRegistry()
-        ModelProviderRegistry.clear_cache()
+        registry = get_default_registry()
+        get_default_registry().clear_cache()
         registry._providers.clear()
         registry._providers.update(self._original_providers)
 
@@ -259,7 +259,7 @@ class TestConfigureProvidersFunction:
             configure_providers()
 
             # Verify only custom provider is available
-            available = ModelProviderRegistry.get_available_providers()
+            available = get_default_registry().get_available_providers()
             assert ProviderType.CUSTOM in available
             assert ProviderType.OPENROUTER not in available
 
@@ -281,7 +281,7 @@ class TestConfigureProvidersFunction:
             configure_providers()
 
             # Verify only OpenRouter provider is available
-            available = ModelProviderRegistry.get_available_providers()
+            available = get_default_registry().get_available_providers()
             assert ProviderType.OPENROUTER in available
             assert ProviderType.CUSTOM not in available
 
@@ -304,7 +304,7 @@ class TestConfigureProvidersFunction:
             configure_providers()
 
             # Verify both providers are available
-            available = ModelProviderRegistry.get_available_providers()
+            available = get_default_registry().get_available_providers()
             assert ProviderType.OPENROUTER in available
             assert ProviderType.CUSTOM in available
 

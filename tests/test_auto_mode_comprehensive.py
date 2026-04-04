@@ -8,7 +8,7 @@ import pytest
 
 from providers.gemini import GeminiModelProvider
 from providers.openai import OpenAIModelProvider
-from providers.registry import ModelProviderRegistry
+from providers.registry import ModelProviderRegistry, get_default_registry
 from providers.shared import ProviderType
 from providers.xai import XAIModelProvider
 from tools.analyze import AnalyzeTool
@@ -35,8 +35,7 @@ class TestAutoModeComprehensive:
 
         utils.model_restrictions._restriction_service = None
 
-        # Clear provider registry by resetting singleton instance
-        ModelProviderRegistry.reset_for_testing()
+        # The conftest autouse fixture handles registry reset
 
     def teardown_method(self):
         """Clean up after each test."""
@@ -60,13 +59,7 @@ class TestAutoModeComprehensive:
 
         utils.model_restrictions._restriction_service = None
 
-        # Clear provider registry by resetting singleton instance
-        ModelProviderRegistry.reset_for_testing()
-
-        # Re-register providers for subsequent tests (like conftest.py does)
-        ModelProviderRegistry.register_provider(ProviderType.GOOGLE, GeminiModelProvider)
-        ModelProviderRegistry.register_provider(ProviderType.OPENAI, OpenAIModelProvider)
-        ModelProviderRegistry.register_provider(ProviderType.XAI, XAIModelProvider)
+        # The conftest autouse fixture handles registry reset for the next test
 
     @pytest.mark.parametrize(
         "provider_config,expected_checks",
@@ -166,23 +159,23 @@ class TestAutoModeComprehensive:
             from providers.openrouter import OpenRouterProvider
 
             if provider_config.get("GEMINI_API_KEY"):
-                ModelProviderRegistry.register_provider(ProviderType.GOOGLE, GeminiModelProvider)
+                get_default_registry().register_provider(ProviderType.GOOGLE, GeminiModelProvider)
             if provider_config.get("OPENAI_API_KEY"):
-                ModelProviderRegistry.register_provider(ProviderType.OPENAI, OpenAIModelProvider)
+                get_default_registry().register_provider(ProviderType.OPENAI, OpenAIModelProvider)
             if provider_config.get("XAI_API_KEY"):
-                ModelProviderRegistry.register_provider(ProviderType.XAI, XAIModelProvider)
+                get_default_registry().register_provider(ProviderType.XAI, XAIModelProvider)
             if provider_config.get("OPENROUTER_API_KEY"):
-                ModelProviderRegistry.register_provider(ProviderType.OPENROUTER, OpenRouterProvider)
+                get_default_registry().register_provider(ProviderType.OPENROUTER, OpenRouterProvider)
 
             # Test each tool category
             for category_name, checks in expected_checks.items():
                 category = ToolModelCategory(category_name.lower())
 
                 # Get preferred fallback model for this category
-                fallback_model = ModelProviderRegistry.get_preferred_fallback_model(category)
+                fallback_model = get_default_registry().get_preferred_fallback_model(category)
 
                 # Validate the model is valid for the expected provider
-                provider = ModelProviderRegistry.get_provider(checks["provider"])
+                provider = get_default_registry().get_provider(checks["provider"])
                 assert provider is not None, f"Provider {checks['provider']} not available for config {provider_config}"
                 assert provider.validate_model_name(fallback_model), (
                     f"Provider config {provider_config}: "
@@ -242,7 +235,7 @@ class TestAutoModeComprehensive:
             importlib.reload(config)
 
             # Register only Gemini provider
-            ModelProviderRegistry.register_provider(ProviderType.GOOGLE, GeminiModelProvider)
+            get_default_registry().register_provider(ProviderType.GOOGLE, GeminiModelProvider)
 
             # Test ChatTool (FAST_RESPONSE) - auto mode should suggest flash variant
             chat_tool = ChatTool()
@@ -281,7 +274,7 @@ class TestAutoModeComprehensive:
             importlib.reload(config)
 
             # Register only Gemini provider
-            ModelProviderRegistry.register_provider(ProviderType.GOOGLE, GeminiModelProvider)
+            get_default_registry().register_provider(ProviderType.GOOGLE, GeminiModelProvider)
 
             tool = AnalyzeTool()
             schema = tool.get_input_schema()
@@ -337,9 +330,9 @@ class TestAutoModeComprehensive:
             importlib.reload(config)
 
             # Register all native providers
-            ModelProviderRegistry.register_provider(ProviderType.GOOGLE, GeminiModelProvider)
-            ModelProviderRegistry.register_provider(ProviderType.OPENAI, OpenAIModelProvider)
-            ModelProviderRegistry.register_provider(ProviderType.XAI, XAIModelProvider)
+            get_default_registry().register_provider(ProviderType.GOOGLE, GeminiModelProvider)
+            get_default_registry().register_provider(ProviderType.OPENAI, OpenAIModelProvider)
+            get_default_registry().register_provider(ProviderType.XAI, XAIModelProvider)
 
             tool = AnalyzeTool()
             schema = tool.get_input_schema()
@@ -386,7 +379,7 @@ class TestAutoModeComprehensive:
             importlib.reload(config)
 
             # Register only Gemini provider
-            ModelProviderRegistry.register_provider(ProviderType.GOOGLE, GeminiModelProvider)
+            get_default_registry().register_provider(ProviderType.GOOGLE, GeminiModelProvider)
 
             # Test with ChatTool (FAST_RESPONSE category)
             chat_tool = ChatTool()
@@ -443,11 +436,11 @@ class TestAutoModeComprehensive:
             utils.model_restrictions._restriction_service = None
 
             # Register providers
-            ModelProviderRegistry.register_provider(ProviderType.GOOGLE, GeminiModelProvider)
-            ModelProviderRegistry.register_provider(ProviderType.OPENAI, OpenAIModelProvider)
+            get_default_registry().register_provider(ProviderType.GOOGLE, GeminiModelProvider)
+            get_default_registry().register_provider(ProviderType.OPENAI, OpenAIModelProvider)
 
             # Get available models - should respect restrictions
-            available_models = ModelProviderRegistry.get_available_models(respect_restrictions=True)
+            available_models = get_default_registry().get_available_models(respect_restrictions=True)
 
             # Should include restricted OpenAI model
             assert "o4-mini" in available_models
@@ -490,7 +483,7 @@ class TestAutoModeComprehensive:
             # Register only OpenRouter provider
             from providers.openrouter import OpenRouterProvider
 
-            ModelProviderRegistry.register_provider(ProviderType.OPENROUTER, OpenRouterProvider)
+            get_default_registry().register_provider(ProviderType.OPENROUTER, OpenRouterProvider)
 
             # Mock OpenRouter registry to return known models
             mock_registry = MagicMock()
@@ -504,10 +497,10 @@ class TestAutoModeComprehensive:
 
             with patch.object(OpenRouterProvider, "_registry", mock_registry):
                 # Get preferred models for different categories
-                extended_reasoning = ModelProviderRegistry.get_preferred_fallback_model(
+                extended_reasoning = get_default_registry().get_preferred_fallback_model(
                     ToolModelCategory.EXTENDED_REASONING
                 )
-                fast_response = ModelProviderRegistry.get_preferred_fallback_model(ToolModelCategory.FAST_RESPONSE)
+                fast_response = get_default_registry().get_preferred_fallback_model(ToolModelCategory.FAST_RESPONSE)
 
                 # Should fallback to known good models even via OpenRouter
                 # The exact model depends on _find_extended_thinking_model implementation
@@ -540,7 +533,7 @@ class TestAutoModeComprehensive:
             importlib.reload(config)
 
             # Register Gemini provider
-            ModelProviderRegistry.register_provider(ProviderType.GOOGLE, GeminiModelProvider)
+            get_default_registry().register_provider(ProviderType.GOOGLE, GeminiModelProvider)
 
             # Mock the actual provider to simulate successful execution
             mock_provider = MagicMock()

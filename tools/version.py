@@ -307,7 +307,7 @@ class VersionTool(BaseTool):
 
         # Check for configured providers
         try:
-            from providers.registry import ModelProviderRegistry
+            from providers.registry import get_default_registry
             from providers.shared import ProviderType
 
             provider_status = []
@@ -324,7 +324,7 @@ class VersionTool(BaseTool):
             provider_names = ["Google Gemini", "OpenAI", "X.AI", "DIAL", "OpenRouter", "Custom/Local"]
 
             for provider_type, provider_name in zip(provider_types, provider_names):
-                provider = ModelProviderRegistry.get_provider(provider_type)
+                provider = get_default_registry().get_provider(provider_type)
                 status = "✅ Configured" if provider is not None else "❌ Not configured"
                 provider_status.append(f"- **{provider_name}**: {status}")
 
@@ -333,7 +333,7 @@ class VersionTool(BaseTool):
 
             # Get total available models
             try:
-                available_models = ModelProviderRegistry.get_available_models(respect_restrictions=True)
+                available_models = get_default_registry().get_available_models(respect_restrictions=True)
                 output_lines.append(f"\n\n**Available Models**: {len(available_models)}")
             except Exception:
                 output_lines.append("\n\n**Available Models**: Unknown")

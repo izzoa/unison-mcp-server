@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from providers.registry import ModelProviderRegistry
+from providers.registry import ModelProviderRegistry, set_default_registry
 from providers.shared import ProviderType
 from tests.transport_helpers import inject_transport
 from tools.chat import ChatTool
@@ -52,11 +52,12 @@ async def test_chat_auto_mode_with_openai(monkeypatch, tmp_path):
             # Replay mode uses dummy key to keep secrets out of the cassette
             m.setenv("OPENAI_API_KEY", "dummy-key-for-replay")
 
-        # Reset registry and register only OpenAI provider
-        ModelProviderRegistry.reset_for_testing()
+        # Create registry and register only OpenAI provider
+        registry = ModelProviderRegistry(config={})
+        set_default_registry(registry)
         from providers.openai import OpenAIModelProvider
 
-        ModelProviderRegistry.register_provider(ProviderType.OPENAI, OpenAIModelProvider)
+        registry.register_provider(ProviderType.OPENAI, OpenAIModelProvider)
 
         # Inject HTTP transport (records or replays depending on cassette state)
         inject_transport(monkeypatch, CASSETTE_PATH)
@@ -116,10 +117,11 @@ async def test_chat_openai_continuation(monkeypatch, tmp_path):
         for key in keys_to_clear:
             m.delenv(key, raising=False)
 
-        ModelProviderRegistry.reset_for_testing()
+        registry = ModelProviderRegistry(config={})
+        set_default_registry(registry)
         from providers.openai import OpenAIModelProvider
 
-        ModelProviderRegistry.register_provider(ProviderType.OPENAI, OpenAIModelProvider)
+        registry.register_provider(ProviderType.OPENAI, OpenAIModelProvider)
 
         inject_transport(monkeypatch, CASSETTE_CONTINUATION_PATH)
 
@@ -172,6 +174,3 @@ async def test_chat_openai_continuation(monkeypatch, tmp_path):
 
     # Ensure the cassette file exists for future replays
     assert CASSETTE_CONTINUATION_PATH.exists()
-
-    # Clean up registry state for subsequent tests
-    ModelProviderRegistry.reset_for_testing()

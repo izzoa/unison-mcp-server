@@ -151,6 +151,7 @@ Unison is forked from [BeehiveInnovations/pal-mcp-server](https://github.com/Bee
 | **Discovered vs Curated** | All models treated equally | `listmodels` distinguishes curated models (with hand-tuned intelligence scores, aliases) from auto-discovered ones |
 | **Model Selection** | Hardcoded preference lists per provider — go stale when models change | Data-driven selection using `intelligence_score` and capability flags; auto-mode always picks the best available model |
 | **Model Freshness** | Manual JSON updates only | Weekly CI workflow fetches the latest LiteLLM catalog and opens a PR with new/updated models for human review |
+| **Conversation Storage** | In-memory only — lost on restart | Optional persistent SQLite backend (`STORAGE_BACKEND=sqlite`) — survives restarts with zero config |
 | **Changelog** | Git-log style | [Keep a Changelog](https://keepachangelog.com/) format with Unreleased section |
 | **Branding** | PAL (Provider Abstraction Layer) | Unison — Providers Together |
 

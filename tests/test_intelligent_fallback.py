@@ -9,7 +9,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from providers.registry import ModelProviderRegistry
+from providers.registry import get_default_registry
 from providers.shared import ProviderType
 
 
@@ -19,17 +19,18 @@ class TestIntelligentFallback:
     def setup_method(self):
         """Setup for each test - clear registry and reset providers"""
         # Store original providers for restoration
-        registry = ModelProviderRegistry()
+        registry = get_default_registry()
         self._original_providers = registry._providers.copy()
         self._original_initialized = registry._initialized_providers.copy()
 
-        # Clear registry completely
-        ModelProviderRegistry.reset_for_testing()
+        # Clear registry completely (conftest autouse fixture provides a fresh one)
+        registry._providers.clear()
+        registry._initialized_providers.clear()
 
     def teardown_method(self):
         """Cleanup after each test - restore original providers"""
         # Restore original registry state
-        registry = ModelProviderRegistry()
+        registry = get_default_registry()
         registry._providers.clear()
         registry._initialized_providers.clear()
         registry._providers.update(self._original_providers)
@@ -41,11 +42,11 @@ class TestIntelligentFallback:
         # Register only OpenAI provider for this test
         from providers.openai import OpenAIModelProvider
 
-        ModelProviderRegistry.register_provider(ProviderType.OPENAI, OpenAIModelProvider)
+        get_default_registry().register_provider(ProviderType.OPENAI, OpenAIModelProvider)
 
-        fallback_model = ModelProviderRegistry.get_preferred_fallback_model()
+        fallback_model = get_default_registry().get_preferred_fallback_model()
         # Should return a valid OpenAI model (highest intelligence_score for BALANCED)
-        provider = ModelProviderRegistry.get_provider(ProviderType.OPENAI)
+        provider = get_default_registry().get_provider(ProviderType.OPENAI)
         assert provider.validate_model_name(fallback_model)
 
     @patch.dict(os.environ, {"OPENAI_API_KEY": "", "GEMINI_API_KEY": "test-gemini-key"}, clear=False)
@@ -54,11 +55,11 @@ class TestIntelligentFallback:
         # Register only Gemini provider for this test
         from providers.gemini import GeminiModelProvider
 
-        ModelProviderRegistry.register_provider(ProviderType.GOOGLE, GeminiModelProvider)
+        get_default_registry().register_provider(ProviderType.GOOGLE, GeminiModelProvider)
 
-        fallback_model = ModelProviderRegistry.get_preferred_fallback_model()
+        fallback_model = get_default_registry().get_preferred_fallback_model()
         # Should return a valid Gemini model
-        provider = ModelProviderRegistry.get_provider(ProviderType.GOOGLE)
+        provider = get_default_registry().get_provider(ProviderType.GOOGLE)
         assert provider.validate_model_name(fallback_model)
 
     @patch.dict(os.environ, {"OPENAI_API_KEY": "sk-test-key", "GEMINI_API_KEY": "test-gemini-key"}, clear=False)
@@ -68,12 +69,12 @@ class TestIntelligentFallback:
         from providers.gemini import GeminiModelProvider
         from providers.openai import OpenAIModelProvider
 
-        ModelProviderRegistry.register_provider(ProviderType.OPENAI, OpenAIModelProvider)
-        ModelProviderRegistry.register_provider(ProviderType.GOOGLE, GeminiModelProvider)
+        get_default_registry().register_provider(ProviderType.OPENAI, OpenAIModelProvider)
+        get_default_registry().register_provider(ProviderType.GOOGLE, GeminiModelProvider)
 
-        fallback_model = ModelProviderRegistry.get_preferred_fallback_model()
+        fallback_model = get_default_registry().get_preferred_fallback_model()
         # Gemini has priority in PROVIDER_PRIORITY_ORDER, so should return a Gemini model
-        provider = ModelProviderRegistry.get_provider(ProviderType.GOOGLE)
+        provider = get_default_registry().get_provider(ProviderType.GOOGLE)
         assert provider.validate_model_name(fallback_model)
 
     @patch.dict(os.environ, {"OPENAI_API_KEY": "", "GEMINI_API_KEY": ""}, clear=False)
@@ -83,11 +84,11 @@ class TestIntelligentFallback:
         from providers.gemini import GeminiModelProvider
         from providers.openai import OpenAIModelProvider
 
-        ModelProviderRegistry.register_provider(ProviderType.OPENAI, OpenAIModelProvider)
-        ModelProviderRegistry.register_provider(ProviderType.GOOGLE, GeminiModelProvider)
+        get_default_registry().register_provider(ProviderType.OPENAI, OpenAIModelProvider)
+        get_default_registry().register_provider(ProviderType.GOOGLE, GeminiModelProvider)
 
         with pytest.raises(ValueError, match="No models available"):
-            ModelProviderRegistry.get_preferred_fallback_model()
+            get_default_registry().get_preferred_fallback_model()
 
     def test_available_providers_with_keys(self):
         """Test the get_available_providers_with_keys method"""
@@ -96,21 +97,25 @@ class TestIntelligentFallback:
 
         with patch.dict(os.environ, {"OPENAI_API_KEY": "sk-test-key", "GEMINI_API_KEY": ""}, clear=False):
             # Clear and register providers
-            ModelProviderRegistry.reset_for_testing()
-            ModelProviderRegistry.register_provider(ProviderType.OPENAI, OpenAIModelProvider)
-            ModelProviderRegistry.register_provider(ProviderType.GOOGLE, GeminiModelProvider)
+            registry = get_default_registry()
+            registry._providers.clear()
+            registry._initialized_providers.clear()
+            registry.register_provider(ProviderType.OPENAI, OpenAIModelProvider)
+            registry.register_provider(ProviderType.GOOGLE, GeminiModelProvider)
 
-            available = ModelProviderRegistry.get_available_providers_with_keys()
+            available = registry.get_available_providers_with_keys()
             assert ProviderType.OPENAI in available
             assert ProviderType.GOOGLE not in available
 
         with patch.dict(os.environ, {"OPENAI_API_KEY": "", "GEMINI_API_KEY": "test-key"}, clear=False):
             # Clear and register providers
-            ModelProviderRegistry.reset_for_testing()
-            ModelProviderRegistry.register_provider(ProviderType.OPENAI, OpenAIModelProvider)
-            ModelProviderRegistry.register_provider(ProviderType.GOOGLE, GeminiModelProvider)
+            registry = get_default_registry()
+            registry._providers.clear()
+            registry._initialized_providers.clear()
+            registry.register_provider(ProviderType.OPENAI, OpenAIModelProvider)
+            registry.register_provider(ProviderType.GOOGLE, GeminiModelProvider)
 
-            available = ModelProviderRegistry.get_available_providers_with_keys()
+            available = registry.get_available_providers_with_keys()
             assert ProviderType.GOOGLE in available
             assert ProviderType.OPENAI not in available
 
@@ -127,7 +132,7 @@ class TestIntelligentFallback:
             # Register only OpenAI provider for this test
             from providers.openai import OpenAIModelProvider
 
-            ModelProviderRegistry.register_provider(ProviderType.OPENAI, OpenAIModelProvider)
+            get_default_registry().register_provider(ProviderType.OPENAI, OpenAIModelProvider)
 
             # Create a context with at least one turn so it doesn't exit early
             from utils.conversation_memory import ConversationTurn
@@ -173,7 +178,7 @@ class TestIntelligentFallback:
             # Register only Gemini provider for this test
             from providers.gemini import GeminiModelProvider
 
-            ModelProviderRegistry.register_provider(ProviderType.GOOGLE, GeminiModelProvider)
+            get_default_registry().register_provider(ProviderType.GOOGLE, GeminiModelProvider)
 
             from utils.conversation_memory import ConversationTurn
 

@@ -82,7 +82,7 @@ class ListModelsTool(BaseTool):
         Returns:
             Formatted list of models by provider
         """
-        from providers.registry import ModelProviderRegistry
+        from providers.registry import get_default_registry
         from providers.shared import ProviderType
         from utils.model_restrictions import get_restriction_service
 
@@ -92,7 +92,7 @@ class ListModelsTool(BaseTool):
         restricted_models_by_provider: dict[ProviderType, list[str]] = {}
 
         if restriction_service:
-            restricted_map = ModelProviderRegistry.get_available_models(respect_restrictions=True)
+            restricted_map = get_default_registry().get_available_models(respect_restrictions=True)
             for model_name, provider_type in restricted_map.items():
                 restricted_models_by_provider.setdefault(provider_type, []).append(model_name)
 
@@ -147,7 +147,7 @@ class ListModelsTool(BaseTool):
         # Check each native provider type
         for provider_type, info in provider_info.items():
             # Check if provider is enabled
-            provider = ModelProviderRegistry.get_provider(provider_type)
+            provider = get_default_registry().get_provider(provider_type)
             is_configured = provider is not None
 
             output_lines.append(f"## {info['name']} {'✅' if is_configured else '❌'}")
@@ -229,7 +229,7 @@ class ListModelsTool(BaseTool):
             output_lines.append("**Description**: Access to multiple cloud AI providers via unified API")
 
             try:
-                provider = ModelProviderRegistry.get_provider(ProviderType.OPENROUTER)
+                provider = get_default_registry().get_provider(ProviderType.OPENROUTER)
                 if provider:
                     registry = OpenRouterModelRegistry()
 
@@ -369,7 +369,7 @@ class ListModelsTool(BaseTool):
             [
                 1
                 for provider_type, info in provider_info.items()
-                if ModelProviderRegistry.get_provider(provider_type) is not None
+                if get_default_registry().get_provider(provider_type) is not None
             ]
         )
         if is_openrouter_configured:
@@ -381,10 +381,10 @@ class ListModelsTool(BaseTool):
 
         # Get total available models
         try:
-            from providers.registry import ModelProviderRegistry
+            from providers.registry import get_default_registry
 
             # Get all available models respecting restrictions
-            available_models = ModelProviderRegistry.get_available_models(respect_restrictions=True)
+            available_models = get_default_registry().get_available_models(respect_restrictions=True)
             total_models = len(available_models)
             output_lines.append(f"**Total Available Models**: {total_models}")
         except Exception as e:

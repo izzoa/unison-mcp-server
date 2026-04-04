@@ -10,7 +10,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from providers.registry import ModelProviderRegistry, ProviderType
+from providers.registry import ModelProviderRegistry, ProviderType, get_default_registry
 from tools.analyze import AnalyzeTool
 from tools.chat import ChatTool
 from tools.codereview import CodeReviewTool
@@ -79,27 +79,27 @@ class TestModelSelection:
 
     def teardown_method(self):
         """Clean up after each test to prevent state pollution."""
-        ModelProviderRegistry.clear_cache()
+        get_default_registry().clear_cache()
         # Unregister all providers
         for provider_type in list(ProviderType):
-            ModelProviderRegistry.unregister_provider(provider_type)
+            get_default_registry().unregister_provider(provider_type)
 
     def test_extended_reasoning_with_openai(self):
         """Test EXTENDED_REASONING with OpenAI provider."""
         # Setup with only OpenAI provider
-        ModelProviderRegistry.clear_cache()
+        get_default_registry().clear_cache()
         # First unregister all providers to ensure isolation
         for provider_type in list(ProviderType):
-            ModelProviderRegistry.unregister_provider(provider_type)
+            get_default_registry().unregister_provider(provider_type)
 
         with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}, clear=False):
             from providers.openai import OpenAIModelProvider
 
-            ModelProviderRegistry.register_provider(ProviderType.OPENAI, OpenAIModelProvider)
+            get_default_registry().register_provider(ProviderType.OPENAI, OpenAIModelProvider)
 
-            model = ModelProviderRegistry.get_preferred_fallback_model(ToolModelCategory.EXTENDED_REASONING)
+            model = get_default_registry().get_preferred_fallback_model(ToolModelCategory.EXTENDED_REASONING)
             # Should return a valid OpenAI model with thinking support for extended reasoning
-            provider = ModelProviderRegistry.get_provider(ProviderType.OPENAI)
+            provider = get_default_registry().get_provider(ProviderType.OPENAI)
             assert provider.validate_model_name(model)
             caps = provider.get_capabilities(model)
             assert caps.supports_extended_thinking
@@ -107,19 +107,19 @@ class TestModelSelection:
     def test_extended_reasoning_with_gemini_only(self):
         """Test EXTENDED_REASONING prefers pro when only Gemini is available."""
         # Clear cache and unregister all providers first
-        ModelProviderRegistry.clear_cache()
+        get_default_registry().clear_cache()
         for provider_type in list(ProviderType):
-            ModelProviderRegistry.unregister_provider(provider_type)
+            get_default_registry().unregister_provider(provider_type)
 
         # Register only Gemini provider
         with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}, clear=False):
             from providers.gemini import GeminiModelProvider
 
-            ModelProviderRegistry.register_provider(ProviderType.GOOGLE, GeminiModelProvider)
+            get_default_registry().register_provider(ProviderType.GOOGLE, GeminiModelProvider)
 
-            model = ModelProviderRegistry.get_preferred_fallback_model(ToolModelCategory.EXTENDED_REASONING)
+            model = get_default_registry().get_preferred_fallback_model(ToolModelCategory.EXTENDED_REASONING)
             # Gemini should return a valid model with thinking support for extended reasoning
-            provider = ModelProviderRegistry.get_provider(ProviderType.GOOGLE)
+            provider = get_default_registry().get_provider(ProviderType.GOOGLE)
             assert provider.validate_model_name(model)
             caps = provider.get_capabilities(model)
             assert caps.supports_extended_thinking
@@ -127,57 +127,57 @@ class TestModelSelection:
     def test_fast_response_with_openai(self):
         """Test FAST_RESPONSE with OpenAI provider."""
         # Setup with only OpenAI provider
-        ModelProviderRegistry.clear_cache()
+        get_default_registry().clear_cache()
         # First unregister all providers to ensure isolation
         for provider_type in list(ProviderType):
-            ModelProviderRegistry.unregister_provider(provider_type)
+            get_default_registry().unregister_provider(provider_type)
 
         with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}, clear=False):
             from providers.openai import OpenAIModelProvider
 
-            ModelProviderRegistry.register_provider(ProviderType.OPENAI, OpenAIModelProvider)
+            get_default_registry().register_provider(ProviderType.OPENAI, OpenAIModelProvider)
 
-            model = ModelProviderRegistry.get_preferred_fallback_model(ToolModelCategory.FAST_RESPONSE)
+            model = get_default_registry().get_preferred_fallback_model(ToolModelCategory.FAST_RESPONSE)
             # Should return a valid OpenAI model; for fast response prefer fast-tier models
-            provider = ModelProviderRegistry.get_provider(ProviderType.OPENAI)
+            provider = get_default_registry().get_provider(ProviderType.OPENAI)
             assert provider.validate_model_name(model)
             assert any(p in model.lower() for p in ("flash", "mini", "lite", "fast", "nano"))
 
     def test_fast_response_with_gemini_only(self):
         """Test FAST_RESPONSE prefers flash when only Gemini is available."""
         # Clear cache and unregister all providers first
-        ModelProviderRegistry.clear_cache()
+        get_default_registry().clear_cache()
         for provider_type in list(ProviderType):
-            ModelProviderRegistry.unregister_provider(provider_type)
+            get_default_registry().unregister_provider(provider_type)
 
         # Register only Gemini provider
         with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}, clear=False):
             from providers.gemini import GeminiModelProvider
 
-            ModelProviderRegistry.register_provider(ProviderType.GOOGLE, GeminiModelProvider)
+            get_default_registry().register_provider(ProviderType.GOOGLE, GeminiModelProvider)
 
-            model = ModelProviderRegistry.get_preferred_fallback_model(ToolModelCategory.FAST_RESPONSE)
+            model = get_default_registry().get_preferred_fallback_model(ToolModelCategory.FAST_RESPONSE)
             # Gemini should return a valid fast-tier model for fast response
-            provider = ModelProviderRegistry.get_provider(ProviderType.GOOGLE)
+            provider = get_default_registry().get_provider(ProviderType.GOOGLE)
             assert provider.validate_model_name(model)
             assert any(p in model.lower() for p in ("flash", "mini", "lite", "fast", "nano"))
 
     def test_balanced_category_fallback(self):
         """Test BALANCED category uses existing logic."""
         # Setup with only OpenAI provider
-        ModelProviderRegistry.clear_cache()
+        get_default_registry().clear_cache()
         # First unregister all providers to ensure isolation
         for provider_type in list(ProviderType):
-            ModelProviderRegistry.unregister_provider(provider_type)
+            get_default_registry().unregister_provider(provider_type)
 
         with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}, clear=False):
             from providers.openai import OpenAIModelProvider
 
-            ModelProviderRegistry.register_provider(ProviderType.OPENAI, OpenAIModelProvider)
+            get_default_registry().register_provider(ProviderType.OPENAI, OpenAIModelProvider)
 
-            model = ModelProviderRegistry.get_preferred_fallback_model(ToolModelCategory.BALANCED)
+            model = get_default_registry().get_preferred_fallback_model(ToolModelCategory.BALANCED)
             # Should return a valid OpenAI model for balanced use
-            provider = ModelProviderRegistry.get_provider(ProviderType.OPENAI)
+            provider = get_default_registry().get_provider(ProviderType.OPENAI)
             assert provider.validate_model_name(model)
 
     def test_no_category_uses_balanced_logic(self):
@@ -186,11 +186,11 @@ class TestModelSelection:
         with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}, clear=False):
             from providers.gemini import GeminiModelProvider
 
-            ModelProviderRegistry.register_provider(ProviderType.GOOGLE, GeminiModelProvider)
+            get_default_registry().register_provider(ProviderType.GOOGLE, GeminiModelProvider)
 
-            model = ModelProviderRegistry.get_preferred_fallback_model()
+            model = get_default_registry().get_preferred_fallback_model()
             # Should return a valid Gemini model for balanced use
-            provider = ModelProviderRegistry.get_provider(ProviderType.GOOGLE)
+            provider = get_default_registry().get_provider(ProviderType.GOOGLE)
             assert provider.validate_model_name(model)
 
 
@@ -226,24 +226,24 @@ class TestFlexibleModelSelection:
 
         for case in test_cases:
             # Clear registry for clean test
-            ModelProviderRegistry.clear_cache()
+            get_default_registry().clear_cache()
             # First unregister all providers to ensure isolation
             for provider_type in list(ProviderType):
-                ModelProviderRegistry.unregister_provider(provider_type)
+                get_default_registry().unregister_provider(provider_type)
 
             with patch.dict(os.environ, case["env"], clear=False):
                 # Register the appropriate provider
                 if case["provider_type"] == ProviderType.OPENAI:
                     from providers.openai import OpenAIModelProvider
 
-                    ModelProviderRegistry.register_provider(ProviderType.OPENAI, OpenAIModelProvider)
+                    get_default_registry().register_provider(ProviderType.OPENAI, OpenAIModelProvider)
                 elif case["provider_type"] == ProviderType.GOOGLE:
                     from providers.gemini import GeminiModelProvider
 
-                    ModelProviderRegistry.register_provider(ProviderType.GOOGLE, GeminiModelProvider)
+                    get_default_registry().register_provider(ProviderType.GOOGLE, GeminiModelProvider)
 
-                model = ModelProviderRegistry.get_preferred_fallback_model(case["category"])
-                provider = ModelProviderRegistry.get_provider(case["provider_type"])
+                model = get_default_registry().get_preferred_fallback_model(case["category"])
+                provider = get_default_registry().get_provider(case["provider_type"])
                 assert provider.validate_model_name(model), f"Invalid model for case: {case}, got {model}"
                 if case["check"] == "thinking":
                     caps = provider.get_capabilities(model)
@@ -260,29 +260,27 @@ class TestCustomProviderFallback:
     def test_extended_reasoning_custom_fallback(self):
         """Test EXTENDED_REASONING with custom provider."""
         # Setup with custom provider
-        ModelProviderRegistry.clear_cache()
+        get_default_registry().clear_cache()
         with patch.dict(os.environ, {"CUSTOM_API_URL": "http://localhost:11434", "CUSTOM_API_KEY": ""}, clear=False):
             from providers.custom import CustomProvider
 
-            ModelProviderRegistry.register_provider(ProviderType.CUSTOM, CustomProvider)
+            get_default_registry().register_provider(ProviderType.CUSTOM, CustomProvider)
 
-            provider = ModelProviderRegistry.get_provider(ProviderType.CUSTOM)
+            provider = get_default_registry().get_provider(ProviderType.CUSTOM)
             if provider:
-                model = ModelProviderRegistry.get_preferred_fallback_model(ToolModelCategory.EXTENDED_REASONING)
+                model = get_default_registry().get_preferred_fallback_model(ToolModelCategory.EXTENDED_REASONING)
                 # Should get a model from custom provider
                 assert model is not None
 
     def test_extended_reasoning_final_fallback(self):
         """Test EXTENDED_REASONING raises ValueError when no providers available."""
         # Clear all providers
-        ModelProviderRegistry.clear_cache()
-        for provider_type in list(
-            ModelProviderRegistry._instance._providers.keys() if ModelProviderRegistry._instance else []
-        ):
-            ModelProviderRegistry.unregister_provider(provider_type)
+        get_default_registry().clear_cache()
+        for provider_type in list(get_default_registry()._providers.keys()):
+            get_default_registry().unregister_provider(provider_type)
 
         with pytest.raises(ValueError, match="No models available"):
-            ModelProviderRegistry.get_preferred_fallback_model(ToolModelCategory.EXTENDED_REASONING)
+            get_default_registry().get_preferred_fallback_model(ToolModelCategory.EXTENDED_REASONING)
 
 
 class TestAutoModeErrorMessages:
@@ -290,8 +288,7 @@ class TestAutoModeErrorMessages:
 
     def teardown_method(self):
         """Clean up after each test to prevent state pollution."""
-        # Clear provider registry singleton
-        ModelProviderRegistry.reset_for_testing()
+        # conftest autouse fixture handles registry reset
 
     @pytest.mark.asyncio
     async def test_chat_auto_error_message(self):
@@ -339,12 +336,12 @@ class TestProviderHelperMethods:
         with patch.dict(os.environ, {"CUSTOM_API_URL": "http://localhost:11434", "CUSTOM_API_KEY": ""}, clear=False):
             from providers.custom import CustomProvider
 
-            ModelProviderRegistry.register_provider(ProviderType.CUSTOM, CustomProvider)
+            get_default_registry().register_provider(ProviderType.CUSTOM, CustomProvider)
 
-            provider = ModelProviderRegistry.get_provider(ProviderType.CUSTOM)
+            provider = get_default_registry().get_provider(ProviderType.CUSTOM)
             if provider:
                 # Custom provider should return a model for extended reasoning
-                model = ModelProviderRegistry.get_preferred_fallback_model(ToolModelCategory.EXTENDED_REASONING)
+                model = get_default_registry().get_preferred_fallback_model(ToolModelCategory.EXTENDED_REASONING)
                 assert model is not None
 
     def test_extended_reasoning_with_openrouter(self):
@@ -353,25 +350,23 @@ class TestProviderHelperMethods:
         with patch.dict(os.environ, {"OPENROUTER_API_KEY": "test-key"}, clear=False):
             from providers.openrouter import OpenRouterProvider
 
-            ModelProviderRegistry.register_provider(ProviderType.OPENROUTER, OpenRouterProvider)
+            get_default_registry().register_provider(ProviderType.OPENROUTER, OpenRouterProvider)
 
             # OpenRouter should provide a model for extended reasoning
-            model = ModelProviderRegistry.get_preferred_fallback_model(ToolModelCategory.EXTENDED_REASONING)
+            model = get_default_registry().get_preferred_fallback_model(ToolModelCategory.EXTENDED_REASONING)
             # Should return first available OpenRouter model
             assert model is not None
 
     def test_fallback_when_no_providers_available(self):
         """Test fallback raises ValueError when no providers are available."""
         # Clear all providers
-        ModelProviderRegistry.clear_cache()
-        for provider_type in list(
-            ModelProviderRegistry._instance._providers.keys() if ModelProviderRegistry._instance else []
-        ):
-            ModelProviderRegistry.unregister_provider(provider_type)
+        get_default_registry().clear_cache()
+        for provider_type in list(get_default_registry()._providers.keys()):
+            get_default_registry().unregister_provider(provider_type)
 
         # Should raise ValueError when no providers have models
         with pytest.raises(ValueError, match="No models available"):
-            ModelProviderRegistry.get_preferred_fallback_model(ToolModelCategory.EXTENDED_REASONING)
+            get_default_registry().get_preferred_fallback_model(ToolModelCategory.EXTENDED_REASONING)
 
 
 class TestEffectiveAutoMode:
@@ -410,8 +405,7 @@ class TestRuntimeModelSelection:
 
     def teardown_method(self):
         """Clean up after each test to prevent state pollution."""
-        # Clear provider registry singleton
-        ModelProviderRegistry.reset_for_testing()
+        # conftest autouse fixture handles registry reset
 
     @pytest.mark.asyncio
     async def test_explicit_auto_in_request(self):

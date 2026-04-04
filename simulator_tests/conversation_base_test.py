@@ -86,11 +86,14 @@ class ConversationBaseTest(BaseSimulatorTest):
             if project_root not in sys.path:
                 sys.path.insert(0, project_root)
 
-            # Import and configure providers first (this is what main() does)
+            # Import and configure providers (mirror what server.py main() does)
             from providers.configure import configure_providers
+            from providers.registry import ModelProviderRegistry, set_default_registry
             from server import TOOLS
 
-            configure_providers()
+            registry = ModelProviderRegistry(config={})
+            set_default_registry(registry)
+            configure_providers(registry)
 
             self._tools = TOOLS
             self.logger.debug(f"Imported {len(self._tools)} tools for in-process testing")
@@ -128,6 +131,12 @@ class ConversationBaseTest(BaseSimulatorTest):
         if tool_name not in self._tools:
             raise ValueError(f"Tool '{tool_name}' not found. Available: {list(self._tools.keys())}")
 
+        # Auto-inject working_directory_absolute_path for the chat tool
+        if tool_name == "chat" and "working_directory_absolute_path" not in params:
+            import os
+
+            params = {**params, "working_directory_absolute_path": os.getcwd()}
+
         try:
             tool = self._tools[tool_name]
             self.logger.debug(f"Calling tool '{tool_name}' directly in-process")
@@ -141,15 +150,16 @@ class ConversationBaseTest(BaseSimulatorTest):
 
             # Import required modules for model resolution (similar to server.py)
             from config import DEFAULT_MODEL
-            from providers.registry import ModelProviderRegistry
+            from providers.registry import get_default_registry
             from utils.model_context import ModelContext
 
+            registry = get_default_registry()
             # Resolve model (simplified version of server.py logic)
             model_name = params.get("model", DEFAULT_MODEL)
-            provider = ModelProviderRegistry.get_provider_for_model(model_name)
+            provider = registry.get_provider_for_model(model_name)
             if not provider:
                 # Fallback to available model for testing
-                available_models = list(ModelProviderRegistry.get_available_models(respect_restrictions=True).keys())
+                available_models = list(registry.get_available_models(respect_restrictions=True).keys())
                 if available_models:
                     model_name = available_models[0]
                     params["model"] = model_name

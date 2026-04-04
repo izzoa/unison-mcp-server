@@ -459,14 +459,14 @@ class TestRegistryIntegration:
 
         utils.model_restrictions._restriction_service = None
 
-        from providers.registry import ModelProviderRegistry
+        from providers.registry import get_default_registry
 
         # Clear registry cache
-        ModelProviderRegistry.clear_cache()
+        get_default_registry().clear_cache()
 
         # Get available models with restrictions
         # This test documents current behavior - get_available_models doesn't handle aliases
-        ModelProviderRegistry.get_available_models(respect_restrictions=True)
+        get_default_registry().get_available_models(respect_restrictions=True)
 
         # Currently, this will be empty because get_available_models doesn't
         # recognize that "mini" allows "o4-mini"
@@ -475,7 +475,7 @@ class TestRegistryIntegration:
     @patch("providers.registry.ModelProviderRegistry.get_provider")
     def test_get_available_models_respects_restrictions(self, mock_get_provider):
         """Test that registry filters models based on restrictions."""
-        from providers.registry import ModelProviderRegistry
+        from providers.registry import get_default_registry
 
         # Mock providers
         mock_openai = MagicMock()
@@ -576,7 +576,7 @@ class TestRegistryIntegration:
         mock_get_provider.side_effect = get_provider_side_effect
 
         # Set up registry with providers
-        registry = ModelProviderRegistry()
+        registry = get_default_registry()
         registry._providers = {
             ProviderType.OPENAI: type(mock_openai),
             ProviderType.GOOGLE: type(mock_gemini),
@@ -591,7 +591,7 @@ class TestRegistryIntegration:
 
             utils.model_restrictions._restriction_service = None
 
-            available = ModelProviderRegistry.get_available_models(respect_restrictions=True)
+            available = get_default_registry().get_available_models(respect_restrictions=True)
 
             # Should only include allowed models
             assert "o3-mini" in available
@@ -628,7 +628,7 @@ class TestShorthandRestrictions:
             }
             return mapping.get(provider_type)
 
-        with patch.object(ModelProviderRegistry, "get_provider", side_effect=registry_side_effect):
+        with patch.object(ModelProviderRegistry, "get_provider", side_effect=registry_side_effect):  # patches class
             assert openai_provider.validate_model_name("mini")  # Should work with shorthand
             assert openai_provider.validate_model_name(mini_target)  # Canonical resolved from shorthand
             assert not openai_provider.validate_model_name("o3-mini")  # Unrelated model still blocked
@@ -692,7 +692,7 @@ class TestAutoModeWithRestrictions:
     @patch("providers.registry.ModelProviderRegistry.get_provider")
     def test_fallback_model_respects_restrictions(self, mock_get_provider):
         """Test that fallback model selection respects restrictions."""
-        from providers.registry import ModelProviderRegistry
+        from providers.registry import get_default_registry
         from tools.models import ToolModelCategory
 
         # Mock providers
@@ -756,7 +756,7 @@ class TestAutoModeWithRestrictions:
         mock_get_provider.side_effect = get_provider_side_effect
 
         # Set up registry
-        registry = ModelProviderRegistry()
+        registry = get_default_registry()
         registry._providers = {ProviderType.OPENAI: type(mock_openai)}
 
         with patch.dict(os.environ, {"OPENAI_ALLOWED_MODELS": "o4-mini"}):
@@ -766,7 +766,7 @@ class TestAutoModeWithRestrictions:
             utils.model_restrictions._restriction_service = None
 
             # Should pick o4-mini instead of o3-mini for fast response
-            model = ModelProviderRegistry.get_preferred_fallback_model(ToolModelCategory.FAST_RESPONSE)
+            model = get_default_registry().get_preferred_fallback_model(ToolModelCategory.FAST_RESPONSE)
             assert model == "o4-mini"
 
     def test_fallback_with_shorthand_restrictions(self, monkeypatch):
@@ -778,28 +778,30 @@ class TestAutoModeWithRestrictions:
 
         # Clear caches and reset registry
         import utils.model_restrictions
-        from providers.registry import ModelProviderRegistry
+        from providers.registry import get_default_registry
         from tools.models import ToolModelCategory
 
         utils.model_restrictions._restriction_service = None
 
         # Store original providers for restoration
-        registry = ModelProviderRegistry()
+        registry = get_default_registry()
         original_providers = registry._providers.copy()
         original_initialized = registry._initialized_providers.copy()
 
         try:
             # Clear registry and register only OpenAI and Gemini providers
-            ModelProviderRegistry.reset_for_testing()
+            registry.clear_cache()
+            for pt in list(registry._providers.keys()):
+                registry.unregister_provider(pt)
             from providers.gemini import GeminiModelProvider
             from providers.openai import OpenAIModelProvider
 
-            ModelProviderRegistry.register_provider(ProviderType.OPENAI, OpenAIModelProvider)
-            ModelProviderRegistry.register_provider(ProviderType.GOOGLE, GeminiModelProvider)
+            registry.register_provider(ProviderType.OPENAI, OpenAIModelProvider)
+            registry.register_provider(ProviderType.GOOGLE, GeminiModelProvider)
 
             # Even with "mini" restriction, fallback should work if provider handles it correctly
             # This tests the real-world scenario
-            model = ModelProviderRegistry.get_preferred_fallback_model(ToolModelCategory.FAST_RESPONSE)
+            model = registry.get_preferred_fallback_model(ToolModelCategory.FAST_RESPONSE)
 
             # The fallback will depend on how get_available_models handles aliases
             # When "mini" is allowed, it's returned as the allowed model
@@ -814,7 +816,7 @@ class TestAutoModeWithRestrictions:
             assert model in ["mini", _mini_tgt, "o4-mini", _flash_tgt]
         finally:
             # Restore original registry state
-            registry = ModelProviderRegistry()
+            registry = get_default_registry()
             registry._providers.clear()
             registry._initialized_providers.clear()
             registry._providers.update(original_providers)

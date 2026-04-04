@@ -46,7 +46,7 @@ class ModelSchemaBuilder:
             bool: True if model parameter should be required in the schema
         """
         from config import DEFAULT_MODEL
-        from providers.registry import ModelProviderRegistry
+        from providers.registry import get_default_registry
 
         # Case 1: Explicit auto mode
         if DEFAULT_MODEL.lower() == "auto":
@@ -54,7 +54,7 @@ class ModelSchemaBuilder:
 
         # Case 2: Model not available (fallback to auto mode)
         if DEFAULT_MODEL.lower() != "auto":
-            provider = ModelProviderRegistry.get_provider_for_model(DEFAULT_MODEL)
+            provider = get_default_registry().get_provider_for_model(DEFAULT_MODEL)
             if not provider:
                 return True
 
@@ -78,9 +78,9 @@ class ModelSchemaBuilder:
             return True
 
         # Case 2: Requested model is not available
-        from providers.registry import ModelProviderRegistry
+        from providers.registry import get_default_registry
 
-        provider = ModelProviderRegistry.get_provider_for_model(model_name)
+        provider = get_default_registry().get_provider_for_model(model_name)
         if not provider:
             logger.warning(f"Model '{model_name}' is not available with current API keys. Requiring model selection.")
             return True
@@ -98,11 +98,11 @@ class ModelSchemaBuilder:
         Returns:
             List of model names from enabled providers only
         """
-        from providers.registry import ModelProviderRegistry
+        from providers.registry import get_default_registry
         from utils.env import get_env
 
         # Get models from enabled providers only (those with valid API keys)
-        all_models = ModelProviderRegistry.get_available_model_names()
+        all_models = get_default_registry().get_available_model_names()
 
         # Add OpenRouter models if OpenRouter is configured
         openrouter_key = get_env("OPENROUTER_API_KEY")
@@ -178,13 +178,13 @@ class ModelSchemaBuilder:
     def _collect_ranked_capabilities(self) -> list[tuple[int, str, Any]]:
         """Gather available model capabilities sorted by capability rank."""
 
-        from providers.registry import ModelProviderRegistry
+        from providers.registry import get_default_registry
 
         ranked: list[tuple[int, str, Any]] = []
-        available = ModelProviderRegistry.get_available_models(respect_restrictions=True)
+        available = get_default_registry().get_available_models(respect_restrictions=True)
 
         for model_name, provider_type in available.items():
-            provider = ModelProviderRegistry.get_provider(provider_type)
+            provider = get_default_registry().get_provider(provider_type)
             if not provider:
                 continue
 
@@ -306,10 +306,10 @@ class ModelSchemaBuilder:
 
     def _build_model_unavailable_message(self, model_name: str) -> str:
         """Compose a consistent error message for unavailable model scenarios."""
-        from providers import ModelProviderRegistry
+        from providers.registry import get_default_registry as _get_registry
 
         tool_category = self.tool.get_model_category()
-        suggested_model = ModelProviderRegistry.get_preferred_fallback_model(tool_category)
+        suggested_model = _get_registry().get_preferred_fallback_model(tool_category)
         available_models_text = self._format_available_models_list()
 
         return (
@@ -321,10 +321,10 @@ class ModelSchemaBuilder:
 
     def _build_auto_mode_required_message(self) -> str:
         """Compose the auto-mode prompt when an explicit model selection is required."""
-        from providers import ModelProviderRegistry
+        from providers.registry import get_default_registry as _get_registry
 
         tool_category = self.tool.get_model_category()
-        suggested_model = ModelProviderRegistry.get_preferred_fallback_model(tool_category)
+        suggested_model = _get_registry().get_preferred_fallback_model(tool_category)
         available_models_text = self._format_available_models_list()
 
         return (

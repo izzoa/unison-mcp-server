@@ -21,7 +21,7 @@ from pathlib import Path
 import pytest
 
 from providers.gemini import GeminiModelProvider
-from providers.registry import ModelProviderRegistry, ProviderType
+from providers.registry import ModelProviderRegistry, ProviderType, get_default_registry, set_default_registry
 from tools.chat import ChatTool
 
 REPLAYS_ROOT = Path(__file__).parent / "gemini_cassettes"
@@ -60,8 +60,9 @@ async def test_chat_codegen_saves_file(monkeypatch, tmp_path):
         for key in ["OPENAI_API_KEY", "XAI_API_KEY", "OPENROUTER_API_KEY", "CUSTOM_API_KEY"]:
             m.delenv(key, raising=False)
 
-        ModelProviderRegistry.reset_for_testing()
-        ModelProviderRegistry.register_provider(ProviderType.GOOGLE, GeminiModelProvider)
+        fresh_registry = ModelProviderRegistry(config={})
+        fresh_registry.register_provider(ProviderType.GOOGLE, GeminiModelProvider)
+        set_default_registry(fresh_registry)
 
         working_dir = tmp_path / "codegen"
         working_dir.mkdir()
@@ -83,7 +84,7 @@ async def test_chat_codegen_saves_file(monkeypatch, tmp_path):
             }
         )
 
-        provider = ModelProviderRegistry.get_provider_for_model("gemini-2.5-pro")
+        provider = get_default_registry().get_provider_for_model("gemini-2.5-pro")
         if provider is not None:
             try:
                 provider.client.close()

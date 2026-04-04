@@ -10,7 +10,7 @@ import os
 
 import pytest
 
-from providers.registry import ModelProviderRegistry
+from providers.registry import get_default_registry
 from providers.shared import ProviderType
 from tools.debug import DebugIssueTool
 from tools.shared.exceptions import ToolExecutionError
@@ -29,7 +29,7 @@ class TestWorkflowMetadata:
         utils.model_restrictions._restriction_service = None
 
         # Clear provider registry
-        registry = ModelProviderRegistry()
+        registry = get_default_registry()
         registry._providers.clear()
         registry._initialized_providers.clear()
 
@@ -71,7 +71,7 @@ class TestWorkflowMetadata:
             # Register OpenRouter provider
             from providers.openrouter import OpenRouterProvider
 
-            ModelProviderRegistry.register_provider(ProviderType.OPENROUTER, OpenRouterProvider)
+            get_default_registry().register_provider(ProviderType.OPENROUTER, OpenRouterProvider)
 
             # Create debug tool
             debug_tool = DebugIssueTool()
@@ -153,7 +153,7 @@ class TestWorkflowMetadata:
             # Register OpenRouter provider
             from providers.openrouter import OpenRouterProvider
 
-            ModelProviderRegistry.register_provider(ProviderType.OPENROUTER, OpenRouterProvider)
+            get_default_registry().register_provider(ProviderType.OPENROUTER, OpenRouterProvider)
 
             # Create debug tool
             debug_tool = DebugIssueTool()
@@ -280,7 +280,7 @@ class TestWorkflowMetadata:
             # Register OpenRouter provider
             from providers.openrouter import OpenRouterProvider
 
-            ModelProviderRegistry.register_provider(ProviderType.OPENROUTER, OpenRouterProvider)
+            get_default_registry().register_provider(ProviderType.OPENROUTER, OpenRouterProvider)
 
             # Create debug tool
             debug_tool = DebugIssueTool()

@@ -182,10 +182,8 @@ class TestXAIProvider:
 
         with patch.dict(os.environ, {"XAI_ALLOWED_MODELS": allowed_model}):
             import utils.model_restrictions
-            from providers.registry import ModelProviderRegistry
 
             utils.model_restrictions._restriction_service = None
-            ModelProviderRegistry.reset_for_testing()
 
             restricted_provider = XAIModelProvider("test-key")
 

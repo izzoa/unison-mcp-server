@@ -6,7 +6,7 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 from providers.base import ModelProvider
-from providers.registry import ModelProviderRegistry
+from providers.registry import ModelProviderRegistry, get_default_registry
 from providers.shared import ModelCapabilities, ProviderType
 from tools.listmodels import ListModelsTool
 
@@ -17,7 +17,7 @@ class TestListModelsRestrictions(unittest.TestCase):
     def setUp(self):
         """Set up test environment."""
         # Clear any existing registry state
-        ModelProviderRegistry.clear_cache()
+        get_default_registry().clear_cache()
 
         # Create mock OpenRouter provider
         self.mock_openrouter = MagicMock(spec=ModelProvider)
@@ -83,7 +83,7 @@ class TestListModelsRestrictions(unittest.TestCase):
 
     def tearDown(self):
         """Clean up after tests."""
-        ModelProviderRegistry.clear_cache()
+        get_default_registry().clear_cache()
         # Clean up environment variables
         for key in ["OPENROUTER_ALLOWED_MODELS", "OPENROUTER_API_KEY", "GEMINI_API_KEY"]:
             os.environ.pop(key, None)
@@ -158,7 +158,8 @@ class TestListModelsRestrictions(unittest.TestCase):
         mock_get_provider.side_effect = get_provider_side_effect
 
         # Ensure registry is cleared before test
-        ModelProviderRegistry._registry = {}
+        get_default_registry()._providers.clear()
+        get_default_registry()._initialized_providers.clear()
 
         # Mock available models
         mock_get_models.return_value = {

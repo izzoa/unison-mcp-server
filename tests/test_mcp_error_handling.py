@@ -27,12 +27,12 @@ def _install_dummy_provider(monkeypatch):
     monkeypatch.setattr(
         ModelProviderRegistry,
         "get_provider_for_model",
-        classmethod(lambda cls, model_name: DummyProvider()),
+        lambda self, model_name: DummyProvider(),
     )
     monkeypatch.setattr(
         ModelProviderRegistry,
         "get_available_models",
-        classmethod(lambda cls, respect_restrictions=False: {"gemini-2.5-flash": None}),
+        lambda self, respect_restrictions=False: {"gemini-2.5-flash": None},
     )
 
 

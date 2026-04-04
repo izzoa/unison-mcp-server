@@ -62,10 +62,6 @@ class TestThinkDeepTool:
             import config
 
             importlib.reload(config)
-            from providers.registry import ModelProviderRegistry
-
-            ModelProviderRegistry.reset_for_testing()
-
             # Test with real provider resolution
             try:
                 result = await tool.execute(
@@ -108,9 +104,8 @@ class TestThinkDeepTool:
                 else:
                     os.environ.pop(key, None)
 
-            # Reload config and clear registry
+            # Reload config
             importlib.reload(config)
-            ModelProviderRegistry.reset_for_testing()
 
 
 class TestCodeReviewTool:
@@ -160,10 +155,6 @@ class TestCodeReviewTool:
             import config
 
             importlib.reload(config)
-            from providers.registry import ModelProviderRegistry
-
-            ModelProviderRegistry.reset_for_testing()
-
             # Test with real provider resolution - expect it to fail at API level
             try:
                 result = await tool.execute(
@@ -201,9 +192,8 @@ class TestCodeReviewTool:
                 else:
                     os.environ.pop(key, None)
 
-            # Reload config and clear registry
+            # Reload config
             importlib.reload(config)
-            ModelProviderRegistry.reset_for_testing()
 
 
 class TestAnalyzeTool:
@@ -262,10 +252,6 @@ class TestAnalyzeTool:
             import config
 
             importlib.reload(config)
-            from providers.registry import ModelProviderRegistry
-
-            ModelProviderRegistry.reset_for_testing()
-
             # Test with real provider resolution - expect it to fail at API level
             try:
                 result = await tool.execute(
@@ -305,9 +291,8 @@ class TestAnalyzeTool:
                 else:
                     os.environ.pop(key, None)
 
-            # Reload config and clear registry
+            # Reload config
             importlib.reload(config)
-            ModelProviderRegistry.reset_for_testing()
 
 
 class TestAbsolutePathValidation:
@@ -391,10 +376,6 @@ class TestAbsolutePathValidation:
             import config
 
             importlib.reload(config)
-            from providers.registry import ModelProviderRegistry
-
-            ModelProviderRegistry.reset_for_testing()
-
             # Test with real provider resolution - expect it to fail at API level
             try:
                 result = await tool.execute(
@@ -432,9 +413,8 @@ class TestAbsolutePathValidation:
                 else:
                     os.environ.pop(key, None)
 
-            # Reload config and clear registry
+            # Reload config
             importlib.reload(config)
-            ModelProviderRegistry.reset_for_testing()
 
 
 class TestSpecialStatusModels:

@@ -2,6 +2,8 @@
 
 from unittest.mock import MagicMock
 
+from providers.registry import ModelProviderRegistry, get_default_registry, set_default_registry
+
 
 class TestStorageBackendProtocol:
     """Tests for StorageBackend protocol and reset/injection functions."""
@@ -51,58 +53,69 @@ class TestStorageBackendProtocol:
         reset_storage_backend()  # Should not raise
 
 
-class TestRegistryResetForTesting:
-    """Tests for ModelProviderRegistry.reset_for_testing()."""
+class TestRegistryIndependentInstances:
+    """Tests for ModelProviderRegistry independent instance creation."""
 
-    def test_reset_produces_clean_registry(self):
-        """reset_for_testing() should produce a registry with no providers or config."""
-        from providers.registry import ModelProviderRegistry
-
-        ModelProviderRegistry.reset_for_testing()
-        registry = ModelProviderRegistry()
+    def test_new_registry_starts_empty(self):
+        """A new registry should have no providers or initialized providers."""
+        registry = ModelProviderRegistry(config={})
         assert len(registry._providers) == 0
         assert len(registry._initialized_providers) == 0
-        assert registry._config is None
-        ModelProviderRegistry.reset_for_testing()
 
-    def test_reset_is_idempotent(self):
-        """Calling reset_for_testing() twice should not raise."""
-        from providers.registry import ModelProviderRegistry
-
-        ModelProviderRegistry.reset_for_testing()
-        ModelProviderRegistry.reset_for_testing()  # Should not raise
-
-    def test_reset_clears_config(self):
-        """reset_for_testing() should clear any injected config."""
-        from providers.registry import ModelProviderRegistry
-
+    def test_config_is_stored(self):
+        """Config passed to __init__ should be stored on the instance."""
         config = {"GEMINI_API_KEY": "test-key"}
-        ModelProviderRegistry.create_for_testing(config)
-        registry = ModelProviderRegistry()
-        assert registry._config is not None
-
-        ModelProviderRegistry.reset_for_testing()
-        registry2 = ModelProviderRegistry()
-        assert registry2._config is None
-        ModelProviderRegistry.reset_for_testing()
-
-
-class TestCreateForTesting:
-    """Tests for ModelProviderRegistry.create_for_testing()."""
-
-    def test_create_for_testing_sets_config(self):
-        """create_for_testing(config) should set config on the registry instance."""
-        from providers.registry import ModelProviderRegistry
-
-        config = {"GEMINI_API_KEY": "test-key-123", "OPENAI_API_KEY": "sk-test"}
-        registry = ModelProviderRegistry.create_for_testing(config)
+        registry = ModelProviderRegistry(config=config)
         assert registry._config == config
-        ModelProviderRegistry.reset_for_testing()
 
-    def test_create_for_testing_returns_clean_registry(self):
-        """create_for_testing() should start with no providers registered."""
-        from providers.registry import ModelProviderRegistry
+    def test_empty_config_is_valid(self):
+        """An empty config dict should be accepted."""
+        registry = ModelProviderRegistry(config={})
+        assert registry._config == {}
 
-        registry = ModelProviderRegistry.create_for_testing({"GEMINI_API_KEY": "test"})
+    def test_separate_instances_are_independent(self):
+        """Two registry instances should be completely independent."""
+        from providers.gemini import GeminiModelProvider
+        from providers.shared import ProviderType
+
+        registry1 = ModelProviderRegistry(config={})
+        registry2 = ModelProviderRegistry(config={})
+
+        registry1.register_provider(ProviderType.GOOGLE, GeminiModelProvider)
+
+        assert ProviderType.GOOGLE in registry1._providers
+        assert ProviderType.GOOGLE not in registry2._providers
+
+
+class TestGetSetDefaultRegistry:
+    """Tests for get_default_registry() and set_default_registry() module-level functions."""
+
+    def test_set_and_get_default_registry(self):
+        """set_default_registry() should make the registry retrievable via get_default_registry()."""
+        registry = ModelProviderRegistry(config={"key": "value"})
+        set_default_registry(registry)
+
+        result = get_default_registry()
+        assert result is registry
+
+    def test_set_default_replaces_previous(self):
+        """Calling set_default_registry() again should replace the previous default."""
+        registry1 = ModelProviderRegistry(config={})
+        registry2 = ModelProviderRegistry(config={})
+
+        set_default_registry(registry1)
+        assert get_default_registry() is registry1
+
+        set_default_registry(registry2)
+        assert get_default_registry() is registry2
+
+    def test_create_registry_with_config(self):
+        """ModelProviderRegistry(config=...) should set config on the instance."""
+        config = {"GEMINI_API_KEY": "test-key-123", "OPENAI_API_KEY": "sk-test"}
+        registry = ModelProviderRegistry(config=config)
+        assert registry._config == config
+
+    def test_create_registry_starts_with_no_providers(self):
+        """A new registry should start with no providers registered."""
+        registry = ModelProviderRegistry(config={"GEMINI_API_KEY": "test"})
         assert len(registry._providers) == 0
-        ModelProviderRegistry.reset_for_testing()

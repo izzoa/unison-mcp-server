@@ -167,7 +167,11 @@ class TestAliasTargetRestrictions:
             assert provider.validate_model_name(o4mini_target)  # target
             assert provider.validate_model_name("o4mini")  # alias
 
-    @patch.dict(os.environ, {"OPENAI_ALLOWED_MODELS": "gpt5"}, clear=True)
+    @patch.dict(
+        os.environ,
+        {"OPENAI_ALLOWED_MODELS": "gpt5", "OPENAI_API_KEY": "test-key"},
+        clear=True,
+    )
     def test_service_alias_allows_canonical_openai(self):
         """ModelRestrictionService should permit canonical names resolved from aliases."""
         import utils.model_restrictions
@@ -180,7 +184,11 @@ class TestAliasTargetRestrictions:
         assert service.is_allowed(ProviderType.OPENAI, gpt5_target)
         assert provider.validate_model_name(gpt5_target)
 
-    @patch.dict(os.environ, {"GOOGLE_ALLOWED_MODELS": "flash"}, clear=True)
+    @patch.dict(
+        os.environ,
+        {"GOOGLE_ALLOWED_MODELS": "flash", "GEMINI_API_KEY": "test-key"},
+        clear=True,
+    )
     def test_service_alias_allows_canonical_gemini(self):
         """Gemini alias allowlists should permit canonical forms."""
         import utils.model_restrictions

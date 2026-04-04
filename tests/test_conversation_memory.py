@@ -141,9 +141,9 @@ class TestConversationMemory:
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test-key", "OPENAI_API_KEY": ""}, clear=False)
     def test_build_conversation_history(self, project_path):
         """Test building conversation history format with files and speaker identification"""
-        from providers.registry import ModelProviderRegistry
+        from providers.registry import get_default_registry
 
-        ModelProviderRegistry.clear_cache()
+        get_default_registry().clear_cache()
 
         # Create real test files to test actual file embedding functionality
         main_file = project_path / "main.py"
@@ -370,9 +370,9 @@ class TestConversationFlow:
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test-key", "OPENAI_API_KEY": ""}, clear=False)
     def test_dynamic_max_turns_configuration(self):
         """Test that all functions respect MAX_CONVERSATION_TURNS configuration"""
-        from providers.registry import ModelProviderRegistry
+        from providers.registry import get_default_registry
 
-        ModelProviderRegistry.clear_cache()
+        get_default_registry().clear_cache()
 
         # This test ensures if we change MAX_CONVERSATION_TURNS, everything updates
 
@@ -501,9 +501,9 @@ class TestConversationFlow:
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test-key", "OPENAI_API_KEY": ""}, clear=False)
     def test_conversation_with_files_and_context_preservation(self, mock_storage):
         """Test complete conversation flow with file tracking and context preservation"""
-        from providers.registry import ModelProviderRegistry
+        from providers.registry import get_default_registry
 
-        ModelProviderRegistry.clear_cache()
+        get_default_registry().clear_cache()
 
         mock_client = Mock()
         mock_storage.return_value = mock_client
@@ -714,9 +714,9 @@ class TestConversationFlow:
         import os
         import tempfile
 
-        from providers.registry import ModelProviderRegistry
+        from providers.registry import get_default_registry
 
-        ModelProviderRegistry.clear_cache()
+        get_default_registry().clear_cache()
 
         from utils.conversation_memory import build_conversation_history
 

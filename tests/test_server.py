@@ -45,13 +45,16 @@ class TestServerTools:
             import config
 
             importlib.reload(config)
-            from providers.registry import ModelProviderRegistry
-
-            ModelProviderRegistry.reset_for_testing()
-
             # Test with real provider resolution
             try:
-                result = await handle_call_tool("chat", {"prompt": "Hello Gemini", "model": "o3-mini"})
+                result = await handle_call_tool(
+                    "chat",
+                    {
+                        "prompt": "Hello Gemini",
+                        "model": "o3-mini",
+                        "working_directory_absolute_path": "/tmp",
+                    },
+                )
 
                 # If we get here, check the response format
                 assert len(result) == 1
@@ -82,9 +85,8 @@ class TestServerTools:
                 else:
                     os.environ.pop(key, None)
 
-            # Reload config and clear registry
+            # Reload config
             importlib.reload(config)
-            ModelProviderRegistry.reset_for_testing()
 
     @pytest.mark.asyncio
     async def test_handle_version(self):

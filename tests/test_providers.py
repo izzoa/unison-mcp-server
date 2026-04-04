@@ -8,6 +8,7 @@ import pytest
 from providers import ModelProviderRegistry, ModelResponse
 from providers.gemini import GeminiModelProvider
 from providers.openai import OpenAIModelProvider
+from providers.registry import get_default_registry, set_default_registry
 from providers.shared import ProviderType
 from tests.model_test_helpers import get_all_model_names, get_flash_model, get_model_with_thinking, is_valid_model
 
@@ -17,34 +18,25 @@ class TestModelProviderRegistry:
 
     def setup_method(self):
         """Clear registry before each test"""
-        # Store the original providers to restore them later
-        registry = ModelProviderRegistry()
-        self._original_providers = registry._providers.copy()
-        registry._providers.clear()
-        registry._initialized_providers.clear()
-
-    def teardown_method(self):
-        """Restore original providers after each test"""
-        # Restore the original providers that were registered in conftest.py
-        registry = ModelProviderRegistry()
-        registry._providers.clear()
-        registry._initialized_providers.clear()
-        registry._providers.update(self._original_providers)
+        # Create a fresh empty registry for isolation
+        registry = ModelProviderRegistry(config={})
+        set_default_registry(registry)
 
     def test_register_provider(self):
         """Test registering a provider"""
-        ModelProviderRegistry.register_provider(ProviderType.GOOGLE, GeminiModelProvider)
+        registry = get_default_registry()
+        registry.register_provider(ProviderType.GOOGLE, GeminiModelProvider)
 
-        registry = ModelProviderRegistry()
         assert ProviderType.GOOGLE in registry._providers
         assert registry._providers[ProviderType.GOOGLE] == GeminiModelProvider
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"})
     def test_get_provider(self):
         """Test getting a provider instance"""
-        ModelProviderRegistry.register_provider(ProviderType.GOOGLE, GeminiModelProvider)
+        registry = get_default_registry()
+        registry.register_provider(ProviderType.GOOGLE, GeminiModelProvider)
 
-        provider = ModelProviderRegistry.get_provider(ProviderType.GOOGLE)
+        provider = registry.get_provider(ProviderType.GOOGLE)
 
         assert provider is not None
         assert isinstance(provider, GeminiModelProvider)
@@ -53,9 +45,10 @@ class TestModelProviderRegistry:
     @patch.dict(os.environ, {}, clear=True)
     def test_get_provider_no_api_key(self):
         """Test getting provider without API key returns None"""
-        ModelProviderRegistry.register_provider(ProviderType.GOOGLE, GeminiModelProvider)
+        registry = get_default_registry()
+        registry.register_provider(ProviderType.GOOGLE, GeminiModelProvider)
 
-        provider = ModelProviderRegistry.get_provider(ProviderType.GOOGLE)
+        provider = registry.get_provider(ProviderType.GOOGLE)
 
         assert provider is None
 
@@ -63,24 +56,26 @@ class TestModelProviderRegistry:
     @pytest.mark.no_mock_provider
     def test_get_provider_for_model(self):
         """Test getting provider for a specific model"""
-        ModelProviderRegistry.register_provider(ProviderType.GOOGLE, GeminiModelProvider)
+        registry = get_default_registry()
+        registry.register_provider(ProviderType.GOOGLE, GeminiModelProvider)
 
         # Use a dynamically looked-up model name
         any_gemini_model = get_all_model_names(ProviderType.GOOGLE)
         assert len(any_gemini_model) > 0, "Gemini provider should have at least one model"
         model_name = any_gemini_model[0]
 
-        provider = ModelProviderRegistry.get_provider_for_model(model_name)
+        provider = registry.get_provider_for_model(model_name)
 
         assert provider is not None
         assert isinstance(provider, GeminiModelProvider)
 
     def test_get_available_providers(self):
         """Test getting list of available providers"""
-        ModelProviderRegistry.register_provider(ProviderType.GOOGLE, GeminiModelProvider)
-        ModelProviderRegistry.register_provider(ProviderType.OPENAI, OpenAIModelProvider)
+        registry = get_default_registry()
+        registry.register_provider(ProviderType.GOOGLE, GeminiModelProvider)
+        registry.register_provider(ProviderType.OPENAI, OpenAIModelProvider)
 
-        providers = ModelProviderRegistry.get_available_providers()
+        providers = registry.get_available_providers()
 
         assert len(providers) == 2
         assert ProviderType.GOOGLE in providers

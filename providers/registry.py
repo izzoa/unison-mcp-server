@@ -12,6 +12,35 @@ if TYPE_CHECKING:
     from tools.models import ToolModelCategory
 
 
+# ---------------------------------------------------------------------------
+# Module-level default registry accessor
+# ---------------------------------------------------------------------------
+
+_default_registry: Optional["ModelProviderRegistry"] = None
+
+
+def get_default_registry() -> "ModelProviderRegistry":
+    """Return the server-created default registry instance.
+
+    Raises:
+        RuntimeError: If ``set_default_registry()`` has not been called yet.
+    """
+    if _default_registry is None:
+        raise RuntimeError("Registry not initialized — call set_default_registry() during server startup")
+    return _default_registry
+
+
+def set_default_registry(registry: "ModelProviderRegistry") -> None:
+    """Set the module-level default registry (called once at server startup)."""
+    global _default_registry
+    _default_registry = registry
+
+
+# ---------------------------------------------------------------------------
+# ModelProviderRegistry — regular class (no singleton)
+# ---------------------------------------------------------------------------
+
+
 class ModelProviderRegistry:
     """Central catalogue of provider implementations used by the MCP server.
 
@@ -31,8 +60,6 @@ class ModelProviderRegistry:
           alias collisions) are resolved deterministically.
     """
 
-    _instance = None
-
     # Provider priority order for model selection
     # Native APIs first, then custom endpoints, then catch-all providers
     PROVIDER_PRIORITY_ORDER = [
@@ -45,33 +72,30 @@ class ModelProviderRegistry:
         ProviderType.OPENROUTER,  # Catch-all for cloud models
     ]
 
-    def __new__(cls):
-        """Singleton pattern for registry."""
-        if cls._instance is None:
-            logging.debug("REGISTRY: Creating new registry instance")
-            cls._instance = super().__new__(cls)
-            # Initialize instance dictionaries on first creation
-            cls._instance._providers = {}
-            cls._instance._initialized_providers = {}
-            cls._instance._config = None
-            logging.debug(f"REGISTRY: Created instance {cls._instance}")
-        return cls._instance
+    def __init__(self, config: dict[str, str]) -> None:
+        """Create a new, independent registry instance.
 
-    @classmethod
-    def register_provider(cls, provider_type: ProviderType, provider_class: type[ModelProvider]) -> None:
+        Args:
+            config: Mapping of environment-variable names to values
+                    (e.g. ``{"GEMINI_API_KEY": "real-key"}``).
+        """
+        self._providers: dict[ProviderType, type] = {}
+        self._initialized_providers: dict[ProviderType, ModelProvider] = {}
+        self._config: dict[str, str] = config
+        logging.debug("REGISTRY: Created new registry instance %s", id(self))
+
+    def register_provider(self, provider_type: ProviderType, provider_class: type[ModelProvider]) -> None:
         """Register a new provider class.
 
         Args:
             provider_type: Type of the provider (e.g., ProviderType.GOOGLE)
             provider_class: Class that implements ModelProvider interface
         """
-        instance = cls()
-        instance._providers[provider_type] = provider_class
+        self._providers[provider_type] = provider_class
         # Invalidate any cached instance so subsequent lookups use the new registration
-        instance._initialized_providers.pop(provider_type, None)
+        self._initialized_providers.pop(provider_type, None)
 
-    @classmethod
-    def get_provider(cls, provider_type: ProviderType, force_new: bool = False) -> Optional[ModelProvider]:
+    def get_provider(self, provider_type: ProviderType, force_new: bool = False) -> Optional[ModelProvider]:
         """Get an initialized provider instance.
 
         Args:
@@ -81,21 +105,19 @@ class ModelProviderRegistry:
         Returns:
             Initialized ModelProvider instance or None if not available
         """
-        instance = cls()
-
         # Return cached instance if available and not forcing new
-        if not force_new and provider_type in instance._initialized_providers:
-            return instance._initialized_providers[provider_type]
+        if not force_new and provider_type in self._initialized_providers:
+            return self._initialized_providers[provider_type]
 
         # Check if provider class is registered
-        if provider_type not in instance._providers:
+        if provider_type not in self._providers:
             return None
 
         # Get API key from environment
-        api_key = cls._get_api_key_for_provider(provider_type)
+        api_key = self._get_api_key_for_provider(provider_type)
 
         # Get provider class or factory function
-        provider_class = instance._providers[provider_type]
+        provider_class = self._providers[provider_type]
 
         # For custom providers, handle special initialization requirements
         if provider_type == ProviderType.CUSTOM:
@@ -105,7 +127,7 @@ class ModelProviderRegistry:
                 provider = provider_class(api_key=api_key)
             else:
                 # Regular class - need to handle URL requirement
-                custom_url = (instance._config or {}).get("CUSTOM_API_URL") or get_env("CUSTOM_API_URL", "") or ""
+                custom_url = self._config.get("CUSTOM_API_URL") or get_env("CUSTOM_API_URL", "") or ""
                 if not custom_url:
                     if api_key:  # Key is set but URL is missing
                         logging.warning("CUSTOM_API_KEY set but CUSTOM_API_URL missing – skipping Custom provider")
@@ -119,7 +141,7 @@ class ModelProviderRegistry:
             # For Gemini, check if custom base URL is configured
             if not api_key:
                 return None
-            gemini_base_url = (instance._config or {}).get("GEMINI_BASE_URL") or get_env("GEMINI_BASE_URL")
+            gemini_base_url = self._config.get("GEMINI_BASE_URL") or get_env("GEMINI_BASE_URL")
             provider_kwargs = {"api_key": api_key}
             if gemini_base_url:
                 provider_kwargs["base_url"] = gemini_base_url
@@ -129,14 +151,12 @@ class ModelProviderRegistry:
             if not api_key:
                 return None
 
-            azure_endpoint = (instance._config or {}).get("AZURE_OPENAI_ENDPOINT") or get_env("AZURE_OPENAI_ENDPOINT")
+            azure_endpoint = self._config.get("AZURE_OPENAI_ENDPOINT") or get_env("AZURE_OPENAI_ENDPOINT")
             if not azure_endpoint:
                 logging.warning("AZURE_OPENAI_ENDPOINT missing – skipping Azure OpenAI provider")
                 return None
 
-            azure_version = (instance._config or {}).get("AZURE_OPENAI_API_VERSION") or get_env(
-                "AZURE_OPENAI_API_VERSION"
-            )
+            azure_version = self._config.get("AZURE_OPENAI_API_VERSION") or get_env("AZURE_OPENAI_API_VERSION")
             provider = provider_class(
                 api_key=api_key,
                 azure_endpoint=azure_endpoint,
@@ -149,12 +169,11 @@ class ModelProviderRegistry:
             provider = provider_class(api_key=api_key)
 
         # Cache the instance
-        instance._initialized_providers[provider_type] = provider
+        self._initialized_providers[provider_type] = provider
 
         return provider
 
-    @classmethod
-    def get_provider_for_model(cls, model_name: str) -> Optional[ModelProvider]:
+    def get_provider_for_model(self, model_name: str) -> Optional[ModelProvider]:
         """Get provider instance for a specific model name.
 
         Provider priority order:
@@ -170,16 +189,14 @@ class ModelProviderRegistry:
         """
         logging.debug(f"get_provider_for_model called with model_name='{model_name}'")
 
-        # Check providers in priority order
-        instance = cls()
-        logging.debug(f"Registry instance: {instance}")
-        logging.debug(f"Available providers in registry: {list(instance._providers.keys())}")
+        logging.debug(f"Registry instance: {self}")
+        logging.debug(f"Available providers in registry: {list(self._providers.keys())}")
 
-        for provider_type in cls.PROVIDER_PRIORITY_ORDER:
-            if provider_type in instance._providers:
+        for provider_type in self.PROVIDER_PRIORITY_ORDER:
+            if provider_type in self._providers:
                 logging.debug(f"Found {provider_type} in registry")
                 # Get or create provider instance
-                provider = cls.get_provider(provider_type)
+                provider = self.get_provider(provider_type)
                 if provider and provider.validate_model_name(model_name):
                     logging.debug(f"{provider_type} validates model {model_name}")
                     return provider
@@ -191,14 +208,11 @@ class ModelProviderRegistry:
         logging.debug(f"No provider found for model {model_name}")
         return None
 
-    @classmethod
-    def get_available_providers(cls) -> list[ProviderType]:
+    def get_available_providers(self) -> list[ProviderType]:
         """Get list of registered provider types."""
-        instance = cls()
-        return list(instance._providers.keys())
+        return list(self._providers.keys())
 
-    @classmethod
-    def get_available_models(cls, respect_restrictions: bool = True) -> dict[str, ProviderType]:
+    def get_available_models(self, respect_restrictions: bool = True) -> dict[str, ProviderType]:
         """Get mapping of all available models to their providers.
 
         Args:
@@ -212,10 +226,9 @@ class ModelProviderRegistry:
 
         restriction_service = get_restriction_service() if respect_restrictions else None
         models: dict[str, ProviderType] = {}
-        instance = cls()
 
-        for provider_type in instance._providers:
-            provider = cls.get_provider(provider_type)
+        for provider_type in self._providers:
+            provider = self.get_provider(provider_type)
             if not provider:
                 continue
 
@@ -226,7 +239,7 @@ class ModelProviderRegistry:
                 continue
 
             if restriction_service and restriction_service.has_restrictions(provider_type):
-                restricted_display = cls._collect_restricted_display_names(
+                restricted_display = self._collect_restricted_display_names(
                     provider,
                     provider_type,
                     available,
@@ -259,9 +272,8 @@ class ModelProviderRegistry:
 
         return models
 
-    @classmethod
+    @staticmethod
     def _collect_restricted_display_names(
-        cls,
         provider: ModelProvider,
         provider_type: ProviderType,
         available: list[str],
@@ -303,8 +315,7 @@ class ModelProviderRegistry:
 
         return display_names
 
-    @classmethod
-    def get_available_model_names(cls, provider_type: Optional[ProviderType] = None) -> list[str]:
+    def get_available_model_names(self, provider_type: Optional[ProviderType] = None) -> list[str]:
         """Get list of available model names, optionally filtered by provider.
 
         This respects model restrictions automatically.
@@ -315,7 +326,7 @@ class ModelProviderRegistry:
         Returns:
             List of available model names
         """
-        available_models = cls.get_available_models(respect_restrictions=True)
+        available_models = self.get_available_models(respect_restrictions=True)
 
         if provider_type:
             # Filter by specific provider
@@ -324,8 +335,7 @@ class ModelProviderRegistry:
             # Return all available models
             return list(available_models.keys())
 
-    @classmethod
-    def _get_api_key_for_provider(cls, provider_type: ProviderType) -> Optional[str]:
+    def _get_api_key_for_provider(self, provider_type: ProviderType) -> Optional[str]:
         """Get API key for a provider from config dict or environment variables.
 
         Args:
@@ -334,7 +344,6 @@ class ModelProviderRegistry:
         Returns:
             API key string or None if not found
         """
-        instance = cls()
         key_mapping = {
             ProviderType.GOOGLE: "GEMINI_API_KEY",
             ProviderType.OPENAI: "OPENAI_API_KEY",
@@ -349,10 +358,9 @@ class ModelProviderRegistry:
         if not env_var:
             return None
 
-        return (instance._config or {}).get(env_var) or get_env(env_var)
+        return self._config.get(env_var) or get_env(env_var)
 
-    @classmethod
-    def _get_allowed_models_for_provider(cls, provider: ModelProvider, provider_type: ProviderType) -> list[str]:
+    def _get_allowed_models_for_provider(self, provider: ModelProvider, provider_type: ProviderType) -> list[str]:
         """Get a list of allowed canonical model names for a given provider.
 
         Args:
@@ -384,8 +392,7 @@ class ModelProviderRegistry:
 
         return allowed_models
 
-    @classmethod
-    def get_preferred_fallback_model(cls, tool_category: Optional["ToolModelCategory"] = None) -> str:
+    def get_preferred_fallback_model(self, tool_category: Optional["ToolModelCategory"] = None) -> str:
         """Get the preferred fallback model based on provider priority and tool category.
 
         This method orchestrates model selection by:
@@ -405,11 +412,11 @@ class ModelProviderRegistry:
         first_available_model = None
 
         # Ask each provider for their preference in priority order
-        for provider_type in cls.PROVIDER_PRIORITY_ORDER:
-            provider = cls.get_provider(provider_type)
+        for provider_type in self.PROVIDER_PRIORITY_ORDER:
+            provider = self.get_provider(provider_type)
             if provider:
                 # 1. Registry filters the models first
-                allowed_models = cls._get_allowed_models_for_provider(provider, provider_type)
+                allowed_models = self._get_allowed_models_for_provider(provider, provider_type)
 
                 if not allowed_models:
                     continue
@@ -435,71 +442,31 @@ class ModelProviderRegistry:
         # Ultimate fallback if no providers have models
         raise ValueError("No models available from any configured provider")
 
-    @classmethod
-    def get_available_providers_with_keys(cls) -> list[ProviderType]:
+    def get_available_providers_with_keys(self) -> list[ProviderType]:
         """Get list of provider types that have valid API keys.
 
         Returns:
             List of ProviderType values for providers with valid API keys
         """
         available = []
-        instance = cls()
-        for provider_type in instance._providers:
-            if cls.get_provider(provider_type) is not None:
+        for provider_type in self._providers:
+            if self.get_provider(provider_type) is not None:
                 available.append(provider_type)
         return available
 
-    @classmethod
-    def clear_cache(cls) -> None:
+    def clear_cache(self) -> None:
         """Clear cached provider instances."""
-        instance = cls()
-        instance._initialized_providers.clear()
+        self._initialized_providers.clear()
 
-    @classmethod
-    def reset_for_testing(cls) -> None:
-        """Reset the registry to a clean state for testing.
-
-        This provides a safe, public API for tests to clean up registry state
-        without directly manipulating private attributes.
-        """
-        cls._instance = None
-        if hasattr(cls, "_providers"):
-            cls._providers = {}
-        cls._config = None
-
-    @classmethod
-    def create_for_testing(cls, config: dict[str, str]) -> "ModelProviderRegistry":
-        """Create a fresh registry instance pre-loaded with the given config.
-
-        This is the preferred entry point for tests that need to inject API keys
-        or endpoint URLs without touching real environment variables.
-
-        Args:
-            config: Mapping of environment-variable names to values
-                    (e.g. ``{"GEMINI_API_KEY": "test-key"}``).
-
-        Returns:
-            A freshly initialised :class:`ModelProviderRegistry` singleton whose
-            ``_config`` dict will be consulted before the real environment.
-        """
-        cls.reset_for_testing()
-        instance = cls()
-        instance._config = config
-        return instance
-
-    @classmethod
-    def unregister_provider(cls, provider_type: ProviderType) -> None:
+    def unregister_provider(self, provider_type: ProviderType) -> None:
         """Unregister a provider (mainly for testing)."""
-        instance = cls()
-        instance._providers.pop(provider_type, None)
-        instance._initialized_providers.pop(provider_type, None)
+        self._providers.pop(provider_type, None)
+        self._initialized_providers.pop(provider_type, None)
 
-    @classmethod
-    def get_all_health_status(cls) -> list[dict]:
+    def get_all_health_status(self) -> list[dict]:
         """Collect health status from all initialised provider instances."""
-        instance = cls()
         statuses = []
-        for provider_type, provider in instance._initialized_providers.items():
+        for provider_type, provider in self._initialized_providers.items():
             try:
                 statuses.append(provider.get_health_status())
             except Exception:

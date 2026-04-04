@@ -50,35 +50,46 @@ importlib.reload(config)
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
-# Register providers for all tests
+# ---------------------------------------------------------------------------
+# Provider Registry Setup
+# ---------------------------------------------------------------------------
+
 from providers.gemini import GeminiModelProvider  # noqa: E402
 from providers.openai import OpenAIModelProvider  # noqa: E402
-from providers.registry import ModelProviderRegistry  # noqa: E402
+from providers.registry import ModelProviderRegistry, set_default_registry  # noqa: E402
 from providers.shared import ProviderType  # noqa: E402
 from providers.xai import XAIModelProvider  # noqa: E402
 
-# Register providers at test startup
-ModelProviderRegistry.register_provider(ProviderType.GOOGLE, GeminiModelProvider)
-ModelProviderRegistry.register_provider(ProviderType.OPENAI, OpenAIModelProvider)
-ModelProviderRegistry.register_provider(ProviderType.XAI, XAIModelProvider)
+
+def _make_test_registry() -> ModelProviderRegistry:
+    """Create a fresh registry with standard test providers registered."""
+    registry = ModelProviderRegistry(config={})
+    registry.register_provider(ProviderType.GOOGLE, GeminiModelProvider)
+    registry.register_provider(ProviderType.OPENAI, OpenAIModelProvider)
+    registry.register_provider(ProviderType.XAI, XAIModelProvider)
+
+    # Register CUSTOM provider if CUSTOM_API_URL is available (for integration tests)
+    if os.getenv("CUSTOM_API_URL") and "test_prompt_regression.py" in os.getenv("PYTEST_CURRENT_TEST", ""):
+        from providers.custom import CustomProvider
+
+        def custom_provider_factory(api_key=None):
+            base_url = os.getenv("CUSTOM_API_URL", "")
+            return CustomProvider(api_key=api_key or "", base_url=base_url)
+
+        registry.register_provider(ProviderType.CUSTOM, custom_provider_factory)
+
+    return registry
+
+
+# Create an initial default registry at module level so import-time code works
+_initial_registry = _make_test_registry()
+set_default_registry(_initial_registry)
 
 # Force registry reload so providers pick up the disabled-discovery state
 # (registries may have been lazily created during import with discovery still enabled)
 GeminiModelProvider.reload_registry()
 OpenAIModelProvider.reload_registry()
 XAIModelProvider.reload_registry()
-
-# Register CUSTOM provider if CUSTOM_API_URL is available (for integration tests)
-# But only if we're actually running integration tests, not unit tests
-if os.getenv("CUSTOM_API_URL") and "test_prompt_regression.py" in os.getenv("PYTEST_CURRENT_TEST", ""):
-    from providers.custom import CustomProvider  # noqa: E402
-
-    def custom_provider_factory(api_key=None):
-        """Factory function that creates CustomProvider with proper parameters."""
-        base_url = os.getenv("CUSTOM_API_URL", "")
-        return CustomProvider(api_key=api_key or "", base_url=base_url)
-
-    ModelProviderRegistry.register_provider(ProviderType.CUSTOM, custom_provider_factory)
 
 
 @pytest.fixture
@@ -118,7 +129,20 @@ def pytest_collection_modifyitems(session, config, items):
 
 
 @pytest.fixture(autouse=True)
-def mock_provider_availability(request, monkeypatch):
+def _fresh_default_registry():
+    """Create an isolated default registry for every test.
+
+    This replaces the old ``ModelProviderRegistry.reset_for_testing()`` pattern.
+    Each test gets its own registry instance so parallel execution is safe.
+    """
+    registry = _make_test_registry()
+    set_default_registry(registry)
+    yield registry
+    # No cleanup needed — next test will set a new default.
+
+
+@pytest.fixture(autouse=True)
+def mock_provider_availability(request, monkeypatch, _fresh_default_registry):
     """
     Automatically mock provider availability for all tests to prevent
     effective auto mode from being triggered when DEFAULT_MODEL is unavailable.
@@ -132,17 +156,17 @@ def mock_provider_availability(request, monkeypatch):
         if marker:
             return
 
-    # Ensure providers are registered (in case other tests cleared the registry)
+    registry = _fresh_default_registry
+
+    # Ensure providers are registered
     from providers.shared import ProviderType
 
-    registry = ModelProviderRegistry()
-
     if ProviderType.GOOGLE not in registry._providers:
-        ModelProviderRegistry.register_provider(ProviderType.GOOGLE, GeminiModelProvider)
+        registry.register_provider(ProviderType.GOOGLE, GeminiModelProvider)
     if ProviderType.OPENAI not in registry._providers:
-        ModelProviderRegistry.register_provider(ProviderType.OPENAI, OpenAIModelProvider)
+        registry.register_provider(ProviderType.OPENAI, OpenAIModelProvider)
     if ProviderType.XAI not in registry._providers:
-        ModelProviderRegistry.register_provider(ProviderType.XAI, XAIModelProvider)
+        registry.register_provider(ProviderType.XAI, XAIModelProvider)
 
     # Ensure CUSTOM provider is registered if needed for integration tests
     if (
@@ -156,7 +180,7 @@ def mock_provider_availability(request, monkeypatch):
             base_url = os.getenv("CUSTOM_API_URL", "")
             return CustomProvider(api_key=api_key or "", base_url=base_url)
 
-        ModelProviderRegistry.register_provider(ProviderType.CUSTOM, custom_provider_factory)
+        registry.register_provider(ProviderType.CUSTOM, custom_provider_factory)
 
     # Also mock is_effective_auto_mode for all BaseTool instances to return False
     # unless we're specifically testing auto mode behavior
@@ -176,10 +200,11 @@ def mock_provider_availability(request, monkeypatch):
         ):
             # Call original method logic
             from config import DEFAULT_MODEL
+            from providers.registry import get_default_registry
 
             if DEFAULT_MODEL.lower() == "auto":
                 return True
-            provider = ModelProviderRegistry.get_provider_for_model(DEFAULT_MODEL)
+            provider = get_default_registry().get_provider_for_model(DEFAULT_MODEL)
             return provider is None
         # For all other tests, return False to disable auto mode
         return False

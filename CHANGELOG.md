@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Persistent conversation storage via SQLite backend (`utils/sqlite_storage.py`) — conversations survive server restarts with zero-config setup (sqlite3 is stdlib). Enable with `STORAGE_BACKEND=sqlite`. Features WAL mode for concurrent reads, lazy TTL expiry on read, periodic background sweep, schema migration support, and thread-safe writes. `InMemoryStorage` remains the default for backward compatibility
+- Storage backend factory (`create_storage_backend()` in `utils/storage_backend.py`) — selects backend based on `STORAGE_BACKEND` env var with graceful fallback to in-memory on errors or unrecognised values
 - Mypy static type checking in CI and local quality checks — strict enforcement on 15 modules across `utils/` and `providers/shared/` with gradual ratchet for expanding coverage. Configured in `pyproject.toml` with per-module overrides and `follow_imports = "silent"` for cross-boundary inference without non-strict noise
 - Provider circuit breaker (`utils/circuit_breaker.py`) — three-state pattern (Closed/Open/Half-Open) that detects sustained provider failures and short-circuits requests, avoiding full retry×timeout waits when a provider is hard-down. Configurable via `CIRCUIT_FAILURE_THRESHOLD`, `CIRCUIT_RESET_TIMEOUT_SECONDS`, and `CIRCUIT_HALF_OPEN_MAX_CALLS` environment variables
 - `ProviderUnavailable` exception for callers to distinguish circuit-open from transient API errors
@@ -38,6 +40,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Simulator test registry initialisation: `conversation_base_test.py` now creates and sets a default `ModelProviderRegistry` before calling `configure_providers()`, matching `server.py:main()` startup sequence
+- Simulator test chat tool calls: auto-inject `working_directory_absolute_path` for chat tool invocations in both subprocess and in-process test paths
+- `per_tool_deduplication` test: switched from subprocess (`call_mcp_tool`) to in-process (`call_mcp_tool_direct`) calls to preserve conversation state across tool invocations
+- Quick mode test reporting: only track results for tests that actually run, preventing unrun tests from being reported as failures
 - License inconsistency: SECURITY.md and Dockerfile now correctly reference AGPL-3.0 (was Apache 2.0); `pyproject.toml` gains a `license` field
 
 ### Changed (infrastructure)

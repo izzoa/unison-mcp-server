@@ -45,14 +45,15 @@ class TestAutoMode:
 
     def test_model_capabilities_descriptions(self):
         """Test that model capabilities are properly defined in providers"""
-        from providers.registry import ModelProviderRegistry
+        from providers.registry import get_default_registry
 
         # Get all providers with valid API keys and check their model descriptions
-        enabled_provider_types = ModelProviderRegistry.get_available_providers_with_keys()
+        registry = get_default_registry()
+        enabled_provider_types = registry.get_available_providers_with_keys()
         models_with_descriptions = {}
 
         for provider_type in enabled_provider_types:
-            provider = ModelProviderRegistry.get_provider(provider_type)
+            provider = registry.get_provider(provider_type)
             if provider:
                 for model_name, config in provider.MODEL_CAPABILITIES.items():
                     # Skip alias entries (string values)
@@ -196,10 +197,7 @@ class TestAutoMode:
 
             importlib.reload(config)
 
-            # Clear registry singleton to force re-initialization with new environment
-            from providers.registry import ModelProviderRegistry
-
-            ModelProviderRegistry.reset_for_testing()
+            # Registry is automatically reset by conftest autouse fixture
 
             tool = ChatTool()
 
@@ -263,9 +261,7 @@ class TestAutoMode:
             else:
                 os.environ.pop("DEFAULT_MODEL", None)
 
-            # Reload config and clear registry singleton
             importlib.reload(config)
-            ModelProviderRegistry.reset_for_testing()
 
     def test_model_field_schema_generation(self):
         """Test the get_model_field_schema method"""

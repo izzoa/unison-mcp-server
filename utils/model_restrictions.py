@@ -158,9 +158,9 @@ class ModelRestrictionService:
 
         # Attempt to resolve canonical names for allowed aliases using provider metadata.
         try:
-            from providers.registry import ModelProviderRegistry
+            from providers.registry import get_default_registry
 
-            provider = ModelProviderRegistry.get_provider(provider_type)
+            provider = get_default_registry().get_provider(provider_type)
         except Exception:  # pragma: no cover - registry lookup failure shouldn't break validation
             provider = None
 

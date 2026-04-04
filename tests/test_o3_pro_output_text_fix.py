@@ -19,7 +19,6 @@ from unittest.mock import patch
 import pytest
 from dotenv import load_dotenv
 
-from providers import ModelProviderRegistry
 from tests.transport_helpers import inject_transport
 from tools.chat import ChatTool
 
@@ -38,22 +37,13 @@ class TestO3ProOutputTextFix:
     """Test o3-pro response parsing fix using respx for HTTP recording/replay."""
 
     def setup_method(self):
-        """Set up the test by ensuring clean registry state."""
-        # Use the new public API for registry cleanup
-        ModelProviderRegistry.reset_for_testing()
-        # Provider registration is now handled by inject_transport helper
-
+        """Set up the test by ensuring clean state."""
         # Clear restriction service to ensure it re-reads environment
         # This is necessary because previous tests may have set restrictions
         # that are cached in the singleton
         import utils.model_restrictions
 
         utils.model_restrictions._restriction_service = None
-
-    def teardown_method(self):
-        """Clean up after test to ensure no state pollution."""
-        # Use the new public API for registry cleanup
-        ModelProviderRegistry.reset_for_testing()
 
     @pytest.mark.no_mock_provider  # Disable provider mocking for this test
     @patch.dict(os.environ, {"OPENAI_ALLOWED_MODELS": "o3-pro", "LOCALE": ""})

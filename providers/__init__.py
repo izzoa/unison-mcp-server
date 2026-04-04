@@ -6,7 +6,7 @@ from .gemini import GeminiModelProvider
 from .openai import OpenAIModelProvider
 from .openai_compatible import OpenAICompatibleProvider
 from .openrouter import OpenRouterProvider
-from .registry import ModelProviderRegistry
+from .registry import ModelProviderRegistry, get_default_registry, set_default_registry
 from .shared import ModelCapabilities, ModelResponse
 
 __all__ = [
@@ -14,6 +14,8 @@ __all__ = [
     "ModelResponse",
     "ModelCapabilities",
     "ModelProviderRegistry",
+    "get_default_registry",
+    "set_default_registry",
     "AzureOpenAIProvider",
     "GeminiModelProvider",
     "OpenAIModelProvider",

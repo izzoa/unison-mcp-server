@@ -360,9 +360,11 @@ async def handle_call_tool(name: str, arguments: dict[str, Any]) -> list[TextCon
         # EARLY MODEL RESOLUTION AT MCP BOUNDARY
         # Resolve model before passing to tool - this ensures consistent model handling
         # NOTE: Consensus tool is exempt as it handles multiple models internally
-        from providers.registry import ModelProviderRegistry
+        from providers.registry import get_default_registry
         from utils.file_utils import check_total_file_size
         from utils.model_context import ModelContext
+
+        registry = get_default_registry()
 
         # Get model from arguments or use default
         model_name = arguments.get("model") or DEFAULT_MODEL
@@ -388,19 +390,19 @@ async def handle_call_tool(name: str, arguments: dict[str, Any]) -> list[TextCon
         if model_name.lower() == "auto":
             # Get tool category to determine appropriate model
             tool_category = tool.get_model_category()
-            resolved_model = ModelProviderRegistry.get_preferred_fallback_model(tool_category)
+            resolved_model = registry.get_preferred_fallback_model(tool_category)
             logger.info(f"Auto mode resolved to {resolved_model} for {name} (category: {tool_category.value})")
             model_name = resolved_model
             # Update arguments with resolved model
             arguments["model"] = model_name
 
         # Validate model availability at MCP boundary
-        provider = ModelProviderRegistry.get_provider_for_model(model_name)
+        provider = registry.get_provider_for_model(model_name)
         if not provider:
             # Get list of available models for error message
-            available_models = list(ModelProviderRegistry.get_available_models(respect_restrictions=True).keys())
+            available_models = list(registry.get_available_models(respect_restrictions=True).keys())
             tool_category = tool.get_model_category()
-            suggested_model = ModelProviderRegistry.get_preferred_fallback_model(tool_category)
+            suggested_model = registry.get_preferred_fallback_model(tool_category)
 
             error_message = (
                 f"Model '{model_name}' is not available with current API keys. "
@@ -423,6 +425,7 @@ async def handle_call_tool(name: str, arguments: dict[str, Any]) -> list[TextCon
         arguments["_context"] = ToolExecutionContext(
             model_context=model_context,
             resolved_model_name=model_name,
+            registry=registry,
         )
         logger.debug(
             f"Model context created for {model_name} with {model_context.capabilities.context_window} token capacity"
@@ -621,9 +624,9 @@ async def reconstruct_thread_context(arguments: dict[str, Any]) -> dict[str, Any
                 )
                 model_context = ModelContext(fallback_model)
 
-        from providers.registry import ModelProviderRegistry
+        from providers.registry import get_default_registry
 
-        provider = ModelProviderRegistry.get_provider_for_model(model_context.model_name)
+        provider = get_default_registry().get_provider_for_model(model_context.model_name)
         if provider is None:
             fallback_model = resolve_fallback_model(
                 tool, f"model '{model_context.model_name}' is not available with current API keys"
@@ -707,11 +710,14 @@ async def reconstruct_thread_context(arguments: dict[str, Any]) -> dict[str, Any
     remaining_tokens = token_allocation.content_tokens - conversation_tokens
 
     # Inject typed execution context with all server-resolved state
+    from providers.registry import get_default_registry as _get_registry
+
     enhanced_arguments["_context"] = ToolExecutionContext(
         model_context=model_context,
         resolved_model_name=model_context.model_name,
         remaining_tokens=max(0, remaining_tokens),
         original_user_prompt=original_prompt,
+        registry=_get_registry(),
     )
 
     if logger.isEnabledFor(logging.DEBUG):
@@ -921,8 +927,14 @@ async def main():
     The server communicates via standard input/output streams using the
     MCP protocol's JSON-RPC message format.
     """
+    # Create the provider registry and set it as the default for the process
+    from providers.registry import ModelProviderRegistry, set_default_registry
+
+    registry = ModelProviderRegistry(config={})
+    set_default_registry(registry)
+
     # Validate and configure providers based on available API keys
-    configure_providers()
+    configure_providers(registry)
 
     # Log startup message
     logger.info("Unison MCP Server starting up...")

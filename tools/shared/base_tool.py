@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     from providers.shared import ModelCapabilities
     from tools.models import ToolModelCategory
 
-from providers import ModelProvider, ModelProviderRegistry
+from providers import ModelProvider
 from tools.shared.model_schema_builder import ModelSchemaBuilder
 from utils.conversation_memory import ConversationTurn
 from utils.env import get_env
@@ -410,7 +410,9 @@ class BaseTool(ABC):
             ValueError: If the model is not available or provider not found
         """
         try:
-            provider = ModelProviderRegistry.get_provider_for_model(model_name)
+            from providers.registry import get_default_registry
+
+            provider = get_default_registry().get_provider_for_model(model_name)
             if not provider:
                 logger.error(f"No provider found for model '{model_name}' in {self.name} tool")
                 raise ValueError(self._build_model_unavailable_message(model_name))
@@ -588,9 +590,9 @@ When recommending searches, be specific about what information you need and why 
             return True
 
         # Case 2: Requested model is not available
-        from providers.registry import ModelProviderRegistry
+        from providers.registry import get_default_registry
 
-        provider = ModelProviderRegistry.get_provider_for_model(model_name)
+        provider = get_default_registry().get_provider_for_model(model_name)
         if not provider:
             logger.warning(f"Model '{model_name}' is not available with current API keys. Requiring model selection.")
             return True
@@ -608,10 +610,10 @@ When recommending searches, be specific about what information you need and why 
         Returns:
             List of model names from enabled providers only
         """
-        from providers.registry import ModelProviderRegistry
+        from providers.registry import get_default_registry
 
         # Get models from enabled providers only (those with valid API keys)
-        all_models = ModelProviderRegistry.get_available_model_names()
+        all_models = get_default_registry().get_available_model_names()
 
         # Add OpenRouter models and their aliases when OpenRouter is configured
         openrouter_key = get_env("OPENROUTER_API_KEY")

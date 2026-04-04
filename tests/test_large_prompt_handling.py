@@ -26,13 +26,6 @@ from utils.tool_execution_context import ToolExecutionContext
 class TestLargePromptHandling:
     """Test suite for large prompt handling across all tools."""
 
-    def teardown_method(self):
-        """Clean up after each test to prevent state pollution."""
-        # Clear provider registry singleton
-        from providers.registry import ModelProviderRegistry
-
-        ModelProviderRegistry.reset_for_testing()
-
     @pytest.fixture
     def large_prompt(self):
         """Create a prompt larger than MCP_PROMPT_SIZE_LIMIT characters."""
@@ -156,13 +149,10 @@ class TestLargePromptHandling:
             for key in ["GEMINI_API_KEY", "XAI_API_KEY", "OPENROUTER_API_KEY"]:
                 os.environ.pop(key, None)
 
-            # Reload config and clear registry
+            # Reload config
             import config
 
             importlib.reload(config)
-            from providers.registry import ModelProviderRegistry
-
-            ModelProviderRegistry.reset_for_testing()
 
             # Test with real provider resolution
             try:
@@ -216,9 +206,8 @@ class TestLargePromptHandling:
                 else:
                     os.environ.pop(key, None)
 
-            # Reload config and clear registry
+            # Reload config
             importlib.reload(config)
-            ModelProviderRegistry.reset_for_testing()
 
     # NOTE: Precommit test has been removed because the precommit tool has been
     # refactored to use a workflow-based pattern instead of accepting simple prompt/path fields.

@@ -265,13 +265,10 @@ class TestImageSupportIntegration:
             for key in ["GEMINI_API_KEY", "XAI_API_KEY", "OPENROUTER_API_KEY"]:
                 os.environ.pop(key, None)
 
-            # Reload config and clear registry
+            # Reload config
             import config
 
             importlib.reload(config)
-            from providers.registry import ModelProviderRegistry
-
-            ModelProviderRegistry.reset_for_testing()
 
             tool = ChatTool()
 
@@ -321,9 +318,8 @@ class TestImageSupportIntegration:
                 else:
                     os.environ.pop(key, None)
 
-            # Reload config and clear registry
+            # Reload config
             importlib.reload(config)
-            ModelProviderRegistry.reset_for_testing()
 
     @patch("utils.conversation_store.get_storage")
     def test_cross_tool_image_context_preservation(self, mock_storage):

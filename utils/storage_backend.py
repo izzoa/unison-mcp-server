@@ -116,6 +116,35 @@ _storage_instance = None
 _storage_lock = threading.Lock()
 
 
+def create_storage_backend() -> StorageBackend:
+    """Create a storage backend based on the ``STORAGE_BACKEND`` env var.
+
+    Returns:
+        * ``SQLiteStorageBackend`` when ``STORAGE_BACKEND=sqlite``
+        * ``InMemoryStorage`` when unset, empty, or ``memory``
+        * ``InMemoryStorage`` (with a warning) for unrecognised values
+    """
+    backend_type = (get_env("STORAGE_BACKEND", "memory") or "memory").strip().lower()
+
+    if backend_type == "sqlite":
+        try:
+            from utils.sqlite_storage import SQLiteStorageBackend
+
+            return SQLiteStorageBackend()
+        except Exception:
+            logger.exception("Failed to initialise SQLite storage — falling back to in-memory")
+            return InMemoryStorage()
+
+    if backend_type == "memory":
+        return InMemoryStorage()
+
+    logger.warning(
+        "Unrecognised STORAGE_BACKEND '%s' — falling back to in-memory",
+        backend_type,
+    )
+    return InMemoryStorage()
+
+
 def get_storage_backend(backend: Optional[StorageBackend] = None) -> StorageBackend:
     """Get the global storage instance (singleton pattern).
 
@@ -131,8 +160,7 @@ def get_storage_backend(backend: Optional[StorageBackend] = None) -> StorageBack
     if _storage_instance is None:
         with _storage_lock:
             if _storage_instance is None:
-                _storage_instance = InMemoryStorage()
-                logger.info("Initialized in-memory conversation storage")
+                _storage_instance = create_storage_backend()
     return _storage_instance
 
 

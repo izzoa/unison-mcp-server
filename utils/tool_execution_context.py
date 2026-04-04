@@ -7,10 +7,13 @@ at arguments["_context"].
 """
 
 import logging
-from dataclasses import dataclass
-from typing import Optional
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Optional
 
 from utils.model_context import ModelContext
+
+if TYPE_CHECKING:
+    from providers.registry import ModelProviderRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -27,12 +30,14 @@ class ToolExecutionContext:
         resolved_model_name: The resolved model name after alias/auto resolution.
         remaining_tokens: Token budget remaining after conversation history (0 if not a continuation).
         original_user_prompt: The user's original prompt before conversation history enhancement ("" if not a continuation).
+        registry: The ModelProviderRegistry instance for this request (None for legacy/test paths).
     """
 
     model_context: ModelContext
     resolved_model_name: str
     remaining_tokens: int = 0
     original_user_prompt: str = ""
+    registry: Optional["ModelProviderRegistry"] = field(default=None, repr=False)
 
     @classmethod
     def from_arguments(cls, args: dict) -> Optional["ToolExecutionContext"]:

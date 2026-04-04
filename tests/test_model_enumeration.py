@@ -11,7 +11,7 @@ import os
 
 import pytest
 
-from providers.registry import ModelProviderRegistry
+from providers.registry import ModelProviderRegistry, set_default_registry
 from tools.analyze import AnalyzeTool
 
 
@@ -31,8 +31,7 @@ class TestModelEnumeration:
             "CUSTOM_API_URL": os.environ.get("CUSTOM_API_URL", ""),
         }
 
-        # Clear provider registry
-        ModelProviderRegistry.reset_for_testing()
+        # The conftest autouse fixture handles registry reset
 
     def teardown_method(self):
         """Clean up after each test."""
@@ -48,8 +47,7 @@ class TestModelEnumeration:
 
         importlib.reload(config)
 
-        # Clear provider registry
-        ModelProviderRegistry.reset_for_testing()
+        # The conftest autouse fixture handles registry reset for the next test
 
     def _setup_environment(self, provider_config):
         """Helper to set up environment variables for testing."""
@@ -211,10 +209,11 @@ class TestModelEnumeration:
         monkeypatch.setattr(OpenRouterProvider, "_registry", None, raising=False)
 
         # Rebuild the provider registry with OpenRouter registered
-        ModelProviderRegistry.reset_for_testing()
+        registry = ModelProviderRegistry(config={})
+        set_default_registry(registry)
         from providers.shared import ProviderType
 
-        ModelProviderRegistry.register_provider(ProviderType.OPENROUTER, OpenRouterProvider)
+        registry.register_provider(ProviderType.OPENROUTER, OpenRouterProvider)
 
         tool = AnalyzeTool()
         models = tool._get_available_models()

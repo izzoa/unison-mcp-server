@@ -31,7 +31,7 @@ from dataclasses import dataclass
 from typing import Any, Optional
 
 from config import DEFAULT_MODEL
-from providers import ModelCapabilities, ModelProviderRegistry
+from providers import ModelCapabilities
 
 logger = logging.getLogger(__name__)
 
@@ -71,9 +71,12 @@ class ModelContext:
     def provider(self):
         """Get the model provider lazily."""
         if self._provider is None:
-            self._provider = ModelProviderRegistry.get_provider_for_model(self.model_name)
+            from providers.registry import get_default_registry
+
+            registry = get_default_registry()
+            self._provider = registry.get_provider_for_model(self.model_name)
             if not self._provider:
-                available_models = ModelProviderRegistry.get_available_model_names()
+                available_models = registry.get_available_model_names()
                 if available_models:
                     available_text = ", ".join(available_models)
                 else:

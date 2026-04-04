@@ -251,10 +251,10 @@ class TestProviderUTF8Encoding(unittest.TestCase):
 
     def test_provider_registry_utf8(self):
         """Test that the provider registry handles UTF-8."""
-        from providers.registry import ModelProviderRegistry
+        from providers.registry import get_default_registry
 
         # Test listing providers with UTF-8 descriptions
-        providers = ModelProviderRegistry.get_available_providers()
+        providers = get_default_registry().get_available_providers()
 
         # Should contain valid providers
         self.assertGreater(len(providers), 0)
