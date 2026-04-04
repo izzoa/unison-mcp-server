@@ -184,6 +184,7 @@ module = [
     "utils.image_utils",
     "utils.context_reconstructor",
     "utils.file_utils",
+    "tools.registry",
 ]
 follow_imports = "normal"
 disallow_untyped_defs = true

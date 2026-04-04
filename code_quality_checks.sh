@@ -102,7 +102,8 @@ if [[ -n "$MYPY" ]]; then
         providers/shared/provider_type.py providers/shared/model_response.py \
         utils/file_types.py utils/security_config.py utils/conversation_memory.py \
         utils/env.py utils/model_resolution.py utils/request_helpers.py \
-        utils/image_utils.py utils/context_reconstructor.py utils/file_utils.py
+        utils/image_utils.py utils/context_reconstructor.py utils/file_utils.py \
+        tools/registry.py
     echo "✅ Step 1b Complete: Type checking passed!"
 fi
 echo ""

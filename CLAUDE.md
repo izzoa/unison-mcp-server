@@ -326,7 +326,18 @@ mypy utils/circuit_breaker.py utils/fs_snapshot.py utils/tool_execution_context.
 mypy utils/circuit_breaker.py
 ```
 
-**Gradual strictness strategy:** 15 modules are under strict mypy checking (see `pyproject.toml` `[[tool.mypy.overrides]]` for the full list). Other packages run with permissive defaults. When adding new files or substantially refactoring existing ones, add them to the strict allowlist in `pyproject.toml` and the mypy commands in `code_quality_checks.sh` and `.github/workflows/test.yml`.
+**Gradual strictness strategy:** 16 modules are under strict mypy checking (see `pyproject.toml` `[[tool.mypy.overrides]]` for the full list). Other packages run with permissive defaults.
+
+> **MANDATORY: When creating new `.py` files or substantially refactoring existing ones, you MUST
+> run `mypy --strict <file>` on the new/changed file.** If it passes with zero errors, add it to
+> the strict allowlist in **all three places**:
+> 1. `pyproject.toml` — `[[tool.mypy.overrides]]` module list
+> 2. `code_quality_checks.sh` — the `$MYPY` command's file list
+> 3. `.github/workflows/test.yml` — the `mypy` step's file list
+>
+> If strict mypy fails due to third-party library issues (untyped decorators, missing stubs),
+> document the blockers in the commit message and skip adding the file — do not weaken the
+> strictness settings to force it through.
 
 ### File Structure Context
 

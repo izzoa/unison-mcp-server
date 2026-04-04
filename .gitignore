@@ -176,7 +176,7 @@ FEATURE_*.md
 CLAUDE.local.md
 
 # Claude Code personal settings
-.claude/settings.local.json
+.claude/
 
 # Standalone mode files
 .unison_venv/
