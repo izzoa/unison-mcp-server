@@ -64,3 +64,13 @@ jobs:
 
       - name: Run ruff linter
         run: ruff check . --exclude test_simulation_files
+
+      - name: Run mypy type checking
+        run: |
+          pip install -r requirements.txt
+          mypy \
+            utils/circuit_breaker.py utils/fs_snapshot.py utils/tool_execution_context.py utils/token_utils.py \
+            providers/shared/provider_type.py providers/shared/model_response.py \
+            utils/file_types.py utils/security_config.py utils/conversation_memory.py \
+            utils/env.py utils/model_resolution.py utils/request_helpers.py \
+            utils/image_utils.py utils/context_reconstructor.py utils/file_utils.py

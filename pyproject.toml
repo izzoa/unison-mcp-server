@@ -153,6 +153,59 @@ exclude_lines = [
 [tool.coverage.html]
 directory = "htmlcov"
 
+# -- Mypy (gradual strictness) ------------------------------------------
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = false
+warn_unused_configs = true
+warn_redundant_casts = true
+check_untyped_defs = false
+# Permissive defaults — most code is not yet strictly typed
+disallow_untyped_defs = false
+follow_imports = "silent"
+
+# Strict allowlist: recently written, well-typed modules
+[[tool.mypy.overrides]]
+module = [
+    "utils.circuit_breaker",
+    "utils.fs_snapshot",
+    "utils.tool_execution_context",
+    "utils.token_utils",
+    # Tier 1: zero errors
+    "providers.shared.provider_type",
+    "providers.shared.model_response",
+    "utils.file_types",
+    "utils.security_config",
+    "utils.conversation_memory",
+    # Tier 2: one-fix files
+    "utils.env",
+    "utils.model_resolution",
+    "utils.request_helpers",
+    "utils.image_utils",
+    "utils.context_reconstructor",
+    "utils.file_utils",
+]
+follow_imports = "normal"
+disallow_untyped_defs = true
+check_untyped_defs = true
+strict_equality = true
+warn_return_any = true
+
+# Third-party libraries without stubs
+[[tool.mypy.overrides]]
+module = [
+    "mcp.*",
+    "litellm.*",
+    "google.*",
+    "dotenv.*",
+    "clink.*",
+    "pydantic.*",
+    "tiktoken.*",
+    "httpx.*",
+    "openai.*",
+]
+ignore_missing_imports = true
+
 [build-system]
 requires = ["setuptools>=45", "wheel", "setuptools_scm[toml]>=6.2"]
 build-backend = "setuptools.build_meta"

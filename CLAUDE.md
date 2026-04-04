@@ -20,6 +20,7 @@ This script automatically runs:
 - Ruff linting with auto-fix
 - Black code formatting 
 - Import sorting with isort
+- Mypy type checking (strict on allowlist files)
 - Complete unit test suite (excluding integration tests)
 - Verification that all checks pass 100%
 
@@ -315,6 +316,17 @@ ruff check .
 black --check .
 isort --check-only .
 ```
+
+#### Type Checking (mypy)
+```bash
+# Run mypy on strict allowlist files (same as CI)
+mypy utils/circuit_breaker.py utils/fs_snapshot.py utils/tool_execution_context.py utils/token_utils.py
+
+# Run mypy on a specific file
+mypy utils/circuit_breaker.py
+```
+
+**Gradual strictness strategy:** 15 modules are under strict mypy checking (see `pyproject.toml` `[[tool.mypy.overrides]]` for the full list). Other packages run with permissive defaults. When adding new files or substantially refactoring existing ones, add them to the strict allowlist in `pyproject.toml` and the mypy commands in `code_quality_checks.sh` and `.github/workflows/test.yml`.
 
 ### File Structure Context
 

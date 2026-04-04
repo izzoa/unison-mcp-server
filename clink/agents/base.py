@@ -52,6 +52,16 @@ class BaseCLIAgent:
         self._parser: BaseParser = get_parser(client.parser)
         self._logger = logging.getLogger(f"clink.runner.{client.name}")
 
+    def get_read_only_args(self) -> list[str]:
+        """Return CLI-specific flags for read-only mode.
+
+        Subclasses override this to provide flags that restrict the CLI
+        to read-only operations. The base implementation returns an empty
+        list — enforcement relies on prompt injection and filesystem
+        verification for unknown CLIs.
+        """
+        return []
+
     async def run(
         self,
         *,
@@ -60,6 +70,7 @@ class BaseCLIAgent:
         system_prompt: str | None = None,
         files: Sequence[str],
         images: Sequence[str],
+        read_only: bool = False,
     ) -> AgentOutput:
         # Files and images are already embedded into the prompt by the tool; they are
         # accepted here only to keep parity with SimpleTool callers.
@@ -77,6 +88,12 @@ class BaseCLIAgent:
                 f"Ensure the command is installed and accessible."
             )
         command[0] = resolved_executable
+
+        # Inject read-only sandbox flags when requested
+        if read_only:
+            ro_args = self.get_read_only_args()
+            if ro_args:
+                command.extend(ro_args)
 
         sanitized_command = list(command)
 

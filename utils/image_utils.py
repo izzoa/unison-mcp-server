@@ -17,7 +17,7 @@ def _valid_mime_types() -> Iterable[str]:
     return (get_image_mime_type(ext) for ext in IMAGES)
 
 
-def validate_image(image_path: str, max_size_mb: float = None) -> tuple[bytes, str]:
+def validate_image(image_path: str, max_size_mb: float | None = None) -> tuple[bytes, str]:
     """Validate a user-supplied image path or data URL.
 
     Args:

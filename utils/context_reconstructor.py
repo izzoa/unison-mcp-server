@@ -16,7 +16,7 @@ a tool_formatter_fn callback instead of importing server.TOOLS directly.
 
 import logging
 import os
-from typing import Callable, Optional
+from typing import Any, Callable, Optional
 
 from utils.conversation_store import MAX_CONVERSATION_TURNS, ConversationTurn, ThreadContext, get_thread_chain
 
@@ -288,8 +288,8 @@ def _default_turn_formatting(turn: ConversationTurn) -> list[str]:
 
 def build_conversation_history(
     context: ThreadContext,
-    model_context=None,
-    read_files_func=None,
+    model_context: Any = None,
+    read_files_func: Any = None,
     tool_formatter_fn: Optional[Callable[[str, ConversationTurn], Optional[list[str]]]] = None,
 ) -> tuple[str, int]:
     """

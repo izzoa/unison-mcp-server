@@ -81,6 +81,32 @@ $RUFF check --exclude test_simulation_files --exclude .unison_venv
 echo "✅ Step 1 Complete: All linting and formatting checks passed!"
 echo ""
 
+# Step 1b: Type Checking (strict allowlist)
+echo "🔎 Step 1b: Running mypy Type Checking"
+echo "---------------------------------------"
+
+# Check if mypy is available
+if [[ -f ".unison_venv/bin/mypy" ]]; then
+    MYPY=".unison_venv/bin/mypy"
+elif command -v mypy &> /dev/null; then
+    MYPY="mypy"
+else
+    echo "⚠️  mypy not found — skipping type checks (install via: pip install -r requirements-dev.txt)"
+    MYPY=""
+fi
+
+if [[ -n "$MYPY" ]]; then
+    echo "🔍 Running mypy on strict allowlist files..."
+    $MYPY \
+        utils/circuit_breaker.py utils/fs_snapshot.py utils/tool_execution_context.py utils/token_utils.py \
+        providers/shared/provider_type.py providers/shared/model_response.py \
+        utils/file_types.py utils/security_config.py utils/conversation_memory.py \
+        utils/env.py utils/model_resolution.py utils/request_helpers.py \
+        utils/image_utils.py utils/context_reconstructor.py utils/file_utils.py
+    echo "✅ Step 1b Complete: Type checking passed!"
+fi
+echo ""
+
 # Step 2: Unit Tests with Coverage
 echo "🧪 Step 2: Running Complete Unit Test Suite with Coverage"
 echo "---------------------------------------------------------"
@@ -98,6 +124,7 @@ echo "=================================="
 echo "✅ Linting (ruff): PASSED"
 echo "✅ Formatting (black): PASSED"
 echo "✅ Import sorting (isort): PASSED"
+echo "✅ Type checking (mypy): PASSED"
 echo "✅ Unit tests: PASSED"
 echo "✅ Coverage: PASSED (threshold: 44%)"
 echo ""

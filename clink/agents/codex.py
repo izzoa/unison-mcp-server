@@ -14,6 +14,10 @@ class CodexAgent(BaseCLIAgent):
     def __init__(self, client: ResolvedCLIClient):
         super().__init__(client)
 
+    def get_read_only_args(self) -> list[str]:
+        """Restrict Codex to suggest mode (no autonomous writes)."""
+        return ["--approval-mode", "suggest"]
+
     def _recover_from_error(
         self,
         *,

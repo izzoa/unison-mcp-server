@@ -6,7 +6,7 @@ and other request processing logic.
 """
 
 
-def get_follow_up_instructions(current_turn_count: int, max_turns: int = None) -> str:
+def get_follow_up_instructions(current_turn_count: int, max_turns: int | None = None) -> str:
     """
     Generate dynamic follow-up instructions based on conversation turn count.
 

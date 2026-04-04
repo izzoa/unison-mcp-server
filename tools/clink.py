@@ -19,6 +19,7 @@ from tools.models import ToolModelCategory, ToolOutput
 from tools.shared.base_models import COMMON_FIELD_DESCRIPTIONS
 from tools.shared.exceptions import ToolExecutionError
 from tools.simple.base import SchemaBuilder, SimpleTool
+from utils.fs_snapshot import capture_snapshot, diff_snapshots
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +50,14 @@ class CLinkRequest(BaseModel):
     continuation_id: str | None = Field(
         default=None,
         description=COMMON_FIELD_DESCRIPTIONS["continuation_id"],
+    )
+    read_only: bool = Field(
+        default=False,
+        description=(
+            "When true, restricts the external CLI to read-only operations via three enforcement layers: "
+            "(1) CLI-specific sandbox flags, (2) prompt-level instruction, (3) post-execution filesystem verification. "
+            "Violations are reported in metadata but do not block the response."
+        ),
     )
 
 
@@ -143,6 +152,14 @@ class CLinkTool(SimpleTool):
             "absolute_file_paths": SchemaBuilder.SIMPLE_FIELD_SCHEMAS["absolute_file_paths"],
             "images": SchemaBuilder.COMMON_FIELD_SCHEMAS["images"],
             "continuation_id": SchemaBuilder.COMMON_FIELD_SCHEMAS["continuation_id"],
+            "read_only": {
+                "type": "boolean",
+                "default": False,
+                "description": (
+                    "Restrict the external CLI to read-only operations. "
+                    "Enforced via CLI sandbox flags, prompt instruction, and post-execution filesystem verification."
+                ),
+            },
         }
 
         schema = {
@@ -206,6 +223,13 @@ class CLinkTool(SimpleTool):
             logger.exception("Failed to prepare clink prompt")
             self._raise_tool_error(f"Failed to prepare prompt: {exc}")
 
+        # Capture pre-execution filesystem snapshot for read-only verification
+        pre_snapshot = None
+        read_only = getattr(request, "read_only", False)
+        snapshot_dir = str(client_config.working_dir) if client_config.working_dir else "."
+        if read_only:
+            pre_snapshot = capture_snapshot(snapshot_dir)
+
         agent = create_agent(client_config)
         try:
             result = await agent.run(
@@ -214,6 +238,7 @@ class CLinkTool(SimpleTool):
                 system_prompt=system_prompt_text if system_prompt_text.strip() else None,
                 files=absolute_file_paths,
                 images=images,
+                read_only=read_only,
             )
         except CLIAgentError as exc:
             metadata = self._build_error_metadata(client_config, exc)
@@ -224,6 +249,21 @@ class CLinkTool(SimpleTool):
 
         metadata = self._build_success_metadata(client_config, role_config, result)
         metadata = self._prune_metadata(metadata, client_config, reason="normal")
+
+        # Post-execution read-only verification
+        if read_only and pre_snapshot is not None:
+            post_snapshot = capture_snapshot(snapshot_dir)
+            diff = diff_snapshots(pre_snapshot, post_snapshot)
+            sandbox_flags = agent.get_read_only_args()
+            metadata["read_only_enforced"] = True
+            metadata["read_only_sandbox_flags"] = sandbox_flags
+            metadata["read_only_violations"] = diff.to_dict() if diff.has_changes else []
+            if diff.has_changes:
+                logger.warning(
+                    "Read-only violation detected for CLI '%s': %s",
+                    client_config.name,
+                    diff.to_dict(),
+                )
 
         content, metadata = self._apply_output_limit(
             client_config,
@@ -292,6 +332,18 @@ class CLinkTool(SimpleTool):
             active_prompt = self.get_system_prompt().strip()
             if include_system_prompt and active_prompt:
                 sections.append(active_prompt)
+
+            # Read-only enforcement: prompt-level instruction
+            if getattr(request, "read_only", False):
+                sections.append(
+                    "=== READ-ONLY MODE ===\n"
+                    "CRITICAL CONSTRAINT: You are operating in READ-ONLY mode. "
+                    "You MUST NOT create, modify, delete, or rename any files. "
+                    "Do not use any file-writing tools (EditFile, WriteFile, CreateFile, "
+                    "DeleteFile, ReplaceInFile, or equivalent). "
+                    "Only read files and provide analysis. Any file modification is a violation."
+                )
+
             sections.append(guidance)
             sections.append("=== USER REQUEST ===\n" + user_content)
             if file_section:

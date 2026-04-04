@@ -11,6 +11,10 @@ from .base import AgentOutput, BaseCLIAgent
 class ClaudeAgent(BaseCLIAgent):
     """Claude CLI agent with system-prompt injection support."""
 
+    def get_read_only_args(self) -> list[str]:
+        """Restrict Claude Code to plan mode (no file writes)."""
+        return ["--permission-mode", "plan"]
+
     def _build_command(self, *, role: ResolvedCLIRole, system_prompt: str | None) -> list[str]:
         command = list(self.client.executable)
         command.extend(self.client.internal_args)

@@ -699,7 +699,8 @@ def read_json_file(file_path: str) -> Optional[dict]:
             return None
 
         with open(file_path, encoding="utf-8") as f:
-            return json.load(f)
+            result: dict = json.load(f)
+            return result
     except (json.JSONDecodeError, OSError):
         return None
 

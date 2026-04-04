@@ -14,8 +14,23 @@ from .base import AgentOutput, BaseCLIAgent
 class GeminiAgent(BaseCLIAgent):
     """Gemini-specific behaviour."""
 
+    # Gemini CLI tools that can modify files
+    _WRITE_TOOLS = [
+        "EditFile",
+        "WriteFile",
+        "CreateFile",
+        "DeleteFile",
+        "ReplaceInFile",
+        "MoveFile",
+        "CreateDirectory",
+    ]
+
     def __init__(self, client: ResolvedCLIClient):
         super().__init__(client)
+
+    def get_read_only_args(self) -> list[str]:
+        """Restrict Gemini CLI to read-only tools via --disallowedTools."""
+        return ["--disallowedTools", ",".join(self._WRITE_TOOLS)]
 
     def _recover_from_error(
         self,

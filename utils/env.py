@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import os
-from collections.abc import Mapping
+from collections.abc import Generator, Mapping
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -90,7 +90,7 @@ def get_all_env() -> dict[str, str | None]:
 
 
 @contextmanager
-def suppress_env_vars(*names: str):
+def suppress_env_vars(*names: str) -> Generator[None, None, None]:
     """Temporarily remove environment variables during the context.
 
     Args:

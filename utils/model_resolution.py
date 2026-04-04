@@ -6,7 +6,7 @@ and resolve_fallback_model() for unified fallback model resolution.
 """
 
 import logging
-from typing import Optional
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +45,7 @@ def parse_model_option(model_string: str) -> tuple[str, Optional[str]]:
     return model_string.strip(), None
 
 
-def resolve_fallback_model(tool, error_context: str) -> str:
+def resolve_fallback_model(tool: Any, error_context: str) -> str:
     """
     Resolve a fallback model when the primary model is unavailable.
 
