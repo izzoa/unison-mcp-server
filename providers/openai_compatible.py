@@ -3,6 +3,7 @@
 import copy
 import ipaddress
 import logging
+from collections.abc import Generator
 from typing import Optional
 from urllib.parse import urlparse
 
@@ -11,7 +12,7 @@ from openai import OpenAI
 from utils.env import get_env, suppress_env_vars
 from utils.image_utils import validate_image
 
-from .base import ModelProvider
+from .base import ModelProvider, StreamChunk
 from .shared import ModelCapabilities, ModelResponse, ProviderType
 
 try:
@@ -676,6 +677,134 @@ class OpenAICompatibleProvider(ModelProvider):
                 f"{'s' if attempts > 1 else ''}: {exc}"
             )
             logging.error(error_msg)
+            raise RuntimeError(error_msg) from exc
+
+    def generate_content_stream(
+        self,
+        prompt: str,
+        model_name: str,
+        system_prompt: Optional[str] = None,
+        temperature: float = 0.3,
+        max_output_tokens: Optional[int] = None,
+        images: Optional[list[str]] = None,
+        **kwargs,
+    ) -> Generator[StreamChunk, None, None]:
+        """Stream content using the OpenAI-compatible ``stream=True`` API.
+
+        Yields :class:`StreamChunk` objects for each ``ChatCompletionChunk``
+        delta received.  The final chunk (where ``finish_reason`` is set) has
+        ``is_final=True`` and includes usage data when available.
+
+        Subclasses (``openai.py``, ``azure_openai.py``, ``xai.py``) inherit
+        this implementation unless they explicitly override it.
+        """
+        if not self.validate_model_name(model_name):
+            raise ValueError(f"Model '{model_name}' not in allowed models list. Allowed models: {self.allowed_models}")
+
+        capabilities: Optional[ModelCapabilities]
+        try:
+            capabilities = self.get_capabilities(model_name)
+        except Exception as exc:
+            logging.debug(f"Falling back to generic capabilities for {model_name}: {exc}")
+            capabilities = None
+
+        if capabilities:
+            effective_temperature = capabilities.get_effective_temperature(temperature)
+            if effective_temperature is not None and effective_temperature != temperature:
+                logging.debug(
+                    f"Adjusting temperature from {temperature} to {effective_temperature} for model {model_name}"
+                )
+        else:
+            effective_temperature = temperature
+
+        if effective_temperature is not None:
+            self.validate_parameters(model_name, effective_temperature)
+
+        resolved_model = self._resolve_model_name(model_name)
+
+        # Build messages
+        messages = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+
+        user_content = [{"type": "text", "text": prompt}]
+        if images and capabilities and capabilities.supports_images:
+            for image_path in images:
+                try:
+                    image_content = self._process_image(image_path)
+                    if image_content:
+                        user_content.append(image_content)
+                except Exception as e:
+                    logging.warning(f"Failed to process image {image_path}: {e}")
+                    continue
+
+        if len(user_content) == 1:
+            messages.append({"role": "user", "content": prompt})
+        else:
+            messages.append({"role": "user", "content": user_content})
+
+        # Build streaming completion params
+        supports_sampling = effective_temperature is not None
+        completion_params = {
+            "model": resolved_model,
+            "messages": messages,
+            "stream": True,
+            "stream_options": {"include_usage": True},
+        }
+        if supports_sampling:
+            completion_params["temperature"] = effective_temperature
+        if max_output_tokens and supports_sampling:
+            completion_params["max_tokens"] = max_output_tokens
+
+        # Models that require the Responses API fall back to the default
+        # single-chunk wrapper since streaming on that endpoint is not
+        # implemented here.
+        use_responses_api = False
+        if capabilities is not None:
+            use_responses_api = getattr(capabilities, "use_openai_response_api", False)
+        else:
+            static_capabilities = self.get_all_model_capabilities().get(resolved_model)
+            if static_capabilities is not None:
+                use_responses_api = getattr(static_capabilities, "use_openai_response_api", False)
+
+        if use_responses_api:
+            yield from super().generate_content_stream(
+                prompt,
+                model_name,
+                system_prompt=system_prompt,
+                temperature=temperature,
+                max_output_tokens=max_output_tokens,
+                images=images,
+                **kwargs,
+            )
+            return
+
+        try:
+            stream = self.client.chat.completions.create(**completion_params)
+            usage = {}
+            for chunk in stream:
+                # Extract usage from the final stream message (when include_usage=True)
+                if hasattr(chunk, "usage") and chunk.usage is not None:
+                    usage = self._extract_usage(chunk)
+
+                if not chunk.choices:
+                    continue
+
+                delta = chunk.choices[0].delta
+                delta_content = getattr(delta, "content", None) or ""
+                finish_reason = chunk.choices[0].finish_reason
+
+                if finish_reason is not None:
+                    yield StreamChunk(text=delta_content, is_final=True, usage=usage or None)
+                    return
+                elif delta_content:
+                    yield StreamChunk(text=delta_content, is_final=False)
+
+            # If we exit the loop without a finish_reason, yield a final chunk
+            yield StreamChunk(text="", is_final=True, usage=usage or None)
+
+        except Exception as exc:
+            error_msg = f"{self.FRIENDLY_NAME} streaming error for model {resolved_model}: {exc}"
             raise RuntimeError(error_msg) from exc
 
     def validate_parameters(self, model_name: str, temperature: float, **kwargs) -> None:

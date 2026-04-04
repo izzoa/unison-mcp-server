@@ -2,6 +2,7 @@
 
 import base64
 import logging
+from collections.abc import Generator
 from typing import TYPE_CHECKING, ClassVar, Optional
 
 if TYPE_CHECKING:
@@ -13,7 +14,7 @@ from google.genai import types
 from utils.env import get_env
 from utils.image_utils import validate_image
 
-from .base import ModelProvider
+from .base import ModelProvider, StreamChunk
 from .registries.gemini import GeminiModelRegistry
 from .registry_provider_mixin import RegistryBackedProviderMixin
 from .shared import ModelCapabilities, ModelResponse, ProviderType
@@ -315,6 +316,98 @@ class GeminiModelProvider(RegistryBackedProviderMixin, ModelProvider):
                 f"Gemini API error for model {resolved_model_name} after {attempts} attempt"
                 f"{'s' if attempts > 1 else ''}: {exc}"
             )
+            raise RuntimeError(error_msg) from exc
+
+    def generate_content_stream(
+        self,
+        prompt: str,
+        model_name: str,
+        system_prompt: Optional[str] = None,
+        temperature: float = 1.0,
+        max_output_tokens: Optional[int] = None,
+        thinking_mode: str = "medium",
+        images: Optional[list[str]] = None,
+        **kwargs,
+    ) -> Generator[StreamChunk, None, None]:
+        """Stream content from Gemini using the native ``stream=True`` API.
+
+        Yields :class:`StreamChunk` objects as the model produces output.
+        The final chunk has ``is_final=True`` and includes usage metadata.
+        """
+        self.validate_parameters(model_name, temperature)
+        capabilities = self.get_capabilities(model_name)
+        capability_map = self.get_all_model_capabilities()
+        resolved_model_name = self._resolve_model_name(model_name)
+
+        # Build contents (same logic as generate_content)
+        parts = []
+        if system_prompt:
+            full_prompt = f"{system_prompt}\n\n{prompt}"
+        else:
+            full_prompt = prompt
+        parts.append({"text": full_prompt})
+
+        if images and capabilities.supports_images:
+            for image_path in images:
+                try:
+                    image_part = self._process_image(image_path)
+                    if image_part:
+                        parts.append(image_part)
+                except Exception as e:
+                    logger.warning(f"Failed to process image {image_path}: {e}")
+                    continue
+        elif images and not capabilities.supports_images:
+            logger.warning(f"Model {resolved_model_name} does not support images, ignoring {len(images)} image(s)")
+
+        contents = [{"parts": parts}]
+
+        # Thinking mode override
+        effective_thinking_mode = thinking_mode
+        if resolved_model_name == "gemini-3-pro-preview" and thinking_mode == "medium":
+            effective_thinking_mode = "high"
+
+        generation_config = types.GenerateContentConfig(
+            temperature=temperature,
+            candidate_count=1,
+        )
+        if max_output_tokens:
+            generation_config.max_output_tokens = max_output_tokens
+
+        if capabilities.supports_extended_thinking and effective_thinking_mode in self.THINKING_BUDGETS:
+            model_config = capability_map.get(resolved_model_name)
+            if model_config and model_config.max_thinking_tokens > 0:
+                max_thinking_tokens = model_config.max_thinking_tokens
+                actual_thinking_budget = int(max_thinking_tokens * self.THINKING_BUDGETS[effective_thinking_mode])
+                generation_config.thinking_config = types.ThinkingConfig(thinking_budget=actual_thinking_budget)
+
+        try:
+            stream_response = self.client.models.generate_content_stream(
+                model=resolved_model_name,
+                contents=contents,
+                config=generation_config,
+            )
+
+            chunks_list = list(stream_response)
+            if not chunks_list:
+                yield StreamChunk(text="", is_final=True, usage={})
+                return
+
+            for i, chunk in enumerate(chunks_list):
+                is_last = i == len(chunks_list) - 1
+                chunk_text = ""
+                try:
+                    chunk_text = chunk.text or ""
+                except (AttributeError, ValueError):
+                    pass
+
+                if is_last:
+                    usage = self._extract_usage(chunk)
+                    yield StreamChunk(text=chunk_text, is_final=True, usage=usage)
+                else:
+                    yield StreamChunk(text=chunk_text, is_final=False)
+
+        except Exception as exc:
+            error_msg = f"Gemini streaming error for model {resolved_model_name}: {exc}"
             raise RuntimeError(error_msg) from exc
 
     def get_provider_type(self) -> ProviderType:

@@ -201,7 +201,8 @@ test_simulation_files/
 .kiro/
 .opencode/
 
-# Persistent conversation storage (SQLite database)
+# Persistent conversation storage (SQLite database, per-project)
+.unison/
 data/
 
 # OpenSpec workflow artifacts (local development only)

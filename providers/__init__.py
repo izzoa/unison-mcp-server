@@ -1,7 +1,7 @@
 """Model provider abstractions for supporting multiple AI providers."""
 
 from .azure_openai import AzureOpenAIProvider
-from .base import ModelProvider
+from .base import ModelProvider, StreamChunk
 from .gemini import GeminiModelProvider
 from .openai import OpenAIModelProvider
 from .openai_compatible import OpenAICompatibleProvider
@@ -11,6 +11,7 @@ from .shared import ModelCapabilities, ModelResponse
 
 __all__ = [
     "ModelProvider",
+    "StreamChunk",
     "ModelResponse",
     "ModelCapabilities",
     "ModelProviderRegistry",

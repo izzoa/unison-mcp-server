@@ -125,6 +125,8 @@ class CodeReviewTool(WorkflowTool):
     including security audits, performance analysis, architectural review, and maintainability assessment.
     """
 
+    supports_streaming = True
+
     def __init__(self):
         super().__init__()
         self.initial_request = None

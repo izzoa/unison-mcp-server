@@ -8,7 +8,8 @@ Enable via environment variable: STORAGE_BACKEND=sqlite
 
 Configuration:
     STORAGE_BACKEND          -- "sqlite" to enable (default: "memory")
-    STORAGE_SQLITE_PATH      -- database file path (default: data/conversations.db)
+    STORAGE_SQLITE_PATH      -- database file path (default: .unison/conversations.db
+                                relative to the working directory, giving per-project isolation)
     STORAGE_SWEEP_INTERVAL_SECONDS -- expired-row cleanup interval (default: 300)
 """
 
@@ -24,12 +25,10 @@ from utils.env import get_env
 
 logger = logging.getLogger(__name__)
 
-# Default database path relative to project root
-_DEFAULT_DB_PATH = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    "data",
-    "conversations.db",
-)
+# Default database path: .unison/conversations.db in the working directory.
+# This gives per-project isolation — conversations for each project stay
+# in that project's directory tree.
+_DEFAULT_DB_PATH = os.path.join(os.getcwd(), ".unison", "conversations.db")
 
 # Current schema version -- bump when adding migrations
 _CURRENT_SCHEMA_VERSION = 1
@@ -57,10 +56,14 @@ class SQLiteStorageBackend:
     concrete class but are **not** part of the protocol contract.
 
     Concurrency model:
-        * WAL journal mode -- concurrent reads proceed without blocking.
-        * A ``threading.Lock`` serialises writes to avoid SQLite contention.
-        * ``check_same_thread=False`` allows the background sweep thread and
-          the main async-loop thread to share the connection.
+        * WAL journal mode -- allows concurrent readers at the database level.
+        * A ``threading.Lock`` serialises **all** access to the shared
+          ``sqlite3.Connection``.  The Python sqlite3 ``Connection`` object
+          is not safe for concurrent use from multiple threads even when
+          ``check_same_thread=False`` -- that flag only disables the
+          thread-identity assertion, not internal state protection.
+        * ``check_same_thread=False`` allows the background sweep thread
+          and the main async-loop thread to share the connection.
     """
 
     # ------------------------------------------------------------------
@@ -84,7 +87,7 @@ class SQLiteStorageBackend:
         self._connection.execute("PRAGMA busy_timeout=5000")
 
         # Serialise all writes
-        self._write_lock = threading.Lock()
+        self._lock = threading.Lock()
 
         # Schema bootstrap + migrations
         self._init_schema()
@@ -118,7 +121,7 @@ class SQLiteStorageBackend:
 
     def _init_schema(self) -> None:
         """Create initial tables if they don't exist."""
-        with self._write_lock:
+        with self._lock:
             with self._connection:
                 self._connection.execute(
                     """
@@ -158,7 +161,7 @@ class SQLiteStorageBackend:
             if target_version <= current_version:
                 continue
             try:
-                with self._write_lock:
+                with self._lock:
                     with self._connection:
                         migration_fn(self._connection)
                         self._connection.execute(
@@ -181,19 +184,19 @@ class SQLiteStorageBackend:
         returned.
         """
         now = time.time()
-        cursor = self._connection.execute("SELECT value, expires_at FROM kv_store WHERE key = ?", (key,))
-        row = cursor.fetchone()
-        if row is None:
-            return None
+        with self._lock:
+            cursor = self._connection.execute("SELECT value, expires_at FROM kv_store WHERE key = ?", (key,))
+            row = cursor.fetchone()
+            if row is None:
+                return None
 
-        value, expires_at = row
-        if expires_at is not None and expires_at <= now:
-            # Lazy expiry
-            with self._write_lock:
+            value, expires_at = row
+            if expires_at is not None and expires_at <= now:
+                # Lazy expiry
                 with self._connection:
                     self._connection.execute("DELETE FROM kv_store WHERE key = ?", (key,))
-            logger.debug("Key %s expired and removed (lazy)", key)
-            return None
+                logger.debug("Key %s expired and removed (lazy)", key)
+                return None
 
         return value
 
@@ -201,7 +204,7 @@ class SQLiteStorageBackend:
         """Store *value* under *key* with a TTL in seconds."""
         now = time.time()
         expires_at = now + ttl_seconds
-        with self._write_lock:
+        with self._lock:
             with self._connection:
                 self._connection.execute(
                     """
@@ -237,7 +240,7 @@ class SQLiteStorageBackend:
 
     def delete(self, key: str) -> None:
         """Remove *key* from the store. Silent no-op if key does not exist."""
-        with self._write_lock:
+        with self._lock:
             with self._connection:
                 self._connection.execute("DELETE FROM kv_store WHERE key = ?", (key,))
 
@@ -245,15 +248,16 @@ class SQLiteStorageBackend:
         """Return all non-expired keys matching a Redis-style glob *pattern*."""
         now = time.time()
         like_pattern = _glob_to_like(pattern)
-        cursor = self._connection.execute(
-            """
-            SELECT key FROM kv_store
-            WHERE key LIKE ? ESCAPE '\\'
-              AND (expires_at IS NULL OR expires_at > ?)
-            """,
-            (like_pattern, now),
-        )
-        return [row[0] for row in cursor.fetchall()]
+        with self._lock:
+            cursor = self._connection.execute(
+                """
+                SELECT key FROM kv_store
+                WHERE key LIKE ? ESCAPE '\\'
+                  AND (expires_at IS NULL OR expires_at > ?)
+                """,
+                (like_pattern, now),
+            )
+            return [row[0] for row in cursor.fetchall()]
 
     # ------------------------------------------------------------------
     # Background TTL sweep
@@ -262,7 +266,7 @@ class SQLiteStorageBackend:
     def _sweep_expired(self) -> None:
         """Delete all rows whose TTL has elapsed."""
         now = time.time()
-        with self._write_lock:
+        with self._lock:
             with self._connection:
                 cursor = self._connection.execute(
                     "DELETE FROM kv_store WHERE expires_at IS NOT NULL AND expires_at < ?",

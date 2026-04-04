@@ -76,20 +76,29 @@ class TestWorkflowToolsUTF8(unittest.IsolatedAsyncioTestCase):
         mock_provider = Mock()
         mock_provider.get_provider_type.return_value = Mock(value="test")
         mock_provider.get_capabilities.return_value = Mock(supports_extended_thinking=False)
+        analysis_json = json.dumps(
+            {
+                "status": "analysis_complete",
+                "raw_analysis": "Analysis completed successfully",
+            },
+            ensure_ascii=False,
+        )
         mock_provider.generate_content = AsyncMock(
             return_value=Mock(
-                content=json.dumps(
-                    {
-                        "status": "analysis_complete",
-                        "raw_analysis": "Analysis completed successfully",
-                    },
-                    ensure_ascii=False,
-                ),
+                content=analysis_json,
                 usage={},
                 model_name="flash",
                 metadata={},
             )
         )
+
+        # Also mock generate_content_stream for streaming-enabled tools
+        from providers.base import StreamChunk
+
+        mock_provider.generate_content_stream = Mock(
+            return_value=iter([StreamChunk(text=analysis_json, is_final=True, usage={})])
+        )
+
         # Use the same provider for both contexts
         mock_get_provider.return_value = mock_provider
         mock_context_instance.provider = mock_provider
@@ -121,9 +130,8 @@ class TestWorkflowToolsUTF8(unittest.IsolatedAsyncioTestCase):
         # Structure checks
         self.assertIn("status", response_data)
 
-        # Check that the French instruction was added
-        # The mock provider's generate_content should be called
-        mock_provider.generate_content.assert_called()
+        # Check that the mock provider's streaming path was called
+        mock_provider.generate_content_stream.assert_called()
         # The call was successful, which means our fix worked
 
     @patch("tools.shared.base_tool.BaseTool.get_model_provider")
@@ -133,12 +141,10 @@ class TestWorkflowToolsUTF8(unittest.IsolatedAsyncioTestCase):
         mock_provider = Mock()
         mock_provider.get_provider_type.return_value = Mock(value="test")
         mock_provider.get_capabilities.return_value = Mock(supports_extended_thinking=False)
-        mock_provider.generate_content = AsyncMock(
-            return_value=Mock(
-                content=json.dumps(
-                    {
-                        "status": "analysis_complete",
-                        "raw_analysis": """
+        review_json = json.dumps(
+            {
+                "status": "analysis_complete",
+                "raw_analysis": """
 🔴 CRITIQUE: Aucun problème critique trouvé.
 
 🟠 ÉLEVÉ: Fichier example.py:42 - Fonction trop complexe
@@ -154,13 +160,22 @@ class TestWorkflowToolsUTF8(unittest.IsolatedAsyncioTestCase):
 • Nomenclature cohérente
 • Tests unitaires présents
 """,
-                    },
-                    ensure_ascii=False,
-                ),
+            },
+            ensure_ascii=False,
+        )
+        mock_provider.generate_content = AsyncMock(
+            return_value=Mock(
+                content=review_json,
                 usage={},
                 model_name="test-model",
                 metadata={},
             )
+        )
+        # Also mock generate_content_stream for streaming-enabled tools
+        from providers.base import StreamChunk
+
+        mock_provider.generate_content_stream = Mock(
+            return_value=iter([StreamChunk(text=review_json, is_final=True, usage={})])
         )
         mock_get_provider.return_value = mock_provider
 

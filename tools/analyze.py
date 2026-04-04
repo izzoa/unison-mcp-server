@@ -140,6 +140,8 @@ class AnalyzeTool(WorkflowTool):
     including architectural review, performance analysis, security assessment, and maintainability evaluation.
     """
 
+    supports_streaming = True
+
     def __init__(self):
         super().__init__()
         self.initial_request = None

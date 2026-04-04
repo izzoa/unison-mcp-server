@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Streaming provider interface: `StreamChunk` dataclass and `ModelProvider.generate_content_stream()` method that yields response chunks incrementally. Default single-chunk wrapper calls `generate_content()` for backward compatibility — zero mandatory per-provider changes
+- Native streaming for Gemini provider using `generate_content_stream()` with `stream=True` on the google-genai SDK
+- Native streaming for OpenAI-compatible provider using `client.chat.completions.create(stream=True)` — inherited by OpenAI, Azure OpenAI, and xAI subclasses
+- MCP progress notification bridge (`utils/streaming.py`): `StreamProgressNotifier` relays streaming chunks to clients via `notifications/progress` with rate limiting (100ms interval / 50-char minimum) and graceful no-op when client doesn't support progress
+- Streaming opt-in for long-running workflow tools: `ThinkDeepTool`, `CodeReviewTool`, and `AnalyzeTool` now use `generate_content_stream()` for expert analysis, providing incremental feedback during generation. Per-tool opt-in via `supports_streaming = True` class attribute
+- `_generate_stream()` method on `BaseWorkflowMixin` that calls the provider streaming interface, accumulates the full response, and relays chunks to MCP progress notifications
+- Comprehensive streaming unit tests (`tests/test_streaming.py`): 14 tests covering default wrapper, native streaming, progress notifier, rate limiting, response assembly, and error handling
 - Persistent conversation storage via SQLite backend (`utils/sqlite_storage.py`) — conversations survive server restarts with zero-config setup (sqlite3 is stdlib). Enable with `STORAGE_BACKEND=sqlite`. Features WAL mode for concurrent reads, lazy TTL expiry on read, periodic background sweep, schema migration support, and thread-safe writes. `InMemoryStorage` remains the default for backward compatibility
 - Storage backend factory (`create_storage_backend()` in `utils/storage_backend.py`) — selects backend based on `STORAGE_BACKEND` env var with graceful fallback to in-memory on errors or unrecognised values
 - Mypy static type checking in CI and local quality checks — strict enforcement on 15 modules across `utils/` and `providers/shared/` with gradual ratchet for expanding coverage. Configured in `pyproject.toml` with per-module overrides and `follow_imports = "silent"` for cross-boundary inference without non-strict noise
@@ -29,6 +36,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Decomposed `server.py` (1,003 → 140 lines) into focused modules: `tools/registry.py` (`ToolRegistry` class with lazy tool instantiation and DISABLED_TOOLS filtering), `handlers/tool_handlers.py` (`list_tools`/`call_tool` handlers + `reconstruct_thread_context`), and `handlers/prompt_handlers.py` (`list_prompts`/`get_prompt` handlers). Server is now a pure wiring module. All backward-compatible re-exports preserved.
+- SQLite storage default path changed from `data/conversations.db` (relative to server install) to `.unison/conversations.db` (relative to working directory) — gives per-project conversation isolation so threads from different projects don't mix. Override with `STORAGE_SQLITE_PATH` for a shared/global database
 - Decomposed `utils/conversation_memory.py` (1,108 lines) into three focused modules: `conversation_store.py` (thread lifecycle), `context_reconstructor.py` (history building), and `conversation_memory.py` (thin facade with re-exports)
 - Eliminated circular dependency: `from server import TOOLS` in conversation memory replaced with `tool_formatter_fn` callback injected by `server.py`
 - `ModelContext.estimate_tokens()` now delegates to the resolved provider's `count_tokens()` instead of using a fixed `len(text) // 3` heuristic
@@ -40,6 +49,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- SQLite storage segfault: `get()` and `keys()` now hold `_lock` during execution — the `sqlite3.Connection` object is not thread-safe for concurrent access even with `check_same_thread=False` and WAL mode, causing a CPython-level segfault when a reader and writer thread used the connection simultaneously
 - Simulator test registry initialisation: `conversation_base_test.py` now creates and sets a default `ModelProviderRegistry` before calling `configure_providers()`, matching `server.py:main()` startup sequence
 - Simulator test chat tool calls: auto-inject `working_directory_absolute_path` for chat tool invocations in both subprocess and in-process test paths
 - `per_tool_deduplication` test: switched from subprocess (`call_mcp_tool`) to in-process (`call_mcp_tool_direct`) calls to preserve conversation state across tool invocations

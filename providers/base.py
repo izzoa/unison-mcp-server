@@ -4,6 +4,8 @@ import asyncio
 import logging
 import time
 from abc import ABC, abstractmethod
+from collections.abc import Generator
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Callable, Optional
 
 if TYPE_CHECKING:
@@ -12,6 +14,26 @@ if TYPE_CHECKING:
 from utils.circuit_breaker import CircuitBreaker, CircuitState, ProviderUnavailable
 
 from .shared import ModelCapabilities, ModelResponse, ProviderType
+
+
+@dataclass
+class StreamChunk:
+    """A single chunk yielded by ``generate_content_stream()``.
+
+    Attributes:
+        text: The incremental content from the model for this chunk.
+        is_final: ``True`` when this is the last chunk in the stream.
+            The final chunk may have empty ``text`` if all content was
+            sent in prior chunks.
+        usage: Token usage metadata (input_tokens, output_tokens,
+            total_tokens).  Present only on the final chunk when the
+            provider reports usage information; ``None`` otherwise.
+    """
+
+    text: str
+    is_final: bool = False
+    usage: Optional[dict] = field(default=None)
+
 
 try:
     import httpx
@@ -301,6 +323,66 @@ class ModelProvider(ABC):
                        or the model is restricted by policy
             RuntimeError: If the API call fails after retries
         """
+
+    def generate_content_stream(
+        self,
+        prompt: str,
+        model_name: str,
+        system_prompt: Optional[str] = None,
+        temperature: float = 0.3,
+        max_output_tokens: Optional[int] = None,
+        **kwargs,
+    ) -> Generator[StreamChunk, None, None]:
+        """Yield response chunks incrementally as the model generates output.
+
+        This method has the same parameter signature as
+        :meth:`generate_content`.  It returns a generator that yields one or
+        more :class:`StreamChunk` objects.  The **last** chunk always has
+        ``is_final=True``.
+
+        The default implementation calls :meth:`generate_content`
+        synchronously and yields the full response as a single
+        ``StreamChunk``.  Concrete providers **MAY** override this method
+        with a native streaming implementation that uses the provider
+        SDK's streaming API for reduced time-to-first-token.
+
+        Streaming contract:
+            * Every chunk has a ``text`` field with incremental content.
+            * Intermediate chunks have ``is_final=False`` and
+              ``usage=None``.
+            * The last chunk has ``is_final=True`` and ``usage`` set to
+              token usage metadata when available from the provider.
+            * Concatenating all chunk ``text`` values produces the same
+              string as the ``content`` field of the :class:`ModelResponse`
+              that :meth:`generate_content` would return for the same
+              input.
+            * If the provider errors mid-stream, the generator raises the
+              exception; any chunks already yielded remain valid.
+
+        Args:
+            prompt: The main user prompt/query to send to the model.
+            model_name: Canonical model name or alias.
+            system_prompt: Optional system instructions.
+            temperature: Sampling temperature (0.0–1.0), default 0.3.
+            max_output_tokens: Optional cap on generated tokens.
+            **kwargs: Additional provider-specific parameters.
+
+        Yields:
+            StreamChunk: Incremental response chunks.
+        """
+        response = self.generate_content(
+            prompt,
+            model_name,
+            system_prompt=system_prompt,
+            temperature=temperature,
+            max_output_tokens=max_output_tokens,
+            **kwargs,
+        )
+        yield StreamChunk(
+            text=response.content,
+            is_final=True,
+            usage=response.usage,
+        )
 
     async def async_generate_content(
         self,

@@ -103,6 +103,7 @@ class ThinkDeepTool(WorkflowTool):
     """
 
     name = "thinkdeep"
+    supports_streaming = True
     description = (
         "Performs multi-stage investigation and reasoning for complex problem analysis. "
         "Use for architecture decisions, complex bugs, performance challenges, and security analysis. "

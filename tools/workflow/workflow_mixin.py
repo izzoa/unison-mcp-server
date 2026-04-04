@@ -1443,6 +1443,97 @@ class BaseWorkflowMixin(ABC):
 
         return "\n".join(summary_parts)
 
+    async def _generate_stream(
+        self,
+        provider,
+        prompt: str,
+        model_name: str,
+        system_prompt: str = "",
+        temperature: float = 0.3,
+        thinking_mode: str = "high",
+        images: Optional[list[str]] = None,
+    ) -> str:
+        """Call ``provider.generate_content_stream()`` and relay chunks to
+        MCP progress notifications while accumulating the full response.
+
+        Returns the assembled response text (identical to what the
+        non-streaming path would produce).
+
+        If the provider or session does not support streaming or progress
+        notifications, falls back gracefully.
+        """
+        import asyncio
+
+        from utils.streaming import StreamProgressNotifier
+
+        # Obtain the MCP server instance and progress token
+        mcp_server = self._get_mcp_server()
+        progress_token = self._get_progress_token()
+
+        notifier = (
+            StreamProgressNotifier(
+                server=mcp_server,
+                progress_token=progress_token,
+            )
+            if mcp_server
+            else None
+        )
+
+        accumulated_text = ""
+        usage = None
+
+        def _run_stream():
+            """Run the synchronous streaming generator in a thread."""
+            nonlocal accumulated_text, usage
+            chunks = []
+            for chunk in provider.generate_content_stream(
+                prompt=prompt,
+                model_name=model_name,
+                system_prompt=system_prompt,
+                temperature=temperature,
+                thinking_mode=thinking_mode,
+                images=images,
+            ):
+                chunks.append(chunk)
+            return chunks
+
+        # Run the blocking generator in a thread
+        chunks = await asyncio.to_thread(_run_stream)
+
+        # Send progress notifications for each chunk
+        for chunk in chunks:
+            accumulated_text += chunk.text
+            if chunk.is_final and chunk.usage:
+                usage = chunk.usage
+            if notifier:
+                await notifier.notify_chunk(chunk)
+
+        if notifier:
+            await notifier.notify_complete(accumulated_text)
+
+        return accumulated_text
+
+    def _get_mcp_server(self):
+        """Return the MCP Server instance, or ``None`` if unavailable."""
+        try:
+            from server import server
+
+            return server
+        except Exception:
+            return None
+
+    def _get_progress_token(self):
+        """Return the progress token from the current MCP request, or ``None``."""
+        try:
+            from server import server
+
+            ctx = server.request_context
+            if ctx.meta and ctx.meta.progressToken is not None:
+                return ctx.meta.progressToken
+        except Exception:
+            pass
+        return None
+
     async def _call_expert_analysis(self, arguments: dict, request) -> dict:
         """Call external model for expert analysis"""
         try:
@@ -1498,18 +1589,34 @@ class BaseWorkflowMixin(ABC):
             for warning in temp_warnings:
                 logger.warning(warning)
 
-            # Generate AI response - use request parameters if available
-            model_response = provider.generate_content(
-                prompt=prompt,
-                model_name=model_name,
-                system_prompt=system_prompt,
-                temperature=validated_temperature,
-                thinking_mode=self.get_request_thinking_mode(request),
-                images=list(set(self.consolidated_findings.images)) if self.consolidated_findings.images else None,
-            )
+            # Generate AI response - use streaming when the tool opts in
+            thinking_mode = self.get_request_thinking_mode(request)
+            images = list(set(self.consolidated_findings.images)) if self.consolidated_findings.images else None
+            supports_streaming = getattr(self, "supports_streaming", False)
 
-            if model_response.content:
-                content = model_response.content.strip()
+            if supports_streaming:
+                response_text = await self._generate_stream(
+                    provider=provider,
+                    prompt=prompt,
+                    model_name=model_name,
+                    system_prompt=system_prompt,
+                    temperature=validated_temperature,
+                    thinking_mode=thinking_mode,
+                    images=images,
+                )
+            else:
+                model_response = provider.generate_content(
+                    prompt=prompt,
+                    model_name=model_name,
+                    system_prompt=system_prompt,
+                    temperature=validated_temperature,
+                    thinking_mode=thinking_mode,
+                    images=images,
+                )
+                response_text = model_response.content
+
+            if response_text:
+                content = response_text.strip()
 
                 # Try to extract JSON from markdown code blocks if present
                 if "```json" in content or "```" in content:
@@ -1525,14 +1632,14 @@ class BaseWorkflowMixin(ABC):
                     # Log the parse error with more details but don't fail
                     logger.info(
                         f"[{self.get_name()}] Expert analysis returned non-JSON response (this is OK for smaller models). "
-                        f"Parse error: {str(e)}. Response length: {len(model_response.content)} chars."
+                        f"Parse error: {str(e)}. Response length: {len(response_text)} chars."
                     )
-                    logger.debug(f"First 500 chars of response: {model_response.content[:500]!r}")
+                    logger.debug(f"First 500 chars of response: {response_text[:500]!r}")
 
                     # Still return the analysis as plain text - this is valid
                     return {
                         "status": "analysis_complete",
-                        "raw_analysis": model_response.content,
+                        "raw_analysis": response_text,
                         "format": "text",  # Indicate it's plain text, not an error
                         "note": "Analysis provided in plain text format",
                     }
