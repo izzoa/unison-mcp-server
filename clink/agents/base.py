@@ -62,6 +62,17 @@ class BaseCLIAgent:
         """
         return []
 
+    def _apply_read_only(self, command: list[str]) -> list[str]:
+        """Apply read-only restrictions to *command*.
+
+        The default implementation appends :meth:`get_read_only_args`.
+        Subclasses may override to strip conflicting flags first.
+        """
+        ro_args = self.get_read_only_args()
+        if ro_args:
+            command.extend(ro_args)
+        return command
+
     async def run(
         self,
         *,
@@ -91,9 +102,7 @@ class BaseCLIAgent:
 
         # Inject read-only sandbox flags when requested
         if read_only:
-            ro_args = self.get_read_only_args()
-            if ro_args:
-                command.extend(ro_args)
+            command = self._apply_read_only(command)
 
         sanitized_command = list(command)
 

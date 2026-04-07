@@ -41,6 +41,22 @@ class TestGeminiAgentReadOnly:
         args = agent.get_read_only_args()
         assert args == ["--approval-mode", "plan"]
 
+    def test_apply_read_only_strips_yolo(self):
+        """--yolo must be removed before --approval-mode plan is appended."""
+        agent = GeminiAgent(_make_mock_client("gemini"))
+        cmd = ["gemini", "-o", "json", "--yolo"]
+        result = agent._apply_read_only(cmd)
+        assert "--yolo" not in result
+        assert "-y" not in result
+        assert result[-2:] == ["--approval-mode", "plan"]
+
+    def test_apply_read_only_strips_short_flag(self):
+        agent = GeminiAgent(_make_mock_client("gemini"))
+        cmd = ["gemini", "-o", "json", "-y"]
+        result = agent._apply_read_only(cmd)
+        assert "-y" not in result
+        assert result[-2:] == ["--approval-mode", "plan"]
+
 
 class TestClaudeAgentReadOnly:
     def test_returns_plan_mode(self):

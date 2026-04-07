@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Codex clink read-only sandbox: replaced invalid `--approval-mode suggest` flag (not supported by `codex exec`) with prompt-based enforcement
-- Gemini clink read-only sandbox: replaced non-existent `--disallowedTools` flag with `--approval-mode plan` (Gemini CLI's actual read-only mode)
+- Gemini clink read-only sandbox: replaced non-existent `--disallowedTools` flag with `--approval-mode plan` (Gemini CLI's actual read-only mode) and strip conflicting `--yolo`/`-y` flag when read-only is active
 
 ### Added
 

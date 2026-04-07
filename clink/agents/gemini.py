@@ -21,6 +21,11 @@ class GeminiAgent(BaseCLIAgent):
         """Restrict Gemini CLI to plan (read-only) approval mode."""
         return ["--approval-mode", "plan"]
 
+    def _apply_read_only(self, command: list[str]) -> list[str]:
+        """Strip ``--yolo``/``-y`` before adding ``--approval-mode plan``."""
+        command = [arg for arg in command if arg not in ("-y", "--yolo")]
+        return super()._apply_read_only(command)
+
     def _recover_from_error(
         self,
         *,
