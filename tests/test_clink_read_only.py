@@ -36,21 +36,10 @@ class TestBaseCLIAgentReadOnly:
 
 
 class TestGeminiAgentReadOnly:
-    def test_returns_disallowed_tools_flag(self):
+    def test_returns_plan_approval_mode(self):
         agent = GeminiAgent(_make_mock_client("gemini"))
         args = agent.get_read_only_args()
-        assert args[0] == "--disallowedTools"
-        # Should deny write tools
-        tools = args[1].split(",")
-        assert "EditFile" in tools
-        assert "WriteFile" in tools
-        assert "DeleteFile" in tools
-        assert "CreateFile" in tools
-
-    def test_flag_format(self):
-        agent = GeminiAgent(_make_mock_client("gemini"))
-        args = agent.get_read_only_args()
-        assert len(args) == 2  # --disallowedTools and the comma-separated list
+        assert args == ["--approval-mode", "plan"]
 
 
 class TestClaudeAgentReadOnly:
@@ -61,10 +50,11 @@ class TestClaudeAgentReadOnly:
 
 
 class TestCodexAgentReadOnly:
-    def test_returns_suggest_mode(self):
+    def test_returns_empty_list(self):
+        """Codex exec has no read-only flag; enforcement via prompt."""
         agent = CodexAgent(_make_mock_client("codex"))
         args = agent.get_read_only_args()
-        assert args == ["--approval-mode", "suggest"]
+        assert args == []
 
 
 # -----------------------------------------------------------------------

@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Codex clink read-only sandbox: replaced invalid `--approval-mode suggest` flag (not supported by `codex exec`) with prompt-based enforcement
+- Gemini clink read-only sandbox: replaced non-existent `--disallowedTools` flag with `--approval-mode plan` (Gemini CLI's actual read-only mode)
+
 ### Added
 
 - Streaming provider interface: `StreamChunk` dataclass and `ModelProvider.generate_content_stream()` method that yields response chunks incrementally. Default single-chunk wrapper calls `generate_content()` for backward compatibility — zero mandatory per-provider changes
