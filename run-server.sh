@@ -1308,38 +1308,35 @@ check_claude_cli_integration() {
                 return 1
             fi
         else
-            # Verify the registered path matches current setup
-            local expected_cmd="$python_cmd $server_path"
-            if echo "$mcp_list" | grep -F "$server_path" &>/dev/null; then
+            # Always refresh registration to pick up .env changes
+            if ! echo "$mcp_list" | grep -F "$server_path" &>/dev/null; then
+                print_warning "Unison registered with different path, updating..."
+            fi
+            claude mcp remove unison -s user 2>/dev/null || true
+
+            # Re-add with current path and environment variables
+            local env_vars=$(parse_env_variables)
+            local env_args=""
+
+            # Convert environment variables to -e arguments
+            if [[ -n "$env_vars" ]]; then
+                while IFS= read -r line; do
+                    if [[ -n "$line" && "$line" =~ ^([^=]+)=(.*)$ ]]; then
+                        env_args+=" -e ${BASH_REMATCH[1]}=\"${BASH_REMATCH[2]}\""
+                    fi
+                done <<< "$env_vars"
+            fi
+
+            local claude_cmd="claude mcp add unison -s user$env_args -- \"$python_cmd\" \"$server_path\""
+            if eval "$claude_cmd" 2>/dev/null; then
+                print_success "Unison MCP registration refreshed with current environment"
                 return 0
             else
-                print_warning "Unison registered with different path, updating..."
-                claude mcp remove unison -s user 2>/dev/null || true
-
-                # Re-add with current path and environment variables
-                local env_vars=$(parse_env_variables)
-                local env_args=""
-                
-                # Convert environment variables to -e arguments
-                if [[ -n "$env_vars" ]]; then
-                    while IFS= read -r line; do
-                        if [[ -n "$line" && "$line" =~ ^([^=]+)=(.*)$ ]]; then
-                            env_args+=" -e ${BASH_REMATCH[1]}=\"${BASH_REMATCH[2]}\""
-                        fi
-                    done <<< "$env_vars"
-                fi
-                
-                local claude_cmd="claude mcp add unison -s user$env_args -- \"$python_cmd\" \"$server_path\""
-                if eval "$claude_cmd" 2>/dev/null; then
-                    print_success "Updated Unison with current path and environment variables"
-                    return 0
-                else
-                    echo ""
-                    echo "Failed to update MCP registration. Please run manually:"
-                    echo "  claude mcp remove unison -s user"
-                    echo "  $claude_cmd"
-                    return 1
-                fi
+                echo ""
+                echo "Failed to update MCP registration. Please run manually:"
+                echo "  claude mcp remove unison -s user"
+                echo "  $claude_cmd"
+                return 1
             fi
         fi
     else
@@ -1398,11 +1395,6 @@ check_claude_desktop_integration() {
     local python_cmd="$1"
     local server_path="$2"
 
-    # Skip if already configured (check flag)
-    if [[ -f "$DESKTOP_CONFIG_FLAG" ]]; then
-        return 0
-    fi
-
     local config_path=$(get_claude_config_path)
     if [[ -z "$config_path" ]]; then
         print_warning "Unable to determine Claude Desktop config path for this platform"
@@ -1413,13 +1405,23 @@ check_claude_desktop_integration() {
     local legacy_names_csv
     legacy_names_csv=$(IFS=,; echo "${LEGACY_MCP_NAMES[*]}")
 
-    echo ""
-    read -p "Configure Unison for Claude Desktop? (Y/n): " -n 1 -r
-    echo ""
-    if [[ $REPLY =~ ^[Nn]$ ]]; then
-        print_info "Skipping Claude Desktop integration"
-        touch "$DESKTOP_CONFIG_FLAG"  # Don't ask again
-        return 0
+    # If previously configured, silently refresh env vars without prompting
+    if [[ -f "$DESKTOP_CONFIG_FLAG" ]]; then
+        if [[ -f "$config_path" ]]; then
+            # Fall through to the existing-config update block below
+            :
+        else
+            return 0
+        fi
+    else
+        echo ""
+        read -p "Configure Unison for Claude Desktop? (Y/n): " -n 1 -r
+        echo ""
+        if [[ $REPLY =~ ^[Nn]$ ]]; then
+            print_info "Skipping Claude Desktop integration"
+            touch "$DESKTOP_CONFIG_FLAG"  # Don't ask again
+            return 0
+        fi
     fi
 
     # Create config directory if it doesn't exist
@@ -1922,7 +1924,43 @@ CODExEOF
         echo "  Restart Codex CLI to use Unison MCP Server"
         codex_has_unison=true
     else
-        print_info "Codex CLI already configured; refreshing Codex settings..."
+        # Refresh env vars in the existing unison env section
+        local env_vars=$(parse_env_variables)
+
+        UNISON_CODEX_CONFIG="$codex_config" python3 - <<'PY' "$env_vars"
+import os, pathlib, re, sys
+
+config_path = pathlib.Path(os.environ["UNISON_CODEX_CONFIG"])
+env_raw = sys.argv[1] if len(sys.argv) > 1 else ""
+
+lines = config_path.read_text().splitlines()
+section_re = re.compile(r"\s*\[([^\]]+)\]")
+output = []
+skip = False
+
+for line in lines:
+    match = section_re.match(line)
+    if match:
+        header = match.group(1).strip()
+        skip = header == "mcp_servers.unison.env"
+        if skip:
+            continue
+    if not skip:
+        output.append(line)
+
+# Re-append [mcp_servers.unison.env] with fresh values
+output.append("")
+output.append("[mcp_servers.unison.env]")
+output.append('PATH = "/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin:$HOME/.local/bin:$HOME/.cargo/bin:$HOME/bin"')
+for raw_line in env_raw.strip().splitlines():
+    if "=" in raw_line:
+        key, value = raw_line.split("=", 1)
+        escaped = value.replace("\\", "\\\\").replace('"', '\\"')
+        output.append(f'{key} = "{escaped}"')
+
+config_path.write_text("\n".join(output).rstrip() + "\n")
+PY
+        print_success "Codex CLI env vars refreshed"
     fi
 
     if [[ "$codex_has_unison" == true ]]; then

@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Codex clink read-only sandbox: replaced invalid `--approval-mode suggest` flag (not supported by `codex exec`) with prompt-based enforcement
 - Gemini clink read-only sandbox: replaced non-existent `--disallowedTools` flag with `--approval-mode plan` (Gemini CLI's actual read-only mode) and strip conflicting `--yolo`/`-y` flag when read-only is active
+- `run-server.sh` now always refreshes MCP registrations with current `.env` values — previously, adding/removing tools via `DISABLED_TOOLS` (or changing any env var) had no effect because Claude Code, Claude Desktop, and Codex CLI registrations were skipped when the server path was unchanged
 
 ### Added
 
