@@ -13,7 +13,7 @@ dependencies = [
 ]
 
 [tool.setuptools.packages.find]
-include = ["tools*", "providers*", "systemprompts*", "utils*", "conf*", "clink*"]
+exclude = ["tests*", "simulator_tests*", "docker*", "docs*", "examples*", "scripts*"]
 
 [tool.setuptools]
 py-modules = ["server", "config"]
@@ -185,6 +185,7 @@ module = [
     "utils.context_reconstructor",
     "utils.file_utils",
     "tools.registry",
+    "smoke_test_wheel",
 ]
 follow_imports = "normal"
 disallow_untyped_defs = true

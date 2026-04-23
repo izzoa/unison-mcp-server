@@ -3,6 +3,8 @@ name: Tests
 on:
   pull_request:
     branches: [main]
+  push:
+    branches: [main]
 
 jobs:
   test:
@@ -44,6 +46,17 @@ jobs:
           path: htmlcov/
           retention-days: 30
 
+      - name: Wheel smoke test
+        run: |
+          python -m pip install build
+          rm -rf dist/ build/ unison_mcp_server.egg-info/
+          python -m build --wheel --sdist --outdir dist/
+          python -m venv /tmp/unison-smoke-ci
+          /tmp/unison-smoke-ci/bin/pip install dist/unison_mcp_server-*.whl
+          python scripts/smoke_test_wheel.py --entry-point /tmp/unison-smoke-ci/bin/unison-mcp-server
+        env:
+          GEMINI_API_KEY: dummy
+
   lint:
     runs-on: ubuntu-latest
     steps:
@@ -74,4 +87,5 @@ jobs:
             utils/file_types.py utils/security_config.py utils/conversation_memory.py \
             utils/env.py utils/model_resolution.py utils/request_helpers.py \
             utils/image_utils.py utils/context_reconstructor.py utils/file_utils.py \
-            tools/registry.py
+            tools/registry.py \
+            scripts/smoke_test_wheel.py

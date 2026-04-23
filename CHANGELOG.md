@@ -9,12 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Installed wheel was missing the `handlers/` subpackage**, causing `ModuleNotFoundError: No module named 'handlers'` at server startup for all uvx / pip / Docker installs since 11.7.0. Manifested to users as MCP client handshake failures with "connection closed: initialize response" (e.g. Codex CLI via `uvx --from git+https://github.com/izzoa/unison-mcp-server.git`). Switched `[tool.setuptools.packages.find]` in `pyproject.toml` from an explicit allowlist to a denylist so future runtime packages are discovered automatically and cannot be silently dropped from the wheel
 - Codex clink read-only sandbox: replaced invalid `--approval-mode suggest` flag (not supported by `codex exec`) with prompt-based enforcement
 - Gemini clink read-only sandbox: replaced non-existent `--disallowedTools` flag with `--approval-mode plan` (Gemini CLI's actual read-only mode) and strip conflicting `--yolo`/`-y` flag when read-only is active
 - `run-server.sh` now always refreshes MCP registrations with current `.env` values — previously, adding/removing tools via `DISABLED_TOOLS` (or changing any env var) had no effect because Claude Code, Claude Desktop, and Codex CLI registrations were skipped when the server path was unchanged
 
+### Changed
+
+- Applied black 26.3.1 formatting to 11 pre-existing files (`simulator_tests/*.py`, several `tests/*.py`, `utils/sqlite_storage.py`) — surfaced by CI once the wheel-packaging fix added `push: main` to the test workflow. Pure mechanical reformat (collapsed wrapped triple-quoted string arguments; removed stray blank line between module docstring and imports); no semantic changes
+
 ### Added
 
+- **Wheel smoke test in CI** (`scripts/smoke_test_wheel.py`): builds the wheel, installs it into a fresh venv, spawns the `unison-mcp-server` entry point, and verifies the MCP `initialize` JSON-RPC handshake completes successfully. Runs on every Python version in the test matrix (3.10, 3.11, 3.12), on pull requests AND pushes to `main`. Designed to catch the class of bug that shipped 11.7.0–11.7.2 (installable wheel crashes at import) at CI time rather than at user runtime
 - Streaming provider interface: `StreamChunk` dataclass and `ModelProvider.generate_content_stream()` method that yields response chunks incrementally. Default single-chunk wrapper calls `generate_content()` for backward compatibility — zero mandatory per-provider changes
 - Native streaming for Gemini provider using `generate_content_stream()` with `stream=True` on the google-genai SDK
 - Native streaming for OpenAI-compatible provider using `client.chat.completions.create(stream=True)` — inherited by OpenAI, Azure OpenAI, and xAI subclasses
