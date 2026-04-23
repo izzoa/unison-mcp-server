@@ -123,8 +123,7 @@ class SQLiteStorageBackend:
         """Create initial tables if they don't exist."""
         with self._lock:
             with self._connection:
-                self._connection.execute(
-                    """
+                self._connection.execute("""
                     CREATE TABLE IF NOT EXISTS kv_store (
                         key        TEXT PRIMARY KEY,
                         value      TEXT NOT NULL,
@@ -132,16 +131,13 @@ class SQLiteStorageBackend:
                         created_at REAL NOT NULL,
                         updated_at REAL NOT NULL
                     )
-                    """
-                )
-                self._connection.execute(
-                    """
+                    """)
+                self._connection.execute("""
                     CREATE TABLE IF NOT EXISTS schema_version (
                         id      INTEGER PRIMARY KEY CHECK (id = 1),
                         version INTEGER NOT NULL
                     )
-                    """
-                )
+                    """)
                 # Seed version row if absent
                 cursor = self._connection.execute("SELECT version FROM schema_version WHERE id = 1")
                 if cursor.fetchone() is None:
