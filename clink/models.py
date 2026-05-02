@@ -51,6 +51,7 @@ class CLIClientConfig(BaseModel):
     timeout_seconds: PositiveInt | None = Field(default=None)
     roles: dict[str, CLIRoleConfig] = Field(default_factory=dict)
     output_to_file: OutputCaptureConfig | None = None
+    supported_models: list[str] = Field(default_factory=list)
 
     @field_validator("additional_args", mode="before")
     @classmethod
@@ -62,6 +63,17 @@ class CLIClientConfig(BaseModel):
         if isinstance(value, str):
             return [value]
         raise TypeError("additional_args must be a list of strings or a single string")
+
+    @field_validator("supported_models", mode="before")
+    @classmethod
+    def _ensure_supported_models_list(cls, value: Any) -> list[str]:
+        if value is None:
+            return []
+        if isinstance(value, list):
+            return [str(item) for item in value]
+        if isinstance(value, str):
+            return [value]
+        raise TypeError("supported_models must be a list of strings or a single string")
 
 
 class ResolvedCLIRole(BaseModel):
@@ -87,6 +99,7 @@ class ResolvedCLIClient(BaseModel):
     runner: str | None = None
     roles: dict[str, ResolvedCLIRole]
     output_to_file: OutputCaptureConfig | None = None
+    supported_models: list[str] = Field(default_factory=list)
 
     def list_roles(self) -> list[str]:
         return list(self.roles.keys())

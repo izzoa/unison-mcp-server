@@ -1,24 +1,26 @@
-"""Codex-specific CLI agent hooks."""
+"""Opencode-specific CLI agent hooks."""
 
 from __future__ import annotations
 
-from clink.models import ResolvedCLIClient
 from clink.parsers.base import ParserError
 
 from .base import AgentOutput, BaseCLIAgent
 
 
-class CodexAgent(BaseCLIAgent):
-    """Codex CLI agent with JSONL recovery support."""
+class OpencodeAgent(BaseCLIAgent):
+    """Opencode CLI agent with plan-mode read-only and JSONL recovery support."""
 
     model_flag_aliases: tuple[str, ...] = ("-m",)
 
-    def __init__(self, client: ResolvedCLIClient):
-        super().__init__(client)
-
     def get_read_only_args(self) -> list[str]:
-        """Codex ``exec`` has no read-only flag; enforcement via prompt."""
-        return []
+        """Restrict opencode to its plan agent.
+
+        Note: ``--agent plan`` references a user-configurable agent definition in
+        ``~/.opencode/config.json``. Layer-1 enforcement is best-effort; layers 2
+        (prompt instruction) and 3 (filesystem snapshot diff) provide
+        defense-in-depth.
+        """
+        return ["--agent", "plan"]
 
     def render_model_args(self, model: str) -> list[str]:
         return ["-m", model]

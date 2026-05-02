@@ -59,6 +59,18 @@ class CLinkRequest(BaseModel):
             "Violations are reported in metadata but do not block the response."
         ),
     )
+    model: str | None = Field(
+        default=None,
+        description=(
+            "Optional model identifier forwarded to the selected CLI. Opencode uses the "
+            "'provider/model' convention (e.g. 'anthropic/claude-sonnet-4-5', 'openai/gpt-5', "
+            "'ollama/llama3.2'); other CLIs accept their own forms (e.g. 'sonnet' for claude, "
+            "model aliases for gemini/codex). When omitted, the CLI uses whatever default is "
+            "set by its manifest. Validation is best-effort: if the selected CLI defines a "
+            "'supported_models' allowlist in its manifest, the value is checked against it; "
+            "otherwise invalid model strings surface as CLI-level errors in response metadata."
+        ),
+    )
 
 
 class CLinkTool(SimpleTool):
@@ -160,6 +172,16 @@ class CLinkTool(SimpleTool):
                     "Enforced via CLI sandbox flags, prompt instruction, and post-execution filesystem verification."
                 ),
             },
+            "model": {
+                "type": "string",
+                "description": (
+                    "Optional model forwarded to the selected CLI. Opencode uses 'provider/model' "
+                    "(e.g. 'anthropic/claude-sonnet-4-5', 'openai/gpt-5', 'ollama/llama3.2'); other CLIs "
+                    "accept their own forms (e.g. 'sonnet' for claude). Omit to use the CLI's manifest "
+                    "default. Validation is best-effort — invalid models surface as CLI-level errors in "
+                    "response metadata unless the manifest declares a 'supported_models' allowlist."
+                ),
+            },
         }
 
         schema = {
@@ -200,6 +222,15 @@ class CLinkTool(SimpleTool):
         except KeyError as exc:
             self._raise_tool_error(str(exc))
 
+        requested_model = (request.model or "").strip() or None
+        if requested_model and client_config.supported_models:
+            if requested_model not in client_config.supported_models:
+                allowed = ", ".join(client_config.supported_models)
+                self._raise_tool_error(
+                    f"Model '{requested_model}' is not in the supported_models allowlist for CLI "
+                    f"'{client_config.name}'. Allowed values: {allowed}."
+                )
+
         absolute_file_paths = self.get_request_files(request)
         images = self.get_request_images(request)
         continuation_id = self.get_request_continuation_id(request)
@@ -239,6 +270,7 @@ class CLinkTool(SimpleTool):
                 files=absolute_file_paths,
                 images=images,
                 read_only=read_only,
+                model=requested_model,
             )
         except CLIAgentError as exc:
             metadata = self._build_error_metadata(client_config, exc)
@@ -247,7 +279,7 @@ class CLinkTool(SimpleTool):
                 metadata=metadata,
             )
 
-        metadata = self._build_success_metadata(client_config, role_config, result)
+        metadata = self._build_success_metadata(client_config, role_config, result, requested_model=requested_model)
         metadata = self._prune_metadata(metadata, client_config, reason="normal")
 
         # Post-execution read-only verification
@@ -362,6 +394,8 @@ class CLinkTool(SimpleTool):
         client: ResolvedCLIClient,
         role: ResolvedCLIRole,
         result: AgentOutput,
+        *,
+        requested_model: str | None = None,
     ) -> dict[str, Any]:
         """Capture execution metadata for successful CLI calls."""
         metadata: dict[str, Any] = {
@@ -373,6 +407,8 @@ class CLinkTool(SimpleTool):
             "return_code": result.returncode,
         }
         metadata.update(result.parsed.metadata)
+        if requested_model:
+            metadata["model_requested"] = requested_model
 
         if result.stderr.strip():
             metadata.setdefault("stderr", result.stderr.strip())

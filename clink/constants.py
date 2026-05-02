@@ -45,4 +45,10 @@ INTERNAL_DEFAULTS: dict[str, CLIInternalDefaults] = {
         default_role_prompt="systemprompts/clink/default.txt",
         runner="claude",
     ),
+    "opencode": CLIInternalDefaults(
+        parser="opencode_jsonl",
+        additional_args=["--format", "json"],
+        default_role_prompt="systemprompts/clink/default.txt",
+        runner="opencode",
+    ),
 }

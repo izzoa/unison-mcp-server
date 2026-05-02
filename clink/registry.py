@@ -164,6 +164,7 @@ class ClinkRegistry:
             roles=roles,
             output_to_file=output_to_file,
             working_dir=working_dir,
+            supported_models=list(raw.supported_models),
         )
 
     def _resolve_executable(

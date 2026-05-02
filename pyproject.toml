@@ -186,6 +186,8 @@ module = [
     "utils.file_utils",
     "tools.registry",
     "smoke_test_wheel",
+    "clink.agents.opencode",
+    "clink.parsers.opencode",
 ]
 follow_imports = "normal"
 disallow_untyped_defs = true

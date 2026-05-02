@@ -11,11 +11,22 @@ from .base import AgentOutput, BaseCLIAgent
 class ClaudeAgent(BaseCLIAgent):
     """Claude CLI agent with system-prompt injection support."""
 
+    model_flag_aliases: tuple[str, ...] = ("--model",)
+
     def get_read_only_args(self) -> list[str]:
         """Restrict Claude Code to plan mode (no file writes)."""
         return ["--permission-mode", "plan"]
 
-    def _build_command(self, *, role: ResolvedCLIRole, system_prompt: str | None) -> list[str]:
+    def render_model_args(self, model: str) -> list[str]:
+        return ["--model", model]
+
+    def _build_command(
+        self,
+        *,
+        role: ResolvedCLIRole,
+        system_prompt: str | None,
+        model: str | None = None,
+    ) -> list[str]:
         command = list(self.client.executable)
         command.extend(self.client.internal_args)
         command.extend(self.client.config_args)
@@ -24,6 +35,11 @@ class ClaudeAgent(BaseCLIAgent):
             command.extend(["--append-system-prompt", system_prompt])
 
         command.extend(role.role_args)
+
+        if model:
+            command = self._strip_model_flags(command)
+            command.extend(self.render_model_args(model))
+
         return command
 
     def _recover_from_error(

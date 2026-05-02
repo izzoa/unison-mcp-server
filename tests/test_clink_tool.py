@@ -146,6 +146,17 @@ async def test_clink_tool_truncates_large_output(monkeypatch):
     assert metadata.get("output_original_length") == len(long_text)
 
 
+def test_input_schema_includes_optional_model_property():
+    tool = CLinkTool()
+    schema = tool.get_input_schema()
+    properties = schema.get("properties", {})
+    assert "model" in properties
+    model_prop = properties["model"]
+    assert model_prop.get("type") == "string"
+    assert "enum" not in model_prop
+    assert "model" not in schema.get("required", [])
+
+
 @pytest.mark.asyncio
 async def test_clink_tool_truncates_without_summary(monkeypatch):
     tool = CLinkTool()

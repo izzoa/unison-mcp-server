@@ -25,10 +25,11 @@ Gemini · OpenAI · Anthropic · Grok · Azure · Ollama · OpenRouter · DIAL �
 
 The new **[`clink`](docs/tools/clink.md)** (CLI + Link) tool connects external AI CLIs directly into your workflow:
 
-- **Connect external CLIs** like [Gemini CLI](https://github.com/google-gemini/gemini-cli), [Codex CLI](https://github.com/openai/codex), and [Claude Code](https://www.anthropic.com/claude-code) directly into your workflow
+- **Connect external CLIs** like [Gemini CLI](https://github.com/google-gemini/gemini-cli), [Codex CLI](https://github.com/openai/codex), [Claude Code](https://www.anthropic.com/claude-code), and [opencode](https://opencode.ai) directly into your workflow
 - **CLI Subagents** - Launch isolated CLI instances from _within_ your current CLI! Claude Code can spawn Codex subagents, Codex can spawn Gemini CLI subagents, etc. Offload heavy tasks (code reviews, bug hunting) to fresh contexts while your main session's context window remains unpolluted. Each subagent returns only final results.
 - **Context Isolation** - Run separate investigations without polluting your primary workspace
 - **Role Specialization** - Spawn `planner`, `codereviewer`, or custom role agents with specialized system prompts
+- **Per-call Model Selection** - Pick a model at call time via the `model` parameter. Opencode uses `provider/model` (e.g. `anthropic/claude-sonnet-4-5`, `openai/gpt-5`, `ollama/llama3.2`) and unlocks ~75 providers through a single integration. Manifests can declare an optional `supported_models` allowlist to curate available models per CLI
 - **Full CLI Capabilities** - Web search, file inspection, MCP tool access, latest documentation lookups
 - **Seamless Continuity** - Sub-CLIs participate as first-class members with full conversation context between tools
 
@@ -37,6 +38,9 @@ The new **[`clink`](docs/tools/clink.md)** (CLI + Link) tool connects external A
 clink with codex codereviewer to audit auth module for security issues
 # Subagent reviews in isolation, returns final report without cluttering your context as codex reads each file and walks the directory structure
 
+# Per-call model selection through opencode (anthropic, openai, ollama, openrouter, ...)
+clink with opencode using anthropic/claude-sonnet-4-5 to refactor the payment flow
+
 # Consensus from different AI models → Implementation handoff with full context preservation between tools
 Use consensus with gpt-5 and gemini-pro to decide: dark mode or offline support next
 Continue with clink gemini - implement the recommended feature
@@ -44,6 +48,82 @@ Continue with clink gemini - implement the recommended feature
 ```
 
 👉 **[Learn more about clink](docs/tools/clink.md)**
+
+---
+
+## How to clink
+
+The `clink` tool takes four parameters that matter day-to-day: `cli_name`, `role`, `model`, and `read_only`. Everything else (file attachments, continuation IDs) works the same as any other Unison tool.
+
+### Basic invocation
+
+```bash
+# Minimum: just pick a CLI and prompt it
+clink with gemini to summarize the auth module
+
+# Pick a role preset (default | planner | codereviewer)
+clink with codex codereviewer to audit auth/ for OWASP top 10 issues
+clink with claude planner to draft a phased migration off the legacy queue
+
+# Pick a per-call model (especially powerful with opencode)
+clink with opencode using anthropic/claude-sonnet-4-5 to refactor payments.py
+clink with opencode using openai/gpt-5 to write a property-based test suite
+
+# Read-only mode (analysis without file writes)
+clink with claude codereviewer in read-only mode to review PR #482
+```
+
+### Supported CLIs
+
+| CLI | Strengths | Read-only flag |
+|---|---|---|
+| `gemini` | Long-context analysis, free tier, web search | `--approval-mode plan` |
+| `codex` | OpenAI-hosted reasoning models, web search via tool | prompt-only |
+| `claude` | Anthropic models with strong agentic behavior | `--permission-mode plan` |
+| `opencode` | **75+ providers** behind one CLI (OpenAI, Anthropic, Google, Ollama, OpenRouter, xAI, Mistral, Groq, …) via `provider/model` syntax | `--agent plan` |
+
+### Where to find valid `model` values
+
+`opencode` is the heavy hitter — one integration unlocks the entire models.dev catalog. To see what your installation can serve:
+
+```bash
+opencode models                          # all models from authenticated providers
+opencode models | grep ^anthropic/        # filter by provider
+opencode models | wc -l                   # count (typically 300+ once you've authed a few providers)
+opencode providers list                   # check which providers are authenticated
+```
+
+| CLI | How to discover valid models | Format |
+|---|---|---|
+| `opencode` | `opencode models` (local) · [models.dev](https://models.dev) (catalog) | `provider/model` (e.g. `anthropic/claude-sonnet-4-5`, `openai/gpt-5`, `ollama/llama3.2`) |
+| `claude` | `claude --help` · [Claude Code docs](https://docs.claude.com/en/docs/claude-code) | aliases (`sonnet`, `opus`, `haiku`) or full IDs |
+| `gemini` | `gemini --help` · [Gemini CLI docs](https://github.com/google-gemini/gemini-cli) | model IDs (e.g. `gemini-2.5-pro`) |
+| `codex` | `codex --help` · [Codex CLI docs](https://github.com/openai/codex) | OpenAI model IDs (e.g. `o3-mini`) |
+
+**Validation behavior:** the `model` field is free-text — invalid values come back as a CLI-level error in response metadata, not a schema rejection. Authentication for opencode providers is opencode's own concern (`opencode auth`); Unison doesn't manage credentials.
+
+### Curating models per CLI (optional)
+
+Add a `supported_models` allowlist to any `conf/cli_clients/*.json` manifest. When set, requests are validated against the list before the CLI is invoked — out-of-list values are rejected with a clear error naming the allowed values:
+
+```json
+{
+  "name": "opencode",
+  "command": "opencode run",
+  "supported_models": [
+    "anthropic/claude-sonnet-4-5",
+    "anthropic/claude-opus-4-5",
+    "openai/gpt-5"
+  ],
+  "roles": { "default": { "prompt_path": "systemprompts/clink/default.txt" } }
+}
+```
+
+When `supported_models` is omitted (the default), any model string is forwarded verbatim.
+
+### When `model` is omitted
+
+Each manifest's `additional_args` carries the CLI's default — claude defaults to `sonnet`, gemini and codex use whatever default their CLI picks. Calls that don't specify `model` produce byte-for-byte identical commands to before this feature shipped, so existing workflows keep working unchanged.
 
 ---
 

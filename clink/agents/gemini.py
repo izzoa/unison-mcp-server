@@ -14,12 +14,17 @@ from .base import AgentOutput, BaseCLIAgent
 class GeminiAgent(BaseCLIAgent):
     """Gemini-specific behaviour."""
 
+    model_flag_aliases: tuple[str, ...] = ("--model",)
+
     def __init__(self, client: ResolvedCLIClient):
         super().__init__(client)
 
     def get_read_only_args(self) -> list[str]:
         """Restrict Gemini CLI to plan (read-only) approval mode."""
         return ["--approval-mode", "plan"]
+
+    def render_model_args(self, model: str) -> list[str]:
+        return ["--model", model]
 
     def _apply_read_only(self, command: list[str]) -> list[str]:
         """Strip ``--yolo``/``-y`` before adding ``--approval-mode plan``."""

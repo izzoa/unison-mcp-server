@@ -47,6 +47,12 @@ class CLIAgentError(RuntimeError):
 class BaseCLIAgent:
     """Execute a configured CLI command and parse its output."""
 
+    #: Flag tokens this CLI uses for model selection. Subclasses declare the
+    #: forms (long, short) they emit from :meth:`render_model_args` so that
+    #: :meth:`_strip_model_flags` can remove any pre-existing manifest-supplied
+    #: model flag before the runtime model is appended. Empty tuple is a no-op.
+    model_flag_aliases: tuple[str, ...] = ()
+
     def __init__(self, client: ResolvedCLIClient):
         self.client = client
         self._parser: BaseParser = get_parser(client.parser)
@@ -61,6 +67,47 @@ class BaseCLIAgent:
         verification for unknown CLIs.
         """
         return []
+
+    def render_model_args(self, model: str) -> list[str]:
+        """Return the argv fragment that conveys ``model`` to this CLI.
+
+        Subclasses override to emit their CLI's flag form (e.g.
+        ``["--model", model]`` or ``["-m", model]``). The base implementation
+        returns ``[]`` so unknown CLIs that have no model selection silently
+        ignore the runtime model.
+        """
+        return []
+
+    def _strip_model_flags(self, command: list[str]) -> list[str]:
+        """Remove every occurrence of ``model_flag_aliases`` from ``command``.
+
+        Each matched alias is removed together with its immediately-following
+        value. A bare alias that appears as the final token (no following
+        value) is dropped and a WARNING is logged so misconfigured manifests
+        are surfaced. Returns a new list; the input is not mutated.
+        """
+        if not self.model_flag_aliases:
+            return list(command)
+
+        aliases = set(self.model_flag_aliases)
+        result: list[str] = []
+        i = 0
+        while i < len(command):
+            token = command[i]
+            if token in aliases:
+                if i + 1 < len(command):
+                    i += 2
+                    continue
+                self._logger.warning(
+                    "Stripped trailing model flag alias '%s' with no value from CLI '%s' command",
+                    token,
+                    self.client.name,
+                )
+                i += 1
+                continue
+            result.append(token)
+            i += 1
+        return result
 
     def _apply_read_only(self, command: list[str]) -> list[str]:
         """Apply read-only restrictions to *command*.
@@ -82,12 +129,13 @@ class BaseCLIAgent:
         files: Sequence[str],
         images: Sequence[str],
         read_only: bool = False,
+        model: str | None = None,
     ) -> AgentOutput:
         # Files and images are already embedded into the prompt by the tool; they are
         # accepted here only to keep parity with SimpleTool callers.
         _ = (files, images)
         # The runner simply executes the configured CLI command for the selected role.
-        command = self._build_command(role=role, system_prompt=system_prompt)
+        command = self._build_command(role=role, system_prompt=system_prompt, model=model)
         env = self._build_environment()
 
         # Resolve executable path for cross-platform compatibility (especially Windows)
@@ -216,11 +264,21 @@ class BaseCLIAgent:
             output_file_content=output_file_content,
         )
 
-    def _build_command(self, *, role: ResolvedCLIRole, system_prompt: str | None) -> list[str]:
+    def _build_command(
+        self,
+        *,
+        role: ResolvedCLIRole,
+        system_prompt: str | None,
+        model: str | None = None,
+    ) -> list[str]:
         base = list(self.client.executable)
         base.extend(self.client.internal_args)
         base.extend(self.client.config_args)
         base.extend(role.role_args)
+
+        if model:
+            base = self._strip_model_flags(base)
+            base.extend(self.render_model_args(model))
 
         return base
 
