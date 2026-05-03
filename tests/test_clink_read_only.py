@@ -8,6 +8,7 @@ from clink.agents.base import BaseCLIAgent
 from clink.agents.claude import ClaudeAgent
 from clink.agents.codex import CodexAgent
 from clink.agents.gemini import GeminiAgent
+from clink.agents.opencode import OpencodeAgent
 
 
 def _make_mock_client(name: str = "test") -> MagicMock:
@@ -71,6 +72,31 @@ class TestCodexAgentReadOnly:
         agent = CodexAgent(_make_mock_client("codex"))
         args = agent.get_read_only_args()
         assert args == []
+
+
+class TestOpencodeAgentReadOnly:
+    def test_returns_empty_list(self):
+        """Opencode has no CLI flag for read-only-while-still-executing mode.
+
+        v11.8.0 used ``--agent plan`` but that switches the agent persona
+        (producing planning-language instead of executing the task), so it was
+        not a true read-only sandbox. Layers 2 (prompt) and 3 (fs snapshot)
+        provide enforcement.
+        """
+        agent = OpencodeAgent(_make_mock_client("opencode"))
+        assert agent.get_read_only_args() == []
+
+    def test_command_is_unchanged_in_read_only_mode(self):
+        """Without a layer-1 flag, the executed command is identical to a
+        non-read-only call for the same inputs."""
+        client = _make_mock_client("opencode")
+        client.parser = "opencode_jsonl"
+        agent = OpencodeAgent(client)
+        # The base agent's _apply_read_only just appends get_read_only_args()
+        # to the command; with [] returned, the command is unchanged.
+        cmd = ["opencode", "run", "--format", "json"]
+        result = agent._apply_read_only(cmd.copy())
+        assert result == cmd
 
 
 # -----------------------------------------------------------------------

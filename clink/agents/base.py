@@ -53,6 +53,19 @@ class BaseCLIAgent:
     #: model flag before the runtime model is appended. Empty tuple is a no-op.
     model_flag_aliases: tuple[str, ...] = ()
 
+    #: Paths the CLI itself creates as bookkeeping (config caches, plugin
+    #: installs, project-id files). Each pattern is either an exact relative
+    #: path (string equality) OR a directory prefix ending in ``"/**"`` (matches
+    #: the prefix or any descendant). ``fnmatch.fnmatch`` is intentionally NOT
+    #: used because stdlib ``fnmatch`` does not implement bash-style globstar
+    #: and produces incorrect results for path-shaped strings on every
+    #: supported Python version. Empty tuple means "no bookkeeping declared";
+    #: every detected change classifies as a model write.
+    #:
+    #: Consumed by :func:`utils.fs_snapshot.classify_changes` after the
+    #: post-execution snapshot diff in :mod:`tools.clink`.
+    fs_violation_ignore_patterns: tuple[str, ...] = ()
+
     def __init__(self, client: ResolvedCLIClient):
         self.client = client
         self._parser: BaseParser = get_parser(client.parser)

@@ -287,6 +287,12 @@ grep "ERROR" logs/mcp_server.log | tail -20
 # Check virtual environment
 which python
 # Should show: .../unison-mcp-server/.unison_venv/bin/python
+
+# Capture the actual stdin sent to a clink CLI (debugging hallucinated paths,
+# wrong outputs, etc.). Set LOG_LEVEL=DEBUG in .env then grep for the
+# "Executing CLI command" line emitted by clink.runner.<cli_name>:
+LOG_LEVEL=DEBUG ./run-server.sh
+grep "clink.runner.opencode" logs/mcp_server.log | tail -10
 ```
 
 #### Test Failures

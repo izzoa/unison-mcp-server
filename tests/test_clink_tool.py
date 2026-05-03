@@ -158,6 +158,143 @@ def test_input_schema_includes_optional_model_property():
 
 
 @pytest.mark.asyncio
+async def test_read_only_violations_have_classified_shape(monkeypatch):
+    """Read-only response metadata uses the nested {by_model, by_cli_bookkeeping} shape."""
+    from utils.fs_snapshot import SnapshotDiff
+
+    tool = CLinkTool()
+
+    # Simulate the snapshot diff that opencode produces on first-run bootstrap
+    # plus one model-driven write.
+    fake_diff = SnapshotDiff(
+        created=[
+            ".opencode/package.json",
+            ".opencode/node_modules/foo.json",
+            ".git/opencode",
+            "src/main.py",  # genuine model write
+        ],
+    )
+
+    async def fake_run(**kwargs):
+        return AgentOutput(
+            parsed=ParsedCLIResponse(content="ok", metadata={}),
+            sanitized_command=["opencode", "run", "--format", "json"],
+            returncode=0,
+            stdout="{}",
+            stderr="",
+            duration_seconds=0.1,
+            parser_name="opencode_jsonl",
+            output_file_content=None,
+        )
+
+    class DummyAgent:
+        fs_violation_ignore_patterns = (
+            ".opencode/.gitignore",
+            ".opencode/package.json",
+            ".opencode/package-lock.json",
+            ".opencode/node_modules/**",
+            ".git/opencode",
+        )
+
+        def get_read_only_args(self):
+            return []
+
+        async def run(self, **kwargs):
+            return await fake_run(**kwargs)
+
+    monkeypatch.setattr("tools.clink.create_agent", lambda c: DummyAgent())
+    monkeypatch.setattr("tools.clink.capture_snapshot", lambda d: {})
+    monkeypatch.setattr("tools.clink.diff_snapshots", lambda a, b: fake_diff)
+
+    arguments = {
+        "prompt": "review",
+        "cli_name": "opencode",
+        "read_only": True,
+        "absolute_file_paths": [],
+        "images": [],
+    }
+    result = await tool.execute(arguments)
+    payload = json.loads(result[0].text)
+    metadata = payload["metadata"]
+
+    # Shape: nested object with both buckets always present
+    assert metadata["read_only_enforced"] is True
+    assert metadata["read_only_sandbox_flags"] == []
+    violations = metadata["read_only_violations"]
+    assert isinstance(violations, dict)
+    assert "by_model" in violations
+    assert "by_cli_bookkeeping" in violations
+
+    # Each bucket has the three categories
+    for bucket_name in ("by_model", "by_cli_bookkeeping"):
+        bucket = violations[bucket_name]
+        for category in ("created", "modified", "deleted"):
+            assert category in bucket
+            assert isinstance(bucket[category], list)
+
+    # Routing: bootstrap files -> bookkeeping; src/main.py -> model
+    assert "src/main.py" in violations["by_model"]["created"]
+    assert ".opencode/package.json" in violations["by_cli_bookkeeping"]["created"]
+    assert ".opencode/node_modules/foo.json" in violations["by_cli_bookkeeping"]["created"]
+    assert ".git/opencode" in violations["by_cli_bookkeeping"]["created"]
+    # No leakage in either direction
+    assert "src/main.py" not in violations["by_cli_bookkeeping"]["created"]
+    assert ".opencode/package.json" not in violations["by_model"]["created"]
+
+
+@pytest.mark.asyncio
+async def test_warning_logged_only_for_model_driven_violations(monkeypatch, caplog):
+    """The WARNING fires for by_model content; bookkeeping-only changes are silent."""
+    from utils.fs_snapshot import SnapshotDiff
+
+    tool = CLinkTool()
+
+    bookkeeping_only = SnapshotDiff(
+        created=[".opencode/package.json", ".git/opencode"],
+    )
+
+    async def fake_run(**kwargs):
+        return AgentOutput(
+            parsed=ParsedCLIResponse(content="ok", metadata={}),
+            sanitized_command=["opencode"],
+            returncode=0,
+            stdout="{}",
+            stderr="",
+            duration_seconds=0.1,
+            parser_name="opencode_jsonl",
+            output_file_content=None,
+        )
+
+    class DummyAgent:
+        fs_violation_ignore_patterns = (".opencode/package.json", ".git/opencode")
+
+        def get_read_only_args(self):
+            return []
+
+        async def run(self, **kwargs):
+            return await fake_run(**kwargs)
+
+    monkeypatch.setattr("tools.clink.create_agent", lambda c: DummyAgent())
+    monkeypatch.setattr("tools.clink.capture_snapshot", lambda d: {})
+    monkeypatch.setattr("tools.clink.diff_snapshots", lambda a, b: bookkeeping_only)
+
+    arguments = {
+        "prompt": "review",
+        "cli_name": "opencode",
+        "read_only": True,
+        "absolute_file_paths": [],
+        "images": [],
+    }
+
+    with caplog.at_level("WARNING", logger="tools.clink"):
+        await tool.execute(arguments)
+    warnings = [r for r in caplog.records if "Read-only violation" in r.message]
+    assert warnings == [], (
+        "WARNING should not fire when only CLI bookkeeping changed; " f"got {[r.message for r in warnings]}"
+    )
+
+
+@pytest.mark.asyncio
 async def test_clink_tool_truncates_without_summary(monkeypatch):
     tool = CLinkTool()
 

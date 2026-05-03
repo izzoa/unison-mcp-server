@@ -49,6 +49,56 @@ class SnapshotDiff:
         }
 
 
+def _path_matches_pattern(rel_path: str, pattern: str) -> bool:
+    """Match ``rel_path`` against a single pattern using the explicit DSL.
+
+    A pattern is one of:
+
+    - An exact relative path (matched by string equality).
+    - A directory prefix ending in ``"/**"`` (matches the prefix path itself
+      OR any descendant of it).
+
+    No ``fnmatch`` involvement — stdlib ``fnmatch`` does not implement
+    bash-style globstar and produces incorrect results for path-shaped
+    strings on every supported Python version.
+    """
+    if pattern.endswith("/**"):
+        prefix = pattern[:-3]
+        return rel_path == prefix or rel_path.startswith(prefix + "/")
+    return rel_path == pattern
+
+
+def classify_changes(
+    diff: SnapshotDiff,
+    ignore_patterns: tuple[str, ...],
+) -> tuple[SnapshotDiff, SnapshotDiff]:
+    """Split a snapshot diff into ``(by_model, by_cli_bookkeeping)``.
+
+    Each path in ``diff`` is checked against ``ignore_patterns`` using the
+    per-CLI matching rules implemented by :func:`_path_matches_pattern`. Paths
+    that match any pattern classify as CLI bookkeeping; everything else
+    classifies as a model write.
+
+    The two returned diffs together contain every change present in the input
+    (no information loss). Empty buckets are returned as ``SnapshotDiff()``
+    defaults; the function never returns ``None`` for either side.
+    """
+    by_model = SnapshotDiff()
+    by_bookkeeping = SnapshotDiff()
+
+    def _route(paths: list[str], target_attr: str) -> None:
+        for path in paths:
+            matched = any(_path_matches_pattern(path, p) for p in ignore_patterns)
+            target = by_bookkeeping if matched else by_model
+            getattr(target, target_attr).append(path)
+
+    _route(diff.created, "created")
+    _route(diff.modified, "modified")
+    _route(diff.deleted, "deleted")
+
+    return by_model, by_bookkeeping
+
+
 def _is_transient(rel_path: str) -> bool:
     """Check if a path matches a transient file pattern."""
     name = os.path.basename(rel_path)

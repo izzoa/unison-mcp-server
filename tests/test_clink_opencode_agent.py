@@ -12,9 +12,32 @@ def _client():
     return get_registry().get_client("opencode")
 
 
-def test_get_read_only_args_returns_plan_agent_flag():
+def test_get_read_only_args_returns_empty_list_for_opencode():
+    """Opencode has no CLI flag for read-only-while-still-executing mode.
+
+    The previously-shipped ``["--agent", "plan"]`` switched the agent persona to
+    opencode's plan agent (which produces planning-language instead of executing
+    the requested task), so it was not a true read-only sandbox. Layer-1
+    enforcement is intentionally absent for opencode; layers 2 (prompt) and 3
+    (fs snapshot diff) provide enforcement.
+    """
     agent = OpencodeAgent(_client())
-    assert agent.get_read_only_args() == ["--agent", "plan"]
+    assert agent.get_read_only_args() == []
+
+
+def test_fs_violation_ignore_patterns_declared():
+    """Opencode declares the explicit, enumerated set of bootstrap paths.
+
+    Tight enumeration (not a directory-wide glob) so model writes to
+    .opencode/skills/ or .opencode/commands/ correctly classify as by_model.
+    """
+    assert OpencodeAgent.fs_violation_ignore_patterns == (
+        ".opencode/.gitignore",
+        ".opencode/package.json",
+        ".opencode/package-lock.json",
+        ".opencode/node_modules/**",
+        ".git/opencode",
+    )
 
 
 def test_render_model_args_returns_short_flag():

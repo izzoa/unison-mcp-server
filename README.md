@@ -80,7 +80,9 @@ clink with claude codereviewer in read-only mode to review PR #482
 | `gemini` | Long-context analysis, free tier, web search | `--approval-mode plan` |
 | `codex` | OpenAI-hosted reasoning models, web search via tool | prompt-only |
 | `claude` | Anthropic models with strong agentic behavior | `--permission-mode plan` |
-| `opencode` | **75+ providers** behind one CLI (OpenAI, Anthropic, Google, Ollama, OpenRouter, xAI, Mistral, Groq, …) via `provider/model` syntax | `--agent plan` |
+| `opencode` | **75+ providers** behind one CLI (OpenAI, Anthropic, Google, Ollama, OpenRouter, xAI, Mistral, Groq, …) via `provider/model` syntax | _(none — see note)_ |
+
+> **Note on opencode read-only mode:** opencode has no CLI flag for read-only-while-still-executing semantics. Its `--agent plan` flag switches the agent persona (producing planning-language instead of executing the requested task), so it is not a true read-only sandbox. Read-only enforcement for opencode relies on the prompt-level instruction and the post-execution filesystem snapshot diff — both CLI-agnostic. CLI bookkeeping that opencode creates on first-run (`.opencode/...` and `.git/opencode`) is classified separately under `read_only_violations.by_cli_bookkeeping` so it doesn't drown out genuine model-write detection.
 
 ### Where to find valid `model` values
 

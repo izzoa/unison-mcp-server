@@ -19,7 +19,7 @@ from tools.models import ToolModelCategory, ToolOutput
 from tools.shared.base_models import COMMON_FIELD_DESCRIPTIONS
 from tools.shared.exceptions import ToolExecutionError
 from tools.simple.base import SchemaBuilder, SimpleTool
-from utils.fs_snapshot import capture_snapshot, diff_snapshots
+from utils.fs_snapshot import capture_snapshot, classify_changes, diff_snapshots
 
 logger = logging.getLogger(__name__)
 
@@ -289,12 +289,16 @@ class CLinkTool(SimpleTool):
             sandbox_flags = agent.get_read_only_args()
             metadata["read_only_enforced"] = True
             metadata["read_only_sandbox_flags"] = sandbox_flags
-            metadata["read_only_violations"] = diff.to_dict() if diff.has_changes else []
-            if diff.has_changes:
+            by_model, by_bookkeeping = classify_changes(diff, agent.fs_violation_ignore_patterns)
+            metadata["read_only_violations"] = {
+                "by_model": by_model.to_dict(),
+                "by_cli_bookkeeping": by_bookkeeping.to_dict(),
+            }
+            if by_model.has_changes:
                 logger.warning(
                     "Read-only violation detected for CLI '%s': %s",
                     client_config.name,
-                    diff.to_dict(),
+                    by_model.to_dict(),
                 )
 
         content, metadata = self._apply_output_limit(
@@ -514,7 +518,14 @@ class CLinkTool(SimpleTool):
         return cleaned
 
     def _build_error_metadata(self, client: ResolvedCLIClient, exc: CLIAgentError) -> dict[str, Any]:
-        """Assemble metadata for failed CLI calls."""
+        """Assemble metadata for failed CLI calls.
+
+        Read-only verification (``read_only_enforced``, ``read_only_sandbox_flags``,
+        ``read_only_violations``) is intentionally NOT included in error metadata
+        because verification only runs after a successful ``agent.run()``. If a
+        future change needs to surface partial verification on error paths,
+        wire it explicitly here rather than relying on shape compatibility.
+        """
         metadata: dict[str, Any] = {
             "cli_name": client.name,
             "return_code": exc.returncode,
