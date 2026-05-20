@@ -8,6 +8,14 @@ from pathlib import Path
 DEFAULT_TIMEOUT_SECONDS = 1800
 DEFAULT_STREAM_LIMIT = 10 * 1024 * 1024  # 10MB per stream
 
+# Recursion-guard environment variables (see clink-multi-cli-infrastructure).
+# A clink-spawned CLI that itself wires Unison as an MCP server creates a
+# potential infinite loop. We propagate a depth counter via env var so the
+# child Unison process can detect the recursion at CLinkTool.execute() entry.
+CLINK_DEPTH_ENV_VAR = "UNISON_CLINK_DEPTH"
+CLINK_MAX_DEPTH_ENV_VAR = "CLINK_MAX_RECURSION_DEPTH"
+DEFAULT_CLINK_MAX_DEPTH = 1
+
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 BUILTIN_PROMPTS_DIR = PROJECT_ROOT / "systemprompts" / "clink"
 CONFIG_DIR = PROJECT_ROOT / "conf" / "cli_clients"

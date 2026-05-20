@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import re
 from datetime import datetime, timezone
 from pathlib import Path
@@ -13,6 +14,7 @@ from pydantic import BaseModel, Field
 
 from clink import get_registry
 from clink.agents import AgentOutput, CLIAgentError, create_agent
+from clink.constants import CLINK_DEPTH_ENV_VAR, CLINK_MAX_DEPTH_ENV_VAR, DEFAULT_CLINK_MAX_DEPTH
 from clink.models import ResolvedCLIClient, ResolvedCLIRole
 from config import TEMPERATURE_BALANCED
 from tools.models import ToolModelCategory, ToolOutput
@@ -25,6 +27,43 @@ logger = logging.getLogger(__name__)
 
 MAX_RESPONSE_CHARS = 20_000
 SUMMARY_PATTERN = re.compile(r"<SUMMARY>(.*?)</SUMMARY>", re.IGNORECASE | re.DOTALL)
+
+
+def _check_recursion_guard() -> None:
+    """Raise ``ToolExecutionError`` when the clink recursion depth is exceeded.
+
+    Reads ``UNISON_CLINK_DEPTH`` (default 0) and compares against
+    ``CLINK_MAX_RECURSION_DEPTH`` (default :data:`DEFAULT_CLINK_MAX_DEPTH`).
+    The depth is incremented by :meth:`BaseCLIAgent._build_environment` for
+    every CLI we spawn, so a clink-spawned CLI that itself invokes Unison
+    via MCP sees a higher depth at this entry point.
+
+    With the default max of 1, depth 0 and 1 succeed (so the user's primary
+    CLI → Unison → a clink-spawned CLI works normally), but depth 2+ fails
+    (the spawned CLI re-invoking Unison creates the loop).
+    """
+    raw_depth = os.environ.get(CLINK_DEPTH_ENV_VAR, "")
+    try:
+        current_depth = int(raw_depth) if raw_depth else 0
+    except ValueError:
+        current_depth = 0
+
+    raw_max = os.environ.get(CLINK_MAX_DEPTH_ENV_VAR, "")
+    try:
+        max_depth = int(raw_max) if raw_max else DEFAULT_CLINK_MAX_DEPTH
+    except ValueError:
+        max_depth = DEFAULT_CLINK_MAX_DEPTH
+
+    if current_depth > max_depth:
+        raise ToolExecutionError(
+            f"clink recursion limit exceeded "
+            f"({CLINK_DEPTH_ENV_VAR}={current_depth}, max={max_depth}). "
+            f"This usually means the calling CLI has Unison wired as an MCP "
+            f"server while also invoking the clink tool, creating a loop. "
+            f"Remove Unison from the calling CLI's MCP server config, or "
+            f"raise {CLINK_MAX_DEPTH_ENV_VAR} in your environment if the "
+            f"depth is intentional."
+        )
 
 
 class CLinkRequest(BaseModel):
@@ -201,6 +240,13 @@ class CLinkTool(SimpleTool):
         return {}
 
     async def execute(self, arguments: dict[str, Any]) -> list[TextContent]:
+        # Recursion guard: if we're already running inside a clink-spawned CLI
+        # that itself wired Unison as an MCP server, refuse to spawn another
+        # CLI rather than enter a context-window-exploding loop. See
+        # clink-multi-cli-infrastructure spec for the env-var propagation
+        # contract.
+        _check_recursion_guard()
+
         self._current_arguments = arguments
         request = self.get_request_model()(**arguments)
 
