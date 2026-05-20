@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from .aider import AiderTextParser
 from .base import BaseParser, ParsedCLIResponse, ParserError
 from .claude import ClaudeJSONParser
 from .codex import CodexJSONLParser
@@ -13,6 +14,7 @@ _PARSER_CLASSES: dict[str, type[BaseParser]] = {
     GeminiJSONParser.name: GeminiJSONParser,
     ClaudeJSONParser.name: ClaudeJSONParser,
     OpencodeJSONLParser.name: OpencodeJSONLParser,
+    AiderTextParser.name: AiderTextParser,
 }
 
 

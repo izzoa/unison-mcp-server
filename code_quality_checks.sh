@@ -105,7 +105,8 @@ if [[ -n "$MYPY" ]]; then
         utils/image_utils.py utils/context_reconstructor.py utils/file_utils.py \
         tools/registry.py \
         scripts/smoke_test_wheel.py scripts/build_mockups.py \
-        clink/agents/opencode.py clink/parsers/opencode.py
+        clink/agents/opencode.py clink/parsers/opencode.py \
+        clink/agents/aider.py clink/parsers/aider.py
     echo "✅ Step 1b Complete: Type checking passed!"
 fi
 echo ""
