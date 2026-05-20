@@ -6,6 +6,7 @@ from .aider import AiderTextParser
 from .base import BaseParser, ParsedCLIResponse, ParserError
 from .claude import ClaudeJSONParser
 from .codex import CodexJSONLParser
+from .crush import CrushTextParser
 from .gemini import GeminiJSONParser
 from .opencode import OpencodeJSONLParser
 
@@ -15,6 +16,7 @@ _PARSER_CLASSES: dict[str, type[BaseParser]] = {
     ClaudeJSONParser.name: ClaudeJSONParser,
     OpencodeJSONLParser.name: OpencodeJSONLParser,
     AiderTextParser.name: AiderTextParser,
+    CrushTextParser.name: CrushTextParser,
 }
 
 

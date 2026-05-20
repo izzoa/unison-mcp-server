@@ -145,6 +145,7 @@ Clink configurations live in `conf/cli_clients/`. We ship presets for the suppor
 | `codex` | `codex exec --json --dangerously-bypass-approvals-and-sandbox` | prompt-only | stable |
 | `opencode` | `opencode --format json` | prompt-only + filesystem snapshot | stable |
 | `aider` | `aider --no-pretty --no-stream --no-auto-commits --yes-always` | `--dry-run` (native) | stable |
+| `crush` | `crush run --quiet` | prompt-only + filesystem snapshot | evolving |
 
 **Stability tiers:** `stable` = proven upstream, infrequent flag changes. `evolving` = active development, flags may rev. `new` = recently released, expect changes.
 
@@ -174,6 +175,7 @@ Ensure the relevant CLI is installed and configured:
 - [Codex CLI](https://github.com/openai/codex)
 - [opencode](https://opencode.ai)
 - [Aider](https://aider.chat) — install with `pip install aider-chat` (or `pipx install aider-chat`). Aider uses standard provider API keys (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, etc.) from the environment; clink does not manage Aider's auth.
+- [Crush](https://github.com/charmbracelet/crush) — install with `brew install charmbracelet/tap/crush` (macOS) or see upstream install docs for other platforms. Crush is multi-provider; configure providers per Crush's own docs. Model selection at clink call time uses `provider/model` syntax (e.g., `anthropic/claude-sonnet-4-5`, `openai/gpt-4o`).
 
 ## Related Guides
 
