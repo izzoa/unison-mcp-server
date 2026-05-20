@@ -27,6 +27,21 @@ jobs:
           pip install -r requirements.txt
           pip install -r requirements-dev.txt
 
+      - name: Check README mockup drift
+        run: |
+          # Re-runs the mockup generator into a temp dir and byte-compares against
+          # the checked-in SVGs. Fails if a contributor edited a scene YAML
+          # without regenerating, or hand-edited a generated SVG.
+          MOCKUP_TMP=$(mktemp -d)
+          python scripts/build_mockups.py --output-dir "$MOCKUP_TMP" >/dev/null
+          if ! diff -r "$MOCKUP_TMP" docs/assets/mockups/ >/dev/null 2>&1; then
+            echo "❌ Generated SVGs are out of sync with scene YAML."
+            echo "   Run: python scripts/build_mockups.py"
+            echo ""
+            diff -rq "$MOCKUP_TMP" docs/assets/mockups/ | head -20
+            exit 1
+          fi
+
       - name: Run unit tests with coverage
         run: |
           # Run only unit tests (exclude simulation tests and integration tests)
@@ -88,5 +103,5 @@ jobs:
             utils/env.py utils/model_resolution.py utils/request_helpers.py \
             utils/image_utils.py utils/context_reconstructor.py utils/file_utils.py \
             tools/registry.py \
-            scripts/smoke_test_wheel.py \
+            scripts/smoke_test_wheel.py scripts/build_mockups.py \
             clink/agents/opencode.py clink/parsers/opencode.py

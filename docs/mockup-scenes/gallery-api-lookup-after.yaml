@@ -1,0 +1,28 @@
+id: gallery-api-lookup-after
+title: ~/myapp — claude code + unison
+description: |
+  With Unison: apilookup fetches current Anthropic docs in a sub-process
+  (zero token cost in the main context) and returns the accurate shape —
+  cache_control attaches to content blocks, with both ephemeral and
+  persistent TTLs, supported on tool definitions and results.
+width: 820
+lines:
+  - { kind: prompt, text: "configure prompt caching with the anthropic sdk" }
+  - { kind: blank }
+  - kind: tool_call
+    spinner: "⠋"
+    name: "unison · apilookup"
+    meta: ["sub-process", "zero ctx cost"]
+  - kind: tree
+    items:
+      - "fetched anthropic.com/docs/.../prompt-caching"
+      - { text: "resolved 2026-05-20", color: success }
+  - { kind: blank }
+  - { kind: output, text: "  cache_control attaches to content blocks, supports", color: muted }
+  - { kind: output, text: "  `ephemeral` (5min) and `persistent` (1h), now works", color: muted }
+  - { kind: output, text: "  on tool definitions + results:", color: muted }
+  - { kind: blank }
+  - { kind: output, text: "      {\"type\":\"text\",\"text\":\"...\"," }
+  - { kind: output, text: "       \"cache_control\":{\"type\":\"ephemeral\"}}" }
+  - { kind: blank }
+  - { kind: status, icon: "✓", text: "model: claude-opus-4-7  ·  current as of today", color: success }

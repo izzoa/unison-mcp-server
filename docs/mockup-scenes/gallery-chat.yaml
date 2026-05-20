@@ -1,0 +1,29 @@
+id: gallery-chat
+title: ~/myapp — claude code
+description: |
+  Chat with Gemini Pro to decide Redis vs Memcached for session storage,
+  then continue the same thread with O3 to dig into cluster-mode tradeoffs.
+  Demonstrates multi-turn conversation continuity across models.
+width: 820
+lines:
+  - { kind: prompt, text: "chat with gemini-pro: redis or memcached for session storage?" }
+  - { kind: blank }
+  - kind: tool_call
+    spinner: "⠋"
+    name: "unison · chat"
+    meta: ["gemini-2.5-pro"]
+  - { kind: blank }
+  - { kind: output, text: "  Redis     ✓ persistence, pub/sub, richer data types", color: success }
+  - { kind: output, text: "            ✗ ~2x memory overhead, larger ops surface", color: warning }
+  - { kind: output, text: "  Memcached ✓ simpler, multithreaded, lower memory per key", color: success }
+  - { kind: output, text: "            ✗ no persistence, key→string only", color: warning }
+  - { kind: blank }
+  - { kind: output, text: "  → For session storage: Redis. allkeys-lru eviction + TTL.", color: accent }
+  - { kind: blank }
+  - { kind: prompt, text: "continue with o3: what about cluster-mode tradeoffs?" }
+  - { kind: blank }
+  - kind: tool_call
+    spinner: "⠙"
+    name: "unison · chat"
+    meta: ["o3", "↳ same thread"]
+  - { kind: output, text: "  o3 picks up gemini's context — no re-explanation needed", color: muted }

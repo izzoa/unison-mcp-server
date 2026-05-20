@@ -1,0 +1,28 @@
+id: clink-subagent
+title: ~/myapp — codex
+description: |
+  clink spawning a Claude subagent in an isolated context window with
+  read-only enforcement. The subagent walks auth/ and reports findings,
+  then returns control to the codex session with the codex context
+  window unchanged.
+width: 820
+lines:
+  - { kind: prompt, text: "clink with claude codereviewer to audit auth/" }
+  - { kind: blank }
+  - kind: tool_call
+    spinner: "⚡"
+    name: "unison · clink"
+    meta: ["claude · sonnet", "isolated · read-only ✓"]
+  - kind: tree
+    items:
+      - "auth/session.py      scoped tokens"
+      - { text: "auth/password.py     bcrypt cost 8 (recommend 12)", color: warning }
+      - { text: "auth/oauth.py        state param missing in 1 flow", color: warning }
+      - { text: "auth/middleware.py   JWT signature unchecked on /health", color: error }
+      - { text: "auth/rate_limit.py   in-memory store (single-instance)", color: warning }
+  - { kind: blank }
+  - kind: box
+    title: "subagent finished"
+    lines:
+      - "1 critical  3 medium  0 low"
+      - "codex context window: unchanged (work ran in isolation)"

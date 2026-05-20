@@ -104,10 +104,33 @@ if [[ -n "$MYPY" ]]; then
         utils/env.py utils/model_resolution.py utils/request_helpers.py \
         utils/image_utils.py utils/context_reconstructor.py utils/file_utils.py \
         tools/registry.py \
-        scripts/smoke_test_wheel.py \
+        scripts/smoke_test_wheel.py scripts/build_mockups.py \
         clink/agents/opencode.py clink/parsers/opencode.py
     echo "✅ Step 1b Complete: Type checking passed!"
 fi
+echo ""
+
+# Step 1c: Mockup drift check
+# Re-runs the README mockup generator into a temp dir and byte-compares against
+# the checked-in SVGs in docs/assets/mockups/. Catches the case where a
+# contributor edits a scene YAML but forgets to regenerate (or hand-edits a
+# generated SVG). Fix: run `python scripts/build_mockups.py` and commit the
+# regenerated SVGs alongside the YAML change.
+echo "🔍 Step 1c: Checking mockup drift (docs/assets/mockups/ vs docs/mockup-scenes/)"
+echo "------------------------------------------------------------------------------"
+MOCKUP_TMP=$(mktemp -d)
+$PYTHON_CMD scripts/build_mockups.py --output-dir "$MOCKUP_TMP" >/dev/null
+if ! diff -r "$MOCKUP_TMP" docs/assets/mockups/ >/dev/null 2>&1; then
+    echo "❌ Generated SVGs are out of sync with scene YAML."
+    echo "   Run: python scripts/build_mockups.py"
+    echo ""
+    echo "   Files that differ:"
+    diff -rq "$MOCKUP_TMP" docs/assets/mockups/ | head -20
+    rm -rf "$MOCKUP_TMP"
+    exit 1
+fi
+rm -rf "$MOCKUP_TMP"
+echo "✅ Step 1c Complete: Mockups in sync!"
 echo ""
 
 # Step 2: Unit Tests with Coverage

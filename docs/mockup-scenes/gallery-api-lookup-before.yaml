@@ -1,0 +1,20 @@
+id: gallery-api-lookup-before
+title: ~/myapp — claude code
+description: |
+  Without Unison: Claude answers from training data, suggests an outdated
+  prompt-caching API shape with a stale model ID. The cache_control
+  parameter is shown on the request object (the old way) and the model
+  alias predates the current Claude family.
+width: 820
+lines:
+  - { kind: prompt, text: "configure prompt caching with the anthropic sdk" }
+  - { kind: blank }
+  - { kind: output, text: "  Use cache_control on the request (added 2024):", color: muted }
+  - { kind: blank }
+  - { kind: output, text: "      messages.create(" }
+  - { kind: output, text: "        model=\"claude-3-5-sonnet-20240620\",", color: warning }
+  - { kind: output, text: "        cache_control={\"type\": \"ephemeral\"},", color: warning }
+  - { kind: output, text: "        ..." }
+  - { kind: output, text: "      )" }
+  - { kind: blank }
+  - { kind: status, icon: "⚠", text: "training-data cutoff: Jan 2025  ·  model ID is stale, shape is wrong", color: warning }

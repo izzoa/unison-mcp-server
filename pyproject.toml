@@ -188,6 +188,7 @@ module = [
     "smoke_test_wheel",
     "clink.agents.opencode",
     "clink.parsers.opencode",
+    "build_mockups",
 ]
 follow_imports = "normal"
 disallow_untyped_defs = true
