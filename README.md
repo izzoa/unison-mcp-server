@@ -21,6 +21,19 @@ Gemini · OpenAI · Anthropic · Grok · Azure · Ollama · OpenRouter · DIAL �
 
 ---
 
+## What this fork adds over PAL
+
+Unison forks [BeehiveInnovations/pal-mcp-server](https://github.com/BeehiveInnovations/pal-mcp-server) and preserves every PAL tool, provider, and workflow. On top of that, it changes what's possible in four ways:
+
+- 🔗 **CLI-to-CLI orchestration.** The new [`clink`](docs/tools/clink.md) tool spawns Claude Code, Codex, Gemini CLI, and opencode as isolated subagents with role presets and read-only enforcement (native CLI flags + post-call filesystem-snapshot diff). **PAL has no equivalent.**
+- 🌐 **75+ providers through one integration.** clink + opencode routes a single call to OpenAI, Anthropic, Google, Ollama, OpenRouter, xAI, Mistral, Groq, DeepSeek, and ~70 more via `provider/model` syntax. No per-provider implementation work.
+- 🧠 **2000+ models, auto-discovered.** Every model from every authenticated provider appears at startup via [LiteLLM](https://github.com/BerriAI/litellm); a **weekly CI workflow** opens a PR with the latest catalog. Auto-mode picks the smartest available model using `intelligence_score`, not hardcoded preference lists that go stale.
+- 🛡️ **Production reliability.** Optional **SQLite conversation backend** survives restarts; a **per-provider circuit breaker** fails fast on outages so consensus doesn't hang on a dead provider.
+
+**Migration is lossless** — every PAL tool, provider, and workflow is preserved. The [full PAL vs Unison comparison](#pal-vs-unison-full-comparison) below breaks down each capability.
+
+---
+
 ## 🆕 Now with CLI-to-CLI Bridge
 
 The new **[`clink`](docs/tools/clink.md)** (CLI + Link) tool connects external AI CLIs directly into your workflow:
@@ -222,20 +235,21 @@ For best results when using [Codex CLI](https://developers.openai.com/codex/cli)
 - **Gemini 3.0 Pro** OR **GPT-5.2-Pro** - Deep thinking, additional code reviews, debugging and validations, pre-commit analysis
 </details>
 
-## Differences from PAL MCP
+## PAL vs Unison: full comparison
 
-Unison is forked from [BeehiveInnovations/pal-mcp-server](https://github.com/BeehiveInnovations/pal-mcp-server). It inherits the full PAL feature set and adds the following:
+Unison inherits the entire PAL feature set. Every row below is an addition or hard upgrade — nothing is removed.
 
-| Area | PAL MCP | Unison MCP |
-|------|---------|------------|
-| **Model Discovery** | Static JSON files only — manual updates required when providers release new models | Automatic model discovery via [LiteLLM](https://github.com/BerriAI/litellm) at startup; new models appear without JSON changes |
-| **Model Catalog** | Limited to manually curated entries per provider | 2000+ models auto-discovered across all providers, with curated overrides for tuned metadata |
-| **Discovered vs Curated** | All models treated equally | `listmodels` distinguishes curated models (with hand-tuned intelligence scores, aliases) from auto-discovered ones |
-| **Model Selection** | Hardcoded preference lists per provider — go stale when models change | Data-driven selection using `intelligence_score` and capability flags; auto-mode always picks the best available model |
-| **Model Freshness** | Manual JSON updates only | Weekly CI workflow fetches the latest LiteLLM catalog and opens a PR with new/updated models for human review |
-| **Conversation Storage** | In-memory only — lost on restart | Optional persistent SQLite backend (`STORAGE_BACKEND=sqlite`) — survives restarts with zero config |
-| **Changelog** | Git-log style | [Keep a Changelog](https://keepachangelog.com/) format with Unreleased section |
-| **Branding** | PAL (Provider Abstraction Layer) | Unison — Providers Together |
+| Capability | PAL MCP | Unison MCP |
+|---|---|---|
+| **CLI-to-CLI orchestration** | — | **`clink`** spawns Claude, Codex, Gemini, opencode as subagents with role presets (`planner`, `codereviewer`) and optional `supported_models` allowlist per CLI |
+| **Read-only mode for sub-CLIs** | — | Native CLI flags (`--approval-mode plan`, `--permission-mode plan`) + prompt instruction + post-call filesystem-snapshot diff; CLI bookkeeping (e.g. `.opencode/`) classified separately so it doesn't drown out genuine model writes |
+| **Provider reach via one integration** | One provider per implementation | **75+ providers** through opencode via `provider/model` syntax (OpenAI, Anthropic, Google, Ollama, OpenRouter, xAI, Mistral, Groq, DeepSeek, …) |
+| **Model catalog** | Static JSON files, manually curated — go stale the day a provider ships a new model | **2000+ models auto-discovered** via [LiteLLM](https://github.com/BerriAI/litellm) at startup, with curated overrides for tuned metadata |
+| **Discovered vs curated** | All models treated equally | `listmodels` distinguishes curated (hand-tuned `intelligence_score`, aliases) from auto-discovered |
+| **Auto-mode model selection** | Hardcoded preference lists per provider | Data-driven using `intelligence_score` and capability flags — newly discovered high-scoring models surface automatically |
+| **Catalog freshness** | Manual JSON updates only | **Weekly CI workflow** fetches the latest LiteLLM catalog and opens a PR for human review |
+| **Conversation persistence** | In-memory only — lost on restart | Optional **SQLite backend** (`STORAGE_BACKEND=sqlite`), zero-config |
+| **Provider failure handling** | Wait through the full retry cycle on every call | **Per-provider circuit breaker** — fails fast after N consecutive failures, auto-probes recovery; consensus skips dead providers and synthesizes from the rest |
 
 > All core tools, providers, workflows, and conversation continuity features from PAL are fully preserved. See [docs/name-change.md](docs/name-change.md) for migration notes.
 >

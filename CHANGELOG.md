@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- README restructured to stress the fork's differentiation from PAL. New "What this fork adds over PAL" top callout (after the elevator pitch, before the clink showcase) leads with four bolded categories: CLI-to-CLI orchestration, 75+ providers via opencode, 2000+ auto-discovered models, and production reliability. The former "Differences from PAL MCP" section is renamed to "PAL vs Unison: full comparison" and rewritten as a 9-row table that adds previously-omitted differentiators (clink orchestration, clink read-only mode, opencode provider reach, per-provider circuit breaker) and drops the cosmetic "Changelog format" and "Branding" rows. Migration-is-lossless reassurance carried in both places
 - Applied black 26.3.1 formatting to 11 pre-existing files (`simulator_tests/*.py`, several `tests/*.py`, `utils/sqlite_storage.py`) — surfaced by CI once the wheel-packaging fix added `push: main` to the test workflow. Pure mechanical reformat (collapsed wrapped triple-quoted string arguments; removed stray blank line between module docstring and imports); no semantic changes
 
 ### Added
