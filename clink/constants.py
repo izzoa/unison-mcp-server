@@ -59,4 +59,10 @@ INTERNAL_DEFAULTS: dict[str, CLIInternalDefaults] = {
         default_role_prompt="systemprompts/clink/default.txt",
         runner="opencode",
     ),
+    "aider": CLIInternalDefaults(
+        parser="aider_text",
+        additional_args=[],
+        default_role_prompt="systemprompts/clink/default.txt",
+        runner="aider",
+    ),
 }

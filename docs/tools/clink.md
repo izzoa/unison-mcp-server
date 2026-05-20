@@ -138,11 +138,19 @@ then codereview to verify the implementation"
 
 Clink configurations live in `conf/cli_clients/`. We ship presets for the supported CLIs:
 
-- `gemini.json` – runs `gemini --telemetry false --yolo -o json`
-- `claude.json` – runs `claude --print --output-format json --permission-mode acceptEdits --model sonnet`
-- `codex.json` – runs `codex exec --json --dangerously-bypass-approvals-and-sandbox`
+| CLI | Command | Read-only mode | Stability |
+|---|---|---|---|
+| `gemini` | `gemini --telemetry false --yolo -o json` | `--approval-mode plan` | stable |
+| `claude` | `claude --print --output-format json --permission-mode acceptEdits --model sonnet` | `--permission-mode plan` | stable |
+| `codex` | `codex exec --json --dangerously-bypass-approvals-and-sandbox` | prompt-only | stable |
+| `opencode` | `opencode --format json` | prompt-only + filesystem snapshot | stable |
+| `aider` | `aider --no-pretty --no-stream --no-auto-commits --yes-always` | `--dry-run` (native) | stable |
+
+**Stability tiers:** `stable` = proven upstream, infrequent flag changes. `evolving` = active development, flags may rev. `new` = recently released, expect changes.
 
 > **CAUTION**: These flags intentionally bypass each CLI's safety prompts so they can edit files or launch tools autonomously via MCP. Only enable them in trusted sandboxes and tailor role prompts or CLI configs if you need more guardrails.
+
+> **Aider notes:** Auto-commits are disabled (`--no-auto-commits`) so clink-spawned Aider invocations never create git commits as a side effect. The prompt is delivered via `--message-file` (Aider has no stdin scripting mode). Bookkeeping files Aider creates (`.aider.chat.history.md`, `.aider.input.history`, `.aider.tags.cache.v4/`) are classified as `by_cli_bookkeeping` in `read_only_violations` metadata, not as model writes.
 
 Each preset points to role-specific prompts in `systemprompts/clink/`. Duplicate those files to add more roles or adjust CLI flags.
 
@@ -163,7 +171,9 @@ Ensure the relevant CLI is installed and configured:
 
 - [Claude Code](https://www.anthropic.com/claude-code)
 - [Gemini CLI](https://github.com/google-gemini/gemini-cli)
-- [Codex CLI](https://docs.sourcegraph.com/codex)
+- [Codex CLI](https://github.com/openai/codex)
+- [opencode](https://opencode.ai)
+- [Aider](https://aider.chat) — install with `pip install aider-chat` (or `pipx install aider-chat`). Aider uses standard provider API keys (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, etc.) from the environment; clink does not manage Aider's auth.
 
 ## Related Guides
 
