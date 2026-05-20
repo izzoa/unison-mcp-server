@@ -190,6 +190,8 @@ module = [
     "clink.parsers.opencode",
     "clink.agents.aider",
     "clink.parsers.aider",
+    "clink.agents.crush",
+    "clink.parsers.crush",
     "build_mockups",
 ]
 follow_imports = "normal"

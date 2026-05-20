@@ -65,4 +65,10 @@ INTERNAL_DEFAULTS: dict[str, CLIInternalDefaults] = {
         default_role_prompt="systemprompts/clink/default.txt",
         runner="aider",
     ),
+    "crush": CLIInternalDefaults(
+        parser="crush_text",
+        additional_args=[],
+        default_role_prompt="systemprompts/clink/default.txt",
+        runner="crush",
+    ),
 }
