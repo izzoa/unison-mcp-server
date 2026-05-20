@@ -3,21 +3,27 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
 import shlex
 import shutil
 import tempfile
 import time
-from collections.abc import Sequence
-from dataclasses import dataclass
+from collections.abc import Callable, Sequence
+from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
-from clink.constants import DEFAULT_STREAM_LIMIT
+from clink.constants import CLINK_DEPTH_ENV_VAR, DEFAULT_STREAM_LIMIT
 from clink.models import ResolvedCLIClient, ResolvedCLIRole
 from clink.parsers import BaseParser, ParsedCLIResponse, ParserError, get_parser
 
 logger = logging.getLogger("clink.agent")
+
+
+def _noop_cleanup() -> None:
+    """Cleanup function used for plans that don't need post-execution work."""
 
 
 @dataclass
@@ -32,6 +38,35 @@ class AgentOutput:
     duration_seconds: float
     parser_name: str
     output_file_content: str | None = None
+
+
+@dataclass(frozen=True)
+class InvocationPlan:
+    """Describes how to deliver the prompt + attachments to the spawned CLI.
+
+    Constructed by :meth:`BaseCLIAgent.prepare_invocation` and consumed by
+    :meth:`BaseCLIAgent.run` to dispatch transport-layer details that vary
+    across CLIs. Supported kinds:
+
+    - ``stdin`` (default): write the prompt to subprocess stdin (current
+      behavior for Claude/Codex/Gemini/opencode).
+    - ``argv``: append the prompt as a command-line argument, optionally
+      preceded by ``flag`` (e.g. ``flag="--prompt"``).
+    - ``message_file``: write the prompt to a temporary file and append
+      ``flag <path>`` to the command (required for ``flag``). Used by Aider
+      via ``--message-file``.
+    - ``stream_json``: serialize prompt + images to a JSON message envelope
+      and write to subprocess stdin. Used by Amp via ``--stream-json``.
+
+    ``extra_payload`` carries kind-specific overrides — subclasses may stash
+    structured fields here when the default serialization isn't enough (e.g.
+    a custom Amp stream-json schema). The base materializer ignores keys it
+    doesn't recognize.
+    """
+
+    kind: str
+    flag: str | None = None
+    extra_payload: dict[str, Any] = field(default_factory=dict)
 
 
 class CLIAgentError(RuntimeError):
@@ -80,6 +115,26 @@ class BaseCLIAgent:
         verification for unknown CLIs.
         """
         return []
+
+    def prepare_invocation(
+        self,
+        prompt: str,
+        files: Sequence[str],
+        images: Sequence[str],
+    ) -> InvocationPlan:
+        """Return how to deliver ``prompt`` + ``files``/``images`` to the CLI.
+
+        The default implementation returns ``InvocationPlan(kind="stdin")``
+        which preserves the historical behavior of writing the prompt to
+        subprocess stdin and ignoring ``files`` / ``images`` (the tool layer
+        embeds those into ``prompt`` before calling ``run``).
+
+        Subclasses override this when their CLI requires a different
+        transport — e.g. Aider's ``--message-file`` needs ``kind="message_file"``,
+        Amp's image input needs ``kind="stream_json"``.
+        """
+        _ = (prompt, files, images)
+        return InvocationPlan(kind="stdin")
 
     def render_model_args(self, model: str) -> list[str]:
         """Return the argv fragment that conveys ``model`` to this CLI.
@@ -144,9 +199,6 @@ class BaseCLIAgent:
         read_only: bool = False,
         model: str | None = None,
     ) -> AgentOutput:
-        # Files and images are already embedded into the prompt by the tool; they are
-        # accepted here only to keep parity with SimpleTool callers.
-        _ = (files, images)
         # The runner simply executes the configured CLI command for the selected role.
         command = self._build_command(role=role, system_prompt=system_prompt, model=model)
         env = self._build_environment()
@@ -190,6 +242,16 @@ class BaseCLIAgent:
             command_with_output_flag.extend(shlex.split(rendered_flag))
             sanitized_command = list(command_with_output_flag)
 
+        # Materialize the invocation plan: stdin / argv / message_file / stream_json.
+        # The default plan is "stdin" which preserves the historical behavior
+        # (write the prompt to subprocess stdin). Subclasses override
+        # prepare_invocation when their CLI needs a different transport.
+        plan = self.prepare_invocation(prompt, files, images)
+        extra_args, stdin_data, cleanup_plan = self._materialize_plan(plan, prompt, files, images)
+        if extra_args:
+            command_with_output_flag.extend(extra_args)
+            sanitized_command = list(command_with_output_flag)
+
         self._logger.debug("Executing CLI command: %s", " ".join(sanitized_command))
         if cwd:
             self._logger.debug("Working directory: %s", cwd)
@@ -205,11 +267,12 @@ class BaseCLIAgent:
                 env=env,
             )
         except FileNotFoundError as exc:
+            cleanup_plan()
             raise CLIAgentError(f"Executable not found for CLI '{self.client.name}': {exc}") from exc
 
         try:
             stdout_bytes, stderr_bytes = await asyncio.wait_for(
-                process.communicate(prompt.encode("utf-8")),
+                process.communicate(stdin_data),
                 timeout=self.client.timeout_seconds,
             )
         except asyncio.TimeoutError as exc:
@@ -219,6 +282,8 @@ class BaseCLIAgent:
                 f"CLI '{self.client.name}' timed out after {self.client.timeout_seconds} seconds",
                 returncode=None,
             ) from exc
+        finally:
+            cleanup_plan()
 
         duration = time.monotonic() - start_time
         return_code = process.returncode
@@ -298,7 +363,97 @@ class BaseCLIAgent:
     def _build_environment(self) -> dict[str, str]:
         env = os.environ.copy()
         env.update(self.client.env)
+        # Propagate the clink recursion depth (incremented by one) so that any
+        # CLI we spawn — if it itself re-invokes Unison via MCP — trips the
+        # recursion guard in CLinkTool.execute() at the child process
+        # boundary. See clink-multi-cli-infrastructure spec.
+        current_depth = self._read_recursion_depth(env)
+        env[CLINK_DEPTH_ENV_VAR] = str(current_depth + 1)
         return env
+
+    @staticmethod
+    def _read_recursion_depth(env: dict[str, str]) -> int:
+        """Parse ``UNISON_CLINK_DEPTH`` from ``env``; default 0 if absent or invalid."""
+        raw = env.get(CLINK_DEPTH_ENV_VAR, "")
+        if not raw:
+            return 0
+        try:
+            return int(raw)
+        except ValueError:
+            return 0
+
+    def _materialize_plan(
+        self,
+        plan: InvocationPlan,
+        prompt: str,
+        files: Sequence[str],
+        images: Sequence[str],
+    ) -> tuple[list[str], bytes, Callable[[], None]]:
+        """Convert an :class:`InvocationPlan` into ``(extra_args, stdin_bytes, cleanup)``.
+
+        - ``stdin``: no extra args, prompt over stdin (current behavior).
+        - ``argv``: prompt as a positional argument, optionally preceded by ``flag``.
+        - ``message_file``: prompt written to a tempfile, ``flag <path>`` appended
+          to the command, no stdin data. ``cleanup`` unlinks the tempfile.
+        - ``stream_json``: prompt + images serialized into a default JSON envelope
+          and written to stdin. Subclasses can override ``prepare_invocation`` to
+          stash a fully custom payload in ``plan.extra_payload['serialized']``
+          (bytes) when the default envelope doesn't match the CLI's schema.
+        """
+        if plan.kind == "stdin":
+            return ([], prompt.encode("utf-8"), _noop_cleanup)
+
+        if plan.kind == "argv":
+            args: list[str] = []
+            if plan.flag:
+                args.append(plan.flag)
+            args.append(prompt)
+            return (args, b"", _noop_cleanup)
+
+        if plan.kind == "message_file":
+            if not plan.flag:
+                raise CLIAgentError(
+                    f"InvocationPlan kind='message_file' requires a 'flag' "
+                    f"(CLI '{self.client.name}' returned a plan without one)"
+                )
+            fd, tmp_path = tempfile.mkstemp(prefix="clink-msg-", suffix=".txt")
+            try:
+                os.write(fd, prompt.encode("utf-8"))
+            finally:
+                os.close(fd)
+
+            def _cleanup_tempfile() -> None:
+                try:
+                    os.unlink(tmp_path)
+                except OSError:
+                    pass
+
+            return ([plan.flag, tmp_path], b"", _cleanup_tempfile)
+
+        if plan.kind == "stream_json":
+            # Subclasses may pre-serialize a CLI-specific payload and stash
+            # the bytes in plan.extra_payload['serialized'] to override the
+            # default envelope below.
+            override = plan.extra_payload.get("serialized")
+            if override is not None:
+                if not isinstance(override, (bytes, bytearray)):
+                    raise CLIAgentError(
+                        f"InvocationPlan.extra_payload['serialized'] must be bytes; " f"got {type(override).__name__}"
+                    )
+                return ([], bytes(override), _noop_cleanup)
+            payload: dict[str, Any] = {
+                "messages": [{"role": "user", "content": prompt}],
+            }
+            if files:
+                payload["files"] = list(files)
+            if images:
+                payload["images"] = list(images)
+            return ([], json.dumps(payload).encode("utf-8"), _noop_cleanup)
+
+        raise CLIAgentError(
+            f"Unknown InvocationPlan kind '{plan.kind}' from CLI '{self.client.name}'. "
+            f"Allowed: stdin, argv, message_file, stream_json."
+        )
 
     # ------------------------------------------------------------------
     # Error recovery hooks

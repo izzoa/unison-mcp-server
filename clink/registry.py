@@ -127,7 +127,13 @@ class ClinkRegistry:
         normalized_name = raw.name.strip()
         internal_defaults = INTERNAL_DEFAULTS.get(normalized_name.lower())
         if internal_defaults is None:
-            raise RegistryLoadError(f"CLI '{raw.name}' is not supported by clink")
+            known = ", ".join(sorted(INTERNAL_DEFAULTS.keys()))
+            raise RegistryLoadError(
+                f"CLI '{raw.name}' (manifest at {source_path}) is not registered. "
+                f"Known CLIs: {known}. To add a new CLI, register it in "
+                f"clink/constants.py (INTERNAL_DEFAULTS), clink/agents/__init__.py "
+                f"(agent factory), and clink/parsers/__init__.py (parser registry)."
+            )
 
         executable = self._resolve_executable(raw, internal_defaults, source_path)
 
