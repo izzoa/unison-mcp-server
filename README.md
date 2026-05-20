@@ -5,7 +5,12 @@
   <em>Unison - Providers Together</em><br />
   <sub><a href="docs/name-change.md">Formerly known as Zen MCP</a></sub>
 
-  [Unison in action](https://github.com/user-attachments/assets/0d26061e-5f21-4ab1-b7d0-f883ddc2c3da)
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/mockups/hero-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="docs/assets/mockups/hero-light.svg">
+    <img alt="Unison hero: O3 debugs a race condition while Gemini Pro validates the fix, both sharing one continuation thread"
+         src="docs/assets/mockups/hero-dark.svg" width="820">
+  </picture>
 
 👉 **[Watch more examples](#-watch-tools-in-action)**
 
@@ -35,6 +40,15 @@ Unison forks [BeehiveInnovations/pal-mcp-server](https://github.com/BeehiveInnov
 ---
 
 ## 🆕 Now with CLI-to-CLI Bridge
+
+<div align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/mockups/clink-subagent-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="docs/assets/mockups/clink-subagent-light.svg">
+    <img alt="clink subagent: codex spawns a claude codereviewer in an isolated read-only context, audits auth/, returns findings without polluting the codex context window"
+         src="docs/assets/mockups/clink-subagent-dark.svg" width="820">
+  </picture>
+</div>
 
 The new **[`clink`](docs/tools/clink.md)** (CLI + Link) tool connects external AI CLIs directly into your workflow:
 
@@ -433,32 +447,41 @@ DISABLED_TOOLS=
 <details>
 <summary><b>Chat Tool</b> - Collaborative decision making and multi-turn conversations</summary>
 
-**Picking Redis vs Memcached:**
-
-[Chat Redis or Memcached_web.webm](https://github.com/user-attachments/assets/41076cfe-dd49-4dfc-82f5-d7461b34705d)
-
-**Multi-turn conversation with continuation:**
-
-[Chat With Gemini_web.webm](https://github.com/user-attachments/assets/37bd57ca-e8a6-42f7-b5fb-11de271e95db)
+<div align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/mockups/gallery-chat-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="docs/assets/mockups/gallery-chat-light.svg">
+    <img alt="chat: Gemini Pro recommends Redis over Memcached for session storage, then O3 picks up the same thread to discuss cluster-mode tradeoffs without re-explanation"
+         src="docs/assets/mockups/gallery-chat-dark.svg" width="820">
+  </picture>
+</div>
 
 </details>
 
 <details>
 <summary><b>Consensus Tool</b> - Multi-model debate and decision making</summary>
 
-**Multi-model consensus debate:**
-
-[Unison Consensus Debate](https://github.com/user-attachments/assets/76a23dd5-887a-4382-9cf0-642f5cf6219e)
+<div align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/mockups/gallery-consensus-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="docs/assets/mockups/gallery-consensus-light.svg">
+    <img alt="consensus: gpt-5 votes for postgres, gemini-pro against, grok-4 neutral; Unison synthesizes a recommendation to stay on sqlite until p99 write latency exceeds 100ms"
+         src="docs/assets/mockups/gallery-consensus-dark.svg" width="820">
+  </picture>
+</div>
 
 </details>
 
 <details>
 <summary><b>PreCommit Tool</b> - Comprehensive change validation</summary>
 
-**Pre-commit validation workflow:**
-
 <div align="center">
-  <img src="https://github.com/user-attachments/assets/584adfa6-d252-49b4-b5b0-0cd6e97fb2c6" width="950">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/mockups/gallery-precommit-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="docs/assets/mockups/gallery-precommit-light.svg">
+    <img alt="precommit: Gemini Pro scans a staged auth fix, confirms tests cover the lockf path, and blocks the push because session.py:88 still leaks a session token in a log statement"
+         src="docs/assets/mockups/gallery-precommit-dark.svg" width="820">
+  </picture>
 </div>
 
 </details>
@@ -466,26 +489,54 @@ DISABLED_TOOLS=
 <details>
 <summary><b>API Lookup Tool</b> - Current vs outdated API documentation</summary>
 
-**Without Unison - outdated APIs:**
+**Without Unison — stale prompt-caching shape, outdated model ID:**
 
-[API without Unison](https://github.com/user-attachments/assets/01a79dc9-ad16-4264-9ce1-76a56c3580ee)
+<div align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/mockups/gallery-api-lookup-before-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="docs/assets/mockups/gallery-api-lookup-before-light.svg">
+    <img alt="without Unison: claude answers from training data, suggests the old cache_control-on-request shape with claude-3-5-sonnet-20240620, both stale"
+         src="docs/assets/mockups/gallery-api-lookup-before-dark.svg" width="820">
+  </picture>
+</div>
 
-**With Unison - current APIs:**
+**With Unison — apilookup fetches current docs in a sub-process:**
 
-[API with Unison](https://github.com/user-attachments/assets/5c847326-4b66-41f7-8f30-f380453dce22)
+<div align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/mockups/gallery-api-lookup-after-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="docs/assets/mockups/gallery-api-lookup-after-light.svg">
+    <img alt="with Unison: apilookup fetches anthropic.com docs in a sub-process at zero context cost, returns the current cache_control-on-content-block shape with the latest Claude model ID"
+         src="docs/assets/mockups/gallery-api-lookup-after-dark.svg" width="820">
+  </picture>
+</div>
 
 </details>
 
 <details>
 <summary><b>Challenge Tool</b> - Critical thinking vs reflexive agreement</summary>
 
-**Without Unison:**
+**Without Unison — reflexive agreement:**
 
-![without_pal@2x](https://github.com/user-attachments/assets/64f3c9fb-7ca9-4876-b687-25e847edfd87)
+<div align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/mockups/gallery-challenge-before-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="docs/assets/mockups/gallery-challenge-before-light.svg">
+    <img alt="without Unison: claude agrees the user_id index can be dropped without verifying the premise, even confidently estimating an INSERT speedup"
+         src="docs/assets/mockups/gallery-challenge-before-dark.svg" width="820">
+  </picture>
+</div>
 
-**With Unison:**
+**With Unison — pushback with concrete checks:**
 
-![with_pal@2x](https://github.com/user-attachments/assets/9d72f444-ba53-4ab1-83e5-250062c6ee70)
+<div align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/mockups/gallery-challenge-after-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="docs/assets/mockups/gallery-challenge-after-light.svg">
+    <img alt="with Unison: challenge tool pushes back, asks for pg_stat_user_indexes scans, foreign-key dependencies, and ORDER BY patterns before dropping the index"
+         src="docs/assets/mockups/gallery-challenge-after-dark.svg" width="820">
+  </picture>
+</div>
 
 </details>
 

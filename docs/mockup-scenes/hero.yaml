@@ -1,0 +1,32 @@
+id: hero
+title: ~/myapp — claude code
+description: |
+  Unison orchestrating two models in one conversation thread: O3 debugs a
+  race condition in concurrent_writer.py, then Gemini Pro validates the
+  proposed lockf() fix while inheriting O3's analysis. Both models share
+  continuation thread 8f3e2a so Gemini does not re-read the file.
+width: 820
+lines:
+  - { kind: prompt, text: "debug this race condition with o3, then have gemini pro validate the fix before I commit" }
+  - { kind: blank }
+  - kind: tool_call
+    spinner: "⠋"
+    name: "unison · debug"
+    meta: ["o3", "thread 8f3e2a"]
+  - kind: tree
+    items:
+      - "walking concurrent_writer.py  847 LOC"
+      - "hypothesis: TOCTOU on fd between line 231→234"
+      - { text: "confidence: high", color: success }
+  - { kind: blank }
+  - kind: tool_call
+    spinner: "⠙"
+    name: "unison · precommit"
+    meta: ["gemini-2.5-pro", "↳ same thread"]
+  - kind: tree
+    items:
+      - "inheriting o3's debug context — no re-read"
+      - "proposed lockf() fix verified against burst-load"
+      - { text: "✓ safe to commit", color: success }
+  - { kind: blank }
+  - { kind: status, icon: "◆", text: "Two models, one thread, one commit-ready fix.", color: accent }

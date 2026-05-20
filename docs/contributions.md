@@ -178,6 +178,23 @@ See our detailed guide: [Adding a New Tool](./adding_tools.md)
 3. Update documentation if behavior changes
 4. Add simulator tests for new functionality
 
+#### Updating README Mockups
+
+The terminal-style demos in `README.md` (hero, clink section, gallery) are
+generated from YAML scene files, not hand-edited SVG. To change a demo:
+
+1. Edit the relevant `docs/mockup-scenes/<scene-id>.yaml` (or add a new one).
+   The schema is documented in [`docs/mockup-scenes/README.md`](../docs/mockup-scenes/README.md).
+2. Regenerate the SVGs:
+   ```bash
+   python scripts/build_mockups.py
+   ```
+3. Commit both the YAML and the regenerated `docs/assets/mockups/<scene-id>-{light,dark}.svg`.
+
+`code_quality_checks.sh` and CI run a drift check that fails if the
+checked-in SVGs disagree with the YAML — so forgetting step 2 will be caught
+before review.
+
 ### 6. Documentation Standards
 
 - Update README.md for user-facing changes

@@ -1,0 +1,26 @@
+id: gallery-consensus
+title: ~/myapp — claude code
+description: |
+  Three models debate a database migration in parallel via the consensus
+  tool. Each model takes a stance (for postgres, against, neutral) and
+  Unison synthesizes a recommendation with a concrete trigger condition.
+width: 820
+lines:
+  - { kind: prompt, text: "unison consensus — postgres now, or sqlite another quarter?" }
+  - { kind: blank }
+  - kind: tool_call
+    spinner: "⚖"
+    name: "unison · consensus"
+    meta: ["3 models in parallel"]
+  - { kind: blank }
+  - { kind: output, text: "  gpt-5         for postgres", color: success }
+  - { kind: output, text: "                \"write throughput will exceed sqlite in ~8wks\"" }
+  - { kind: blank }
+  - { kind: output, text: "  gemini-pro    against postgres", color: error }
+  - { kind: output, text: "                \"ops overhead outweighs current scale needs\"" }
+  - { kind: blank }
+  - { kind: output, text: "  grok-4        neutral", color: muted }
+  - { kind: output, text: "                \"depends on burst-write patterns, not RPS\"" }
+  - { kind: blank }
+  - { kind: status, icon: "►", text: "synthesis: stay on sqlite. trigger migration when p99 write", color: accent }
+  - { kind: output, text: "             latency > 100ms sustained for 24h.", color: accent }

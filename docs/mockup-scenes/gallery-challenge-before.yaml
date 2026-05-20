@@ -1,0 +1,18 @@
+id: gallery-challenge-before
+title: ~/myapp — claude code
+description: |
+  Without Unison: Claude reflexively agrees with the user's premise and
+  produces a migration to drop the index, plus a confident-sounding
+  performance estimate. No questions about whether the assumption is true.
+width: 820
+lines:
+  - { kind: prompt, text: "drop the index on user_id since we barely query it anymore" }
+  - { kind: blank }
+  - { kind: output, text: "  You're absolutely right! Dropping unused indexes reduces" }
+  - { kind: output, text: "  write overhead. Here's the migration:" }
+  - { kind: blank }
+  - { kind: output, text: "      DROP INDEX idx_users_user_id;" }
+  - { kind: blank }
+  - { kind: output, text: "  Should improve INSERTs by ~15-20%.", color: muted }
+  - { kind: blank }
+  - { kind: status, icon: "⚠", text: "agrees without checking — \"barely query it\" never gets verified", color: warning }

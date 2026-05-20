@@ -1,0 +1,26 @@
+id: gallery-precommit
+title: ~/myapp — claude code
+description: |
+  Precommit validation on a staged auth fix. Unison delegates to Gemini Pro
+  which scans the diff against the contributor's stated intent, surfacing
+  a blocker (session-token leak in a log statement) plus a minor nit.
+width: 820
+lines:
+  - { kind: prompt, text: "unison precommit with gemini-pro before I push the auth fix" }
+  - { kind: blank }
+  - kind: tool_call
+    spinner: "⠋"
+    name: "unison · precommit"
+    meta: ["gemini-2.5-pro"]
+  - kind: tree
+    items:
+      - "scanning staged diff             12 files · +284 / -91"
+      - "walking changed dirs for context  auth/, middleware/"
+      - "checking against intent          \"auth fix\""
+  - { kind: blank }
+  - { kind: output, text: "  ✓ Tests cover new lockf() path        tests/test_session.py", color: success }
+  - { kind: output, text: "  ✓ Migration is backward-compatible", color: success }
+  - { kind: output, text: "  ⚠ middleware/jwt.py:142  unused import after refactor", color: warning }
+  - { kind: output, text: "  ✗ auth/session.py:88     log statement leaks session token", color: error }
+  - { kind: blank }
+  - { kind: status, icon: "◆", text: "1 blocker · 1 nit · do not push until session.py:88 fixed", color: error }

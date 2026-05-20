@@ -1,0 +1,22 @@
+id: gallery-challenge-after
+title: ~/myapp — claude code + unison
+description: |
+  With Unison: the challenge tool pushes back on the user's premise with
+  three concrete things to verify before dropping the index — index scan
+  stats, foreign-key usage, and silent sort-merge dependencies.
+width: 820
+lines:
+  - { kind: prompt, text: "drop the index on user_id  — challenge this" }
+  - { kind: blank }
+  - kind: tool_call
+    spinner: "⠋"
+    name: "unison · challenge"
+    meta: []
+  - { kind: blank }
+  - { kind: output, text: "  Hold on. \"Barely query it\" is a vibe, not a measurement:", color: accent }
+  - { kind: blank }
+  - { kind: output, text: "   1. pg_stat_user_indexes.idx_scan over last 30 days?" }
+  - { kind: output, text: "   2. Foreign keys referencing users.id silently use it" }
+  - { kind: output, text: "   3. ORDER BY user_id triggers sort-merge use" }
+  - { kind: blank }
+  - { kind: status, icon: "◆", text: "If idx_scan ≥ a few/day, dropping it is a regression.", color: accent }
