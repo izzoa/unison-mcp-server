@@ -71,4 +71,10 @@ INTERNAL_DEFAULTS: dict[str, CLIInternalDefaults] = {
         default_role_prompt="systemprompts/clink/default.txt",
         runner="crush",
     ),
+    "amp": CLIInternalDefaults(
+        parser="amp_jsonl",
+        additional_args=[],
+        default_role_prompt="systemprompts/clink/default.txt",
+        runner="amp",
+    ),
 }

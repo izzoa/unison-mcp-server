@@ -5,6 +5,7 @@ from __future__ import annotations
 from clink.models import ResolvedCLIClient
 
 from .aider import AiderAgent
+from .amp import AmpAgent
 from .base import AgentOutput, BaseCLIAgent, CLIAgentError
 from .claude import ClaudeAgent
 from .codex import CodexAgent
@@ -19,6 +20,7 @@ _AGENTS: dict[str, type[BaseCLIAgent]] = {
     "opencode": OpencodeAgent,
     "aider": AiderAgent,
     "crush": CrushAgent,
+    "amp": AmpAgent,
 }
 
 
