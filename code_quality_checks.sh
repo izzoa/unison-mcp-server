@@ -107,7 +107,8 @@ if [[ -n "$MYPY" ]]; then
         scripts/smoke_test_wheel.py scripts/build_mockups.py \
         clink/agents/opencode.py clink/parsers/opencode.py \
         clink/agents/aider.py clink/parsers/aider.py \
-        clink/agents/crush.py clink/parsers/crush.py
+        clink/agents/crush.py clink/parsers/crush.py \
+        clink/agents/amp.py clink/parsers/amp.py
     echo "✅ Step 1b Complete: Type checking passed!"
 fi
 echo ""
