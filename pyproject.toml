@@ -194,6 +194,8 @@ module = [
     "clink.parsers.crush",
     "clink.agents.amp",
     "clink.parsers.amp",
+    "clink.agents.copilot",
+    "clink.parsers.copilot",
     "build_mockups",
 ]
 follow_imports = "normal"

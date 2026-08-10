@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **GitHub Copilot CLI is now a clink target** (`cli_name="copilot"`). Invoked non-interactively by piping the prompt to stdin — no `-p` flag — which keeps prompts with embedded file contents off argv and away from the `ARG_MAX` ceiling. Output is parsed from `--output-format json` JSONL, selecting on `assistant.message` events and excluding messages from subagents spawned via Copilot's `task` tool (those carry `agentId` on the envelope and `parentToolCallId` in `data`). Supports runtime model selection via `--model` and native image/PDF attachments via repeated `--attachment` flags, including base64 blobs materialized to temporary files.
+- **Copilot read-only mode is fail-closed.** `read_only=true` restricts the model's tool schema with `--available-tools view,grep,glob` rather than denylisting known-dangerous tools, so a tool added by a future Copilot release is excluded by default instead of silently permitted. Verified against CLI 1.0.78 that this reduces the schema from 23 tools to exactly 3 — and that it also removes MCP server tools (5 `github-mcp-server-*` tools disappeared alongside the native ones), so no separate MCP handling is needed. `--deny-tool write` / `--deny-tool shell` back it up as a second layer. Note this is application-level enforcement, not an OS sandbox like Codex's `--sandbox read-only`.
+- **`InvocationPlan.extra_args`** lets a clink agent contribute per-request argv fragments regardless of transport kind. The `stdin` materializer previously contributed no argv at all, making per-request flags impossible for any stdin-transport CLI. Defaults to empty, so command construction for all seven existing agents is byte-identical.
+
 ### Changed
 
 - **BREAKING: `clink` now requires `cli_name` when more than one CLI is configured.** The generated tool schema has always marked the field required in that case, but nothing enforced it — the Pydantic field was optional and an omitted value silently fell back to a hardcoded `gemini` preference. Requests that omit `cli_name` in a multi-CLI deployment now fail with an error enumerating the configured clients instead of dispatching somewhere the caller did not ask for. A single-CLI deployment may still omit the field. Note the previous fallback also contradicted the field's own documentation, which promised "the first configured CLI".

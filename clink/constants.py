@@ -77,4 +77,26 @@ INTERNAL_DEFAULTS: dict[str, CLIInternalDefaults] = {
         default_role_prompt="systemprompts/clink/default.txt",
         runner="amp",
     ),
+    # Copilot invariants, all required rather than cosmetic:
+    #   --output-format json  Copilot defaults to prose; without this the
+    #                         JSONL parser receives text and fails.
+    #   --allow-all-tools     required for non-interactive mode; without it the
+    #                         process blocks on an approval prompt until the
+    #                         clink timeout. Read-only denials still outrank it.
+    #   --no-auto-update      Copilot self-updates by default outside CI, which
+    #                         would let the binary change mid-session.
+    "copilot": CLIInternalDefaults(
+        parser="copilot_jsonl",
+        additional_args=[
+            "--output-format",
+            "json",
+            "--allow-all-tools",
+            "--no-color",
+            "--log-level",
+            "none",
+            "--no-auto-update",
+        ],
+        default_role_prompt="systemprompts/clink/default.txt",
+        runner="copilot",
+    ),
 }

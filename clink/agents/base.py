@@ -89,11 +89,19 @@ class InvocationPlan:
     structured fields here when the default serialization isn't enough (e.g.
     a custom Amp stream-json schema). The base materializer ignores keys it
     doesn't recognize.
+
+    ``extra_args`` carries argv fragments the plan contributes regardless of
+    its transport kind, emitted before whatever argv the kind itself adds.
+    Without it, a CLI whose prompt arrives over stdin could not contribute
+    per-request flags at all — the ``stdin`` branch adds no argv — which is
+    what Copilot's repeated ``--attachment <path>`` pairs need. Defaults to
+    empty so every existing agent's command construction is byte-identical.
     """
 
     kind: str
     flag: str | None = None
     extra_payload: dict[str, Any] = field(default_factory=dict)
+    extra_args: list[str] = field(default_factory=list)
 
 
 class CLIAgentError(RuntimeError):
@@ -476,7 +484,7 @@ class BaseCLIAgent:
     ) -> tuple[list[str], bytes, Callable[[], None]]:
         """Convert an :class:`InvocationPlan` into ``(extra_args, stdin_bytes, cleanup)``.
 
-        - ``stdin``: no extra args, prompt over stdin (current behavior).
+        - ``stdin``: prompt over stdin (current behavior).
         - ``argv``: prompt as a positional argument, optionally preceded by ``flag``.
         - ``message_file``: prompt written to a tempfile, ``flag <path>`` appended
           to the command, no stdin data. ``cleanup`` unlinks the tempfile.
@@ -484,12 +492,19 @@ class BaseCLIAgent:
           and written to stdin. Subclasses can override ``prepare_invocation`` to
           stash a fully custom payload in ``plan.extra_payload['serialized']``
           (bytes) when the default envelope doesn't match the CLI's schema.
+
+        ``plan.extra_args`` is prepended to whatever argv the kind contributes,
+        for every kind. Emitting it first keeps flags ahead of the positional
+        prompt under the ``argv`` kind; with the default empty list the returned
+        argv is unchanged for every existing agent.
         """
+        leading = list(plan.extra_args)
+
         if plan.kind == "stdin":
-            return ([], prompt.encode("utf-8"), _noop_cleanup)
+            return (leading, prompt.encode("utf-8"), _noop_cleanup)
 
         if plan.kind == "argv":
-            args: list[str] = []
+            args: list[str] = leading
             if plan.flag:
                 args.append(plan.flag)
             args.append(prompt)
@@ -513,7 +528,7 @@ class BaseCLIAgent:
                 except OSError:
                     pass
 
-            return ([plan.flag, tmp_path], b"", _cleanup_tempfile)
+            return (leading + [plan.flag, tmp_path], b"", _cleanup_tempfile)
 
         if plan.kind == "stream_json":
             # Subclasses may pre-serialize a CLI-specific payload and stash
@@ -525,7 +540,7 @@ class BaseCLIAgent:
                     raise CLIAgentError(
                         f"InvocationPlan.extra_payload['serialized'] must be bytes; " f"got {type(override).__name__}"
                     )
-                return ([], bytes(override), _noop_cleanup)
+                return (leading, bytes(override), _noop_cleanup)
             payload: dict[str, Any] = {
                 "messages": [{"role": "user", "content": prompt}],
             }
@@ -533,7 +548,7 @@ class BaseCLIAgent:
                 payload["files"] = list(files)
             if images:
                 payload["images"] = list(images)
-            return ([], json.dumps(payload).encode("utf-8"), _noop_cleanup)
+            return (leading, json.dumps(payload).encode("utf-8"), _noop_cleanup)
 
         raise CLIAgentError(
             f"Unknown InvocationPlan kind '{plan.kind}' from CLI '{self.client.name}'. "
