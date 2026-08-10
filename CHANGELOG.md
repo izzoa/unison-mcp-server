@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`code_quality_checks.sh` reformatted unrelated files on every run.** Tool paths were all gated on a single `.unison_venv/bin/ruff` existence check, so a venv holding some tools but not ruff sent every tool to whatever was on `PATH` — resolving `black` to a system copy two major versions behind the one CI installs. Each local run then reverted files CI considered correctly formatted, producing recurring churn in `utils/sqlite_storage.py` and three test modules. Each tool is now resolved independently.
+
 ### Added
 
 - **GitHub Copilot CLI is now a clink target** (`cli_name="copilot"`). Invoked non-interactively by piping the prompt to stdin — no `-p` flag — which keeps prompts with embedded file contents off argv and away from the `ARG_MAX` ceiling. Output is parsed from `--output-format json` JSONL, selecting on `assistant.message` events and excluding messages from subagents spawned via Copilot's `task` tool (those carry `agentId` on the envelope and `parentToolCallId` in `data`). Supports runtime model selection via `--model` and native image/PDF attachments via repeated `--attachment` flags, including base64 blobs materialized to temporary files.

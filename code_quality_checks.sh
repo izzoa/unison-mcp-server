@@ -48,18 +48,24 @@ else
     echo "✅ Development dependencies already installed"
 fi
 
-# Set tool paths
-if [[ -f ".unison_venv/bin/ruff" ]]; then
-    RUFF=".unison_venv/bin/ruff"
-    BLACK=".unison_venv/bin/black"
-    ISORT=".unison_venv/bin/isort"
-    PYTEST=".unison_venv/bin/pytest"
-else
-    RUFF="ruff"
-    BLACK="black"
-    ISORT="isort"
-    PYTEST="pytest"
-fi
+# Set tool paths, resolving each tool independently.
+#
+# This previously gated all four paths on whether .unison_venv/bin/ruff
+# existed. When the venv held some tools but not ruff, every tool fell through
+# to whatever was on PATH — including a system black that could be an older
+# major version than the one CI installs. The result was a formatting tug-of-war
+# where each local run reverted files that CI considered correctly formatted.
+pick_tool() {
+    if [[ -x ".unison_venv/bin/$1" ]]; then
+        echo ".unison_venv/bin/$1"
+    else
+        echo "$1"
+    fi
+}
+RUFF=$(pick_tool ruff)
+BLACK=$(pick_tool black)
+ISORT=$(pick_tool isort)
+PYTEST=$(pick_tool pytest)
 echo ""
 
 # Step 1: Linting and Formatting
