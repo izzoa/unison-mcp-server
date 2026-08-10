@@ -162,6 +162,18 @@ if (Test-Path ".env") {
     }
 }
 
+# Resolve the interpreter once, preferring the virtual environment, so both the
+# integration suite and the simulator run against the same environment rather
+# than whatever `python` happens to be first on PATH.
+$pythonCmd = if ($IsWindows -or $env:OS -eq "Windows_NT") {
+    if (Test-Path ".unison_venv\Scripts\python.exe") { ".unison_venv\Scripts\python.exe" } else { "python" }
+} else {
+    if (Test-Path ".unison_venv/bin/python") { ".unison_venv/bin/python" } else { "python" }
+}
+if ($pythonCmd -eq "python") {
+    Write-Emoji "⚠️" "Using 'python' from PATH - no virtual environment interpreter found" -Color Yellow
+}
+
 # Run integration tests
 Write-Emoji "🏃" "Running integration tests..." -Color Cyan
 Write-ColorText "------------------------------" -Color Cyan
@@ -169,13 +181,13 @@ Write-ColorText "------------------------------" -Color Cyan
 try {
     # Build pytest command
     $pytestArgs = @("tests/", "-v", "-m", "integration", "--tb=short")
-    
+
     if ($VerboseOutput) {
         $pytestArgs += "--verbose"
     }
-    
+
     # Run pytest
-    python -m pytest @pytestArgs
+    & $pythonCmd -m pytest @pytestArgs
     
     if ($LASTEXITCODE -ne 0) {
         throw "Integration tests failed"
@@ -197,27 +209,28 @@ if ($WithSimulator) {
     Write-ColorText "----------------------------" -Color Cyan
     
     try {
+        # Use the resolved interpreter, not a bare `python`, so the simulator
+        # runs against the same environment as the integration suite.
         if ($VerboseOutput) {
-            python communication_simulator_test.py --verbose
+            & $pythonCmd communication_simulator_test.py --verbose
         } else {
-            python communication_simulator_test.py
+            & $pythonCmd communication_simulator_test.py
         }
-        
+
         if ($LASTEXITCODE -ne 0) {
             Write-Host ""
             Write-Emoji "❌" "Simulator tests failed!" -Color Red
-            Write-ColorText "This may be due to a known issue in communication_simulator_test.py" -Color Yellow
-            Write-ColorText "Integration tests completed successfully - you can proceed." -Color Green
-        } else {
-            Write-Host ""
-            Write-Emoji "✅" "Simulator tests completed!" -Color Green
+            Write-ColorText "The simulator suite exited $LASTEXITCODE." -Color Red
+            exit 1
         }
+
+        Write-Host ""
+        Write-Emoji "✅" "Simulator tests completed!" -Color Green
     } catch {
         Write-Host ""
         Write-Emoji "❌" "Simulator tests failed!" -Color Red
         Write-ColorText "Error: $_" -Color Red
-        Write-ColorText "This may be due to a known issue in communication_simulator_test.py" -Color Yellow
-        Write-ColorText "Integration tests completed successfully - you can proceed." -Color Green
+        exit 1
     }
 }
 

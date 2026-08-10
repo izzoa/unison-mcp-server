@@ -302,10 +302,27 @@ git clone https://github.com/izzoa/unison-mcp-server.git
 cd unison-mcp-server
 
 # Handles everything: setup, config, API keys from system environment. 
-# Auto-configures Claude Desktop, Claude Code, Gemini CLI, Codex CLI, Qwen Code CLI
+# Auto-configures Claude Desktop, Claude Code, Gemini CLI, Codex CLI, Qwen Code CLI,
+# VS Code, VS Code Insiders, Cursor, Windsurf, and Trae (same host set on Windows)
 # Enable / disable additional settings in .env
 ./run-server.sh  
 ```
+
+**On Windows, use `run-server.ps1` instead — WSL is not required.** It is native PowerShell and invokes no bash.
+
+```powershell
+git clone https://github.com/izzoa/unison-mcp-server.git
+cd unison-mcp-server
+
+# Windows blocks unsigned scripts by default; allow it for this shell only
+Set-ExecutionPolicy -Scope Process -Bypass
+
+.\run-server.ps1
+```
+
+> **Requires PowerShell 7.0+.** The Windows PowerShell 5.1 that ships with Windows 10/11 cannot parse this script. Install it with `winget install --id Microsoft.PowerShell --source winget`, then run `pwsh` rather than `powershell`.
+>
+> `Set-ExecutionPolicy -Scope Process` applies to the current shell only and needs no administrator rights, but it **cannot** override a `MachinePolicy` or `UserPolicy` set by Group Policy — those take precedence. On a managed machine, contact your administrator.
 
 **Option B: Instant Setup with [uvx](https://docs.astral.sh/uv/getting-started/installation/)**
 ```json
@@ -607,7 +624,7 @@ DISABLED_TOOLS=
 - [Model Ranking Guide](docs/model_ranking.md) - How intelligence scores drive auto-mode suggestions
 
 **🔧 Setup & Support**
-- [WSL Setup](docs/wsl-setup.md) - Windows users
+- [WSL Setup](docs/wsl-setup.md) - Optional for Windows; `run-server.ps1` is native and needs no WSL
 - [Troubleshooting](docs/troubleshooting.md) - Common issues
 - [Contributing](docs/contributions.md) - Code standards, PR process
 

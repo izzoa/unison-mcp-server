@@ -7,7 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **`run-server.ps1` now declares `#Requires -Version 7.0`.** It previously declared 5.1 while using the PowerShell 7 ternary operator, and PowerShell parses a script in full before executing any of it — so on the Windows PowerShell 5.1 shipped with Windows 10/11 the script failed with an unexplained parse error rather than a version message. Windows users need PowerShell 7 (`winget install --id Microsoft.PowerShell`); they already did, they just weren't told. WSL remains unnecessary — the script is native PowerShell.
+
+### Added
+
+- **MCP host registration now covers the same hosts on every platform.** `run-server.sh` gains VS Code, VS Code Insiders, Cursor, Windsurf, and Trae registration (previously Windows-only); `run-server.ps1` gains Codex CLI registration (previously Unix-only). Both scripts now enumerate their full host set in one declarative structure — `MCP_HOST_REGISTRY` in bash, `$script:McpClientDefinitions` in PowerShell — so coverage can be compared row-for-row instead of by reading 5,000 lines of control flow. Editor registrations write the same entry shape on both platforms (`command`/`args`/`type: stdio`), clean the same legacy server names, and back up existing configs before writing.
+
 ### Fixed
+
+- **The PowerShell quality gate was weaker than the bash one.** `code_quality_checks.ps1` ran ruff, black, isort and pytest but skipped mypy on the strict allowlist, skipped the mockup-drift check, and did not enforce the coverage threshold, so a Windows contributor could see a green gate on a tree the bash gate rejects. All three are now enforced, mypy is included in the dev-tool install list, and each tool's resolution (venv vs `PATH`) is reported so a mixed toolchain is visible rather than silent.
+- **`run_integration_tests.ps1` reported success after a failed simulator run.** It printed "Simulator tests failed!" immediately followed by "Integration tests completed successfully - you can proceed" and exited zero. It now exits non-zero. It also invoked the simulator through a bare `python`; both it and the integration suite now use the resolved virtual-environment interpreter.
+- **VS Code MCP registration on Windows wrote an outdated configuration shape.** `run-server.ps1` wrote `settings.json` with an `mcp.servers` key; VS Code reads a user-profile `mcp.json` with a top-level `servers` key. VS Code Insiders in the same script was already correct — the format check is now keyed on the configured shape rather than on which client it is, so the two cannot drift apart again.
+- **Claude CLI registration on Windows only printed instructions.** `run-server.ps1` displayed the `claude mcp add` command for the user to run while `run-server.sh` performed the registration. It now registers, falling back to printing the command only if that fails.
 
 - **`code_quality_checks.sh` reformatted unrelated files on every run.** Tool paths were all gated on a single `.unison_venv/bin/ruff` existence check, so a venv holding some tools but not ruff sent every tool to whatever was on `PATH` — resolving `black` to a system copy two major versions behind the one CI installs. Each local run then reverted files CI considered correctly formatted, producing recurring churn in `utils/sqlite_storage.py` and three test modules. Each tool is now resolved independently.
 

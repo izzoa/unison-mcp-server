@@ -75,8 +75,32 @@
     Version            : See config.py (__version__)
     References         : https://github.com/izzoa/unison-mcp-server
 
+    REQUIREMENTS
+    PowerShell 7.0 or later. The Windows PowerShell 5.1 that ships with
+    Windows 10/11 cannot parse this script. Install with:
+        winget install --id Microsoft.PowerShell --source winget
+
+    WSL is NOT required. This script is native PowerShell and invokes no
+    bash, no WSL, and no Unix utilities.
+
+    EXECUTION POLICY
+    Windows blocks unsigned scripts by default, so this script may fail
+    before its first line with "running scripts is disabled on this system".
+    Allow it for the current process only:
+        Set-ExecutionPolicy -Scope Process -Bypass
+
+    A process-scoped policy expires with the shell and needs no administrator
+    rights, but it CANNOT override a MachinePolicy or UserPolicy set by Group
+    Policy — those take precedence. On a managed machine, contact your
+    administrator.
+
 #>
-#Requires -Version 5.1
+# PowerShell 7.0+ is required: this script uses the ternary operator, which
+# Windows PowerShell 5.1 cannot parse. PowerShell parses a script in full
+# before executing any of it, so declaring 5.1 here produced an unexplained
+# parse error on the interpreter shipped with Windows rather than a version
+# message. Raise this deliberately if later syntax is adopted.
+#Requires -Version 7.0
 [CmdletBinding()]
 param(
     [switch]$Help,
@@ -1048,11 +1072,16 @@ $script:McpClientDefinitions = @(
         NeedsConfigDir = $true
     },
     @{
+        # VS Code reads MCP servers from a user-profile `mcp.json` with a
+        # top-level `servers` key. This entry previously wrote `settings.json`
+        # with an `mcp.servers` key, which is the older shape — VS Code Insiders
+        # below was already updated and stable was not.
+        # https://code.visualstudio.com/docs/agent-customization/mcp-servers
         Name             = "VSCode"
         DetectionCommand = "code"
         DetectionType    = "Command"
-        ConfigPath       = "$env:APPDATA\Code\User\settings.json"
-        ConfigJsonPath   = "mcp.servers.unison"
+        ConfigPath       = "$env:APPDATA\Code\User\mcp.json"
+        ConfigJsonPath   = "servers.unison"
         IsVSCode         = $true
     },
     @{
@@ -1083,6 +1112,35 @@ $script:McpClientDefinitions = @(
         DetectionType  = "Path"
         ConfigPath     = "$env:APPDATA\Trae\User\mcp.json"
         ConfigJsonPath = "mcpServers.unison"
+    },
+    # CLI hosts. These don't follow the JSON-config pattern above; each row
+    # names its Handler function, which Invoke-McpClientConfiguration
+    # dispatches instead of Configure-McpClient. They are listed here so this
+    # table enumerates EVERY supported host - comparing coverage with
+    # run-server.sh means comparing this table against its MCP_HOST_REGISTRY.
+    @{
+        Name             = "Claude CLI"
+        DetectionCommand = "claude"
+        DetectionType    = "Command"
+        Handler          = "Test-ClaudeCliIntegration"
+    },
+    @{
+        Name             = "Gemini CLI"
+        DetectionPath    = "$env:USERPROFILE\.gemini\settings.json"
+        DetectionType    = "Path"
+        Handler          = "Test-GeminiCliIntegration"
+    },
+    @{
+        Name             = "Qwen CLI"
+        DetectionCommand = "qwen"
+        DetectionType    = "Command"
+        Handler          = "Test-QwenCliIntegration"
+    },
+    @{
+        Name             = "Codex CLI"
+        DetectionCommand = "codex"
+        DetectionType    = "Command"
+        Handler          = "Test-CodexCliIntegration"
     }
 )
 
@@ -1125,11 +1183,16 @@ function Test-McpJsonFormat {
     return $configFileName -eq "mcp.json"
 }
 
-# Check if client uses the new VS Code Insiders format (servers instead of mcpServers)
+# Check if a client uses the mcp.json format (top-level `servers` key) rather
+# than the older `mcpServers` / `mcp.servers` shapes.
+#
+# Keyed on the configured shape rather than on which client it is, so both
+# VS Code stable and Insiders are covered — they now use the same format, and
+# tying this to a client flag is what let stable drift onto the old shape.
 function Test-VSCodeInsidersFormat {
     param([hashtable]$Client)
-    
-    return $Client.IsVSCodeInsiders -eq $true -and $Client.ConfigJsonPath -eq "servers.unison"
+
+    return $Client.ConfigJsonPath -eq "servers.unison"
 }
 
 # Analyze existing MCP configuration to determine type (Python or Docker)
@@ -1496,17 +1559,20 @@ function Invoke-McpClientConfiguration {
     )
     
     Write-Step "Checking Client Integrations"
-    
-    # Configure GUI clients
+
+    # One pass over the full host table. JSON-config hosts go through
+    # Configure-McpClient; rows that declare a Handler are CLI hosts and
+    # dispatch to their handler function (all handlers share the signature
+    # PythonPath, ServerPath). CLI handlers are skipped under Docker, matching
+    # the previous behavior.
     foreach ($client in $script:McpClientDefinitions) {
+        if ($client.Handler) {
+            if (!$UseDocker) {
+                & $client.Handler $PythonPath $ServerPath
+            }
+            continue
+        }
         Configure-McpClient -Client $client -UseDocker $UseDocker -PythonPath $PythonPath -ServerPath $ServerPath
-    }
-    
-    # Handle CLI tools separately (they don't follow JSON config pattern)
-    if (!$UseDocker) {
-        Test-ClaudeCliIntegration $PythonPath $ServerPath
-        Test-GeminiCliIntegration (Split-Path $ServerPath -Parent)
-        Test-QwenCliIntegration $PythonPath $ServerPath
     }
 }
 
@@ -1528,21 +1594,35 @@ function Test-ClaudeCliIntegration {
         $claudeConfig = claude mcp list 2>$null
         if ($claudeConfig -match "unison") {
             Write-Success "Claude CLI already configured for unison server"
+            return
+        }
+
+        # Perform the registration rather than printing it for the user to run.
+        # run-server.sh registers automatically, and setup that leaves an
+        # unexecuted command on screen is not equivalent to setup that works.
+        Write-Info "Registering unison server with Claude CLI..."
+        claude mcp add -s user unison $PythonPath $ServerPath 2>$null | Out-Null
+
+        if ($LASTEXITCODE -eq 0) {
+            Write-Success "Registered unison server with Claude CLI"
         }
         else {
-            Write-Info "To add unison server to Claude CLI, run:"
+            Write-Warning "Automatic registration failed. To configure manually, run:"
             Write-Host "  claude mcp add -s user unison $PythonPath $ServerPath" -ForegroundColor Cyan
         }
     }
     catch {
-        Write-Info "To configure Claude CLI manually, run:"
+        Write-Warning "Could not query or configure Claude CLI. To configure manually, run:"
         Write-Host "  claude mcp add -s user unison $PythonPath $ServerPath" -ForegroundColor Cyan
     }
 }
 
 function Test-GeminiCliIntegration {
-    param([string]$ScriptDir)
-    
+    # Uniform registry-handler signature (PythonPath, ServerPath); this handler
+    # only needs the script directory, derived from ServerPath.
+    param([string]$PythonPath, [string]$ServerPath)
+
+    $ScriptDir = Split-Path $ServerPath -Parent
     $palWrapper = Join-Path $ScriptDir "unison-mcp-server.cmd"
     
     # Check if Gemini settings file exists (Windows path)
@@ -1901,6 +1981,118 @@ function Test-QwenCliIntegration {
 # ----------------------------------------------------------------------------
 
 # Show script help
+function Test-CodexCliIntegration {
+    # Windows counterpart of run-server.sh's check_codex_cli_integration:
+    # cleans legacy [mcp_servers.<legacy>] sections from ~/.codex/config.toml,
+    # recognises an existing unison entry, and otherwise appends one. The
+    # server entry uses the resolved interpreter + server.py (the same shape
+    # Get-PythonMcpConfig registers everywhere else on Windows) rather than the
+    # bash/uvx launcher the Unix script writes, which has no Windows equivalent.
+    param([string]$PythonPath, [string]$ServerPath)
+
+    if (!(Test-Command "codex")) {
+        return
+    }
+
+    Write-Info "Codex CLI detected - checking configuration..."
+
+    $configPath = Join-Path (Join-Path $env:USERPROFILE ".codex") "config.toml"
+
+    # TOML basic strings treat backslash as an escape, so Windows paths must be
+    # escaped before being written.
+    $escapedCommand = $PythonPath -replace '\\', '\\' -replace '"', '\"'
+    $escapedArg = $ServerPath -replace '\\', '\\' -replace '"', '\"'
+
+    if (Test-Path $configPath) {
+        # Remove legacy [mcp_servers.<legacy>] sections (and their subsections),
+        # mirroring the line-filter the Unix script applies.
+        $lines = Get-Content $configPath
+        $output = New-Object System.Collections.Generic.List[string]
+        $skip = $false
+        $removed = $false
+
+        foreach ($line in $lines) {
+            if ($line -match '^\s*\[([^\]]+)\]') {
+                $header = $matches[1].Trim()
+                $parts = $header.Split('.')
+                $isLegacy = $false
+                if ($parts.Count -ge 2 -and $parts[0] -eq 'mcp_servers') {
+                    $sectionKey = ($parts | Select-Object -Skip 1) -join '.'
+                    foreach ($name in $script:LegacyServerNames) {
+                        if ($sectionKey -eq $name -or $sectionKey.StartsWith("$name.")) {
+                            $isLegacy = $true
+                            break
+                        }
+                    }
+                }
+                $skip = $isLegacy
+                if ($isLegacy) { $removed = $true; continue }
+            }
+            if (!$skip) { $output.Add($line) }
+        }
+
+        if ($removed) {
+            Set-Content -Path $configPath -Value ($output -join "`n").TrimEnd()
+            Write-Success "Removed legacy Codex MCP entries"
+        }
+
+        if (Select-String -Path $configPath -Pattern '\[mcp_servers\.unison\]' -Quiet) {
+            Write-Success "Codex CLI already configured for unison server"
+            return
+        }
+    }
+
+    $response = Read-Host "`nConfigure Unison for Codex CLI? (y/N)"
+    if ($response -notmatch '^[Yy]') {
+        Write-Info "Skipping Codex CLI integration"
+        return
+    }
+
+    $configDir = Split-Path $configPath -Parent
+    if (!(Test-Path $configDir)) {
+        New-Item -ItemType Directory -Path $configDir -Force | Out-Null
+    }
+    if (Test-Path $configPath) {
+        $timestamp = Get-Date -Format 'yyyyMMdd_HHmmss'
+        Copy-Item $configPath "$configPath.backup_$timestamp"
+    }
+
+    $block = @(
+        ""
+        "[mcp_servers.unison]"
+        "command = `"$escapedCommand`""
+        "args = [`"$escapedArg`"]"
+        "tool_timeout_sec = 1200"
+    )
+
+    # Mirror the Unix script's env section, populated from .env when present.
+    $envLines = @()
+    if (Test-Path ".env") {
+        foreach ($line in Get-Content ".env") {
+            $trimmed = $line.Trim()
+            if ([string]::IsNullOrWhiteSpace($trimmed) -or $trimmed.StartsWith('#')) { continue }
+            if ($trimmed -match '^([^=]+)=(.*)$') {
+                $key = $matches[1].Trim()
+                $value = $matches[2].Trim() -replace '^["'']|["'']$', ''
+                if ([string]::IsNullOrWhiteSpace($value) -or $value -match '^your_.*_here$') { continue }
+                $escapedValue = $value -replace '\\', '\\' -replace '"', '\"'
+                $envLines += "$key = `"$escapedValue`""
+            }
+        }
+    }
+    if ($envLines.Count -gt 0) {
+        $block += ""
+        $block += "[mcp_servers.unison.env]"
+        $block += $envLines
+    }
+
+    Add-Content -Path $configPath -Value ($block -join "`n")
+
+    Write-Success "Successfully configured Codex CLI"
+    Write-Host "  Config: $configPath"
+    Write-Host "  Restart Codex CLI to use Unison MCP Server"
+}
+
 function Show-Help {
     Write-Host @"
 Unison MCP Server - Setup and Launch Script
