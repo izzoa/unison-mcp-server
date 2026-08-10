@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Third-party tool plugins.** `pip install` a package declaring a `BaseTool` subclass under `[project.entry-points."unison.tools"]` and it becomes a tool — the entry-point key is the tool name. The registry gains `register(name, cls)` (classes only, never instances — lazy instantiation is preserved), a `@register_tool("name")` decorator backed by a pending catalog with a startup freeze, and an opt-in import-only local scan (`UNISON_TOOL_AUTODISCOVERY=true`, default off) that excludes built-in modules *before* import so their lazy imports survive. Validation is two-stage: structural at registration (including detecting a non-overridden `BaseTool.execute`, whose inherited default only raises `NotImplementedError`); instance-level at first use, with failures **quarantining** the tool (excluded from availability, controlled error on direct access) instead of crashing the server. With no plugins and the scan flag unset, the registered tool set, schemas, dispatch, and import profile are unchanged. See `docs/plugins.md`.
+- **Opt-in structured observability.** `UNISON_JSON_LOGS=true` switches `mcp_activity.log` to single-line, schema-versioned JSON (server log stays text); `UNISON_OTEL_ENABLED=true` adds one OpenTelemetry parent span per tool invocation plus tool/provider metrics, with OTel packages as an optional extra (`pip install unison-mcp-server[observability]`) and graceful no-op fallback when absent. Provider attribution comes from shared call-site instrumentation (sync-in-thread, native async, and streaming paths) with the active tool identity carried in a `ContextVar`, aggregating tokens and models onto the parent span — `tool.model` scalar for single-model calls, `tool.models` array for consensus fan-out; the tool-call counter increments exactly once per invocation, never per provider call or retry.
+
+### Security
+
+- **One public redaction helper now guards every export surface.** The 12.0.0 `RedactingFilter` scrubbed only `record.msg`, leaving bypass channels: formatted exception text (appended after filters run — leaking in TEXT mode today) and any field-level emission. `redact_text()` is now applied to text-mode exception output, every string the JSON formatter emits (message, tool fields, nested `extra` values, exception text), and all telemetry strings — span attributes, error messages, `record_exception` content. Tool-argument span attributes export key names and counts only, never values.
+
 ### Changed
 
 - **`run-server.ps1` now declares `#Requires -Version 7.0`.** It previously declared 5.1 while using the PowerShell 7 ternary operator, and PowerShell parses a script in full before executing any of it — so on the Windows PowerShell 5.1 shipped with Windows 10/11 the script failed with an unexplained parse error rather than a version message. Windows users need PowerShell 7 (`winget install --id Microsoft.PowerShell`); they already did, they just weren't told. WSL remains unnecessary — the script is native PowerShell.

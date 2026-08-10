@@ -34,6 +34,7 @@ Unison forks [BeehiveInnovations/pal-mcp-server](https://github.com/BeehiveInnov
 - 🌐 **75+ providers through one integration.** clink + opencode routes a single call to OpenAI, Anthropic, Google, Ollama, OpenRouter, xAI, Mistral, Groq, DeepSeek, and ~70 more via `provider/model` syntax. No per-provider implementation work.
 - 🧠 **2000+ models, auto-discovered.** Every model from every authenticated provider appears at startup via [LiteLLM](https://github.com/BerriAI/litellm); a **weekly CI workflow** opens a PR with the latest catalog. Auto-mode picks the smartest available model using `intelligence_score`, not hardcoded preference lists that go stale.
 - 🛡️ **Production reliability.** Optional **SQLite conversation backend** survives restarts; a **per-provider circuit breaker** fails fast on outages so consensus doesn't hang on a dead provider.
+- 🔌 **Pip-installable tool plugins.** Third-party packages add tools via `[project.entry-points."unison.tools"]` — validated, quarantined on failure, never able to crash the server ([guide](docs/plugins.md)). Opt-in **structured observability**: JSON activity logs (`UNISON_JSON_LOGS`) and OpenTelemetry spans/metrics per tool call (`UNISON_OTEL_ENABLED`), credential-redacted end to end.
 
 **Migration is lossless** — every PAL tool, provider, and workflow is preserved. The [full PAL vs Unison comparison](#pal-vs-unison-full-comparison) below breaks down each capability.
 

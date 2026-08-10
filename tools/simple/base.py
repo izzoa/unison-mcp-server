@@ -20,6 +20,7 @@ from tools.shared.base_models import ToolRequest
 from tools.shared.base_tool import BaseTool
 from tools.shared.exceptions import ToolExecutionError
 from tools.shared.schema_builders import SchemaBuilder
+from utils.observability import instrument_generate as _instrument_generate
 
 
 class SimpleTool(BaseTool):
@@ -468,7 +469,7 @@ class SimpleTool(BaseTool):
             # than async_generate_content so callers/tests that stub the sync
             # method continue to work.
             model_response = await asyncio.to_thread(
-                provider.generate_content,
+                _instrument_generate(provider),
                 prompt=prompt,
                 model_name=self._current_model_name,
                 system_prompt=system_prompt,
@@ -526,7 +527,7 @@ class SimpleTool(BaseTool):
 
                         try:
                             retry_response = await asyncio.to_thread(
-                                provider.generate_content,
+                                _instrument_generate(provider),
                                 prompt=retry_prompt,
                                 model_name=self._current_model_name,
                                 system_prompt=system_prompt,

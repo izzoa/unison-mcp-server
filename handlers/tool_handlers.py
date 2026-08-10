@@ -15,6 +15,7 @@ from tools.models import ToolOutput
 from tools.shared.exceptions import ToolExecutionError
 from utils.env import get_env
 from utils.model_resolution import parse_model_option
+from utils.observability import tool_span
 from utils.request_helpers import get_follow_up_instructions
 
 logger = logging.getLogger(__name__)
@@ -95,8 +96,7 @@ def register(server, tool_registry):
         logger.debug("Returning %d tools to MCP client", len(tools))
         return tools
 
-    @server.call_tool()
-    async def handle_call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
+    async def _handle_call_tool_inner(name: str, arguments: dict[str, Any]) -> list[TextContent]:
         """
         Handle incoming tool execution requests from MCP clients.
 
@@ -160,7 +160,19 @@ def register(server, tool_registry):
         # Route to registered tools
         if tool_registry.is_available(name):
             logger.info("Executing tool '%s' with %d parameter(s)", name, len(arguments))
-            tool = tool_registry.get_tool_instance(name)
+            try:
+                tool = tool_registry.get_tool_instance(name)
+            except Exception as exc:
+                # A dynamic tool can be quarantined between the availability
+                # gate and here (instance-level validation runs on first
+                # instantiation). Map the controlled registry error to a
+                # tool-level response instead of surfacing a raw traceback.
+                from tools.registry import ToolQuarantinedError
+
+                if isinstance(exc, ToolQuarantinedError):
+                    logger.warning("Tool '%s' unavailable: %s", safe_name, exc.reason)
+                    return [TextContent(type="text", text=f"Tool '{name}' is unavailable: {exc.reason}")]
+                raise
 
             # EARLY MODEL RESOLUTION AT MCP BOUNDARY
             from providers.registry import get_default_registry
@@ -274,6 +286,18 @@ def register(server, tool_registry):
 
         else:
             return [TextContent(type="text", text=f"Unknown tool: {name}")]
+
+    @server.call_tool()
+    async def handle_call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
+        """MCP entry point: one parent observability span wraps the full tool lifecycle.
+
+        `tool_span` is a no-op unless UNISON_OTEL_ENABLED=true; when enabled it
+        records lifecycle attributes, aggregates provider-call token/model data
+        propagated via ContextVar, and increments the tool-call counter exactly
+        once per invocation (provider fan-out and retries never inflate it).
+        """
+        with tool_span(name, arguments):
+            return await _handle_call_tool_inner(name, arguments)
 
     return handle_list_tools, handle_call_tool
 

@@ -32,6 +32,7 @@ from mcp.types import TextContent
 
 from config import MCP_PROMPT_SIZE_LIMIT
 from utils.conversation_memory import add_turn, create_thread
+from utils.observability import instrument_generate as _instrument_generate
 
 from ..shared.base_models import ConsolidatedFindings
 from ..shared.exceptions import ToolExecutionError
@@ -1527,13 +1528,19 @@ class BaseWorkflowMixin(ABC):
             """Run the synchronous streaming generator in a worker thread, pushing
             each chunk onto the loop's queue as it is produced."""
             try:
-                for chunk in provider.generate_content_stream(
-                    prompt=prompt,
-                    model_name=model_name,
-                    system_prompt=system_prompt,
-                    temperature=temperature,
-                    thinking_mode=thinking_mode,
-                    images=images,
+                from utils.observability import instrument_stream
+
+                for chunk in instrument_stream(
+                    provider,
+                    provider.generate_content_stream(
+                        prompt=prompt,
+                        model_name=model_name,
+                        system_prompt=system_prompt,
+                        temperature=temperature,
+                        thinking_mode=thinking_mode,
+                        images=images,
+                    ),
+                    model=model_name,
                 ):
                     loop.call_soon_threadsafe(queue.put_nowait, chunk)
             except Exception as exc:  # surface to the consumer side
@@ -1658,7 +1665,7 @@ class BaseWorkflowMixin(ABC):
                 # analysis). to_thread(generate_content) keeps sync-method stubs
                 # in tests working.
                 model_response = await asyncio.to_thread(
-                    provider.generate_content,
+                    _instrument_generate(provider),
                     prompt=prompt,
                     model_name=model_name,
                     system_prompt=system_prompt,

@@ -41,6 +41,17 @@ else:
 # ---------------------------------------------------------------------------
 server: Server = Server("unison-server")
 tool_registry = ToolRegistry()
+# Load dynamic tool sources (entry-point plugins, opt-in local scan, pending
+# @register_tool decorations) before handlers are wired, then the registry is
+# frozen. With no plugins installed and UNISON_TOOL_AUTODISCOVERY unset this
+# is a no-op beyond a DEBUG log line.
+tool_registry.load_dynamic_sources()
+
+# Initialize opt-in observability (no-op unless UNISON_OTEL_ENABLED=true; the
+# OTel packages are an optional extra and their absence downgrades gracefully).
+from utils.observability import init_observability  # noqa: E402
+
+init_observability()
 
 # Wire handler modules onto the server and capture handler references
 handle_list_tools, handle_call_tool = tool_handlers.register(server, tool_registry)

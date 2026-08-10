@@ -663,7 +663,10 @@ of the evidence, even when it strongly points in one direction.""",
                 logger.warning(warning)
 
             # Call the model with validated temperature (async path for concurrent dispatch)
-            response = await provider.async_generate_content(
+            from utils.observability import instrumented_async_generate
+
+            response = await instrumented_async_generate(
+                provider,
                 prompt=prompt,
                 model_name=model_name,
                 system_prompt=system_prompt,

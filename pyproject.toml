@@ -36,6 +36,23 @@ py-modules = ["server", "config"]
     "conf/dial_models.json",
 ]
 
+# Third-party tool plugins: declare a BaseTool subclass under this group and
+# `pip install` makes it available — the ENTRY-POINT KEY becomes the tool name.
+# Example (in the plugin package's pyproject.toml):
+#
+#   [project.entry-points."unison.tools"]
+#   my_tool = "my_package.tools:MyTool"
+#
+# See docs/plugins.md for the full plugin development guide.
+
+[project.optional-dependencies]
+observability = [
+    "opentelemetry-api>=1.20.0",
+    "opentelemetry-sdk>=1.20.0",
+    "opentelemetry-exporter-otlp-proto-grpc>=1.20.0",
+    "opentelemetry-exporter-otlp-proto-http>=1.20.0",
+]
+
 [project.scripts]
 unison-mcp-server = "server:run"
 
@@ -196,6 +213,8 @@ module = [
     "clink.parsers.amp",
     "clink.agents.copilot",
     "clink.parsers.copilot",
+    "utils.observability",
+    "utils.json_log_formatter",
     "build_mockups",
 ]
 follow_imports = "normal"
@@ -216,6 +235,7 @@ module = [
     "tiktoken.*",
     "httpx.*",
     "openai.*",
+    "opentelemetry.*",
 ]
 ignore_missing_imports = true
 

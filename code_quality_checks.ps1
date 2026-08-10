@@ -265,7 +265,8 @@ if (!$SkipLinting) {
             "clink/agents/aider.py", "clink/parsers/aider.py",
             "clink/agents/crush.py", "clink/parsers/crush.py",
             "clink/agents/amp.py", "clink/parsers/amp.py",
-            "clink/agents/copilot.py", "clink/parsers/copilot.py"
+            "clink/agents/copilot.py", "clink/parsers/copilot.py",
+            "utils/observability.py", "utils/json_log_formatter.py"
         )
 
         Write-Emoji "🔍" "Running mypy on strict allowlist files..." -Color Yellow
