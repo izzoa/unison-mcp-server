@@ -91,10 +91,10 @@ tail -f logs/mcp_activity.log | grep -E "(TOOL_CALL|TOOL_COMPLETED|ERROR|WARNING
 
 **Current log files (with proper rotation):**
 ```bash
-# Main server log (all activity including debug info) - 20MB max, 10 backups
+# Main server log (all activity including debug info) - 20MB max, 5 backups
 tail -f logs/mcp_server.log
 
-# Tool activity only (TOOL_CALL, TOOL_COMPLETED, etc.) - 20MB max, 5 backups  
+# Tool activity only (TOOL_CALL, TOOL_COMPLETED, etc.) - 10MB max, 2 backups  
 tail -f logs/mcp_activity.log
 ```
 
