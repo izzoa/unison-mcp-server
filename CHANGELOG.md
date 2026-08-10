@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **BREAKING: `clink` now requires `cli_name` when more than one CLI is configured.** The generated tool schema has always marked the field required in that case, but nothing enforced it — the Pydantic field was optional and an omitted value silently fell back to a hardcoded `gemini` preference. Requests that omit `cli_name` in a multi-CLI deployment now fail with an error enumerating the configured clients instead of dispatching somewhere the caller did not ask for. A single-CLI deployment may still omit the field. Note the previous fallback also contradicted the field's own documentation, which promised "the first configured CLI".
+
+### Fixed
+
+- **Every clink target was told it is Gemini.** `_agent_capabilities_guidance()` returned a hardcoded "You are operating through the Gemini CLI agent" string and was applied unconditionally, so all seven targets — aider, amp, claude, codex, crush, gemini, opencode — received false identity guidance on every invocation. The guidance is now derived from the resolved client, so a newly registered CLI is named correctly with no code change. Dates back to the original clink commit, when Gemini was the only target.
+- **Guidance promised capabilities the system cannot verify.** The same text asserted every target could launch web searches and had a "full suite of CLI capabilities". No capability information is modelled per client and the claim is false for at least one target (aider has no web search), so the guidance now directs the CLI to use whatever tools are available to it.
+- **The read-only prompt instruction named tools that no target has.** The injected `=== READ-ONLY MODE ===` block enumerated `EditFile`, `WriteFile`, `CreateFile`, `DeleteFile`, and `ReplaceInFile` — stale for all seven CLIs, including Gemini (which exposes `write_file` and `replace`). The prohibition is now expressed behaviorally, covers any filesystem-writing tool regardless of name, and explicitly includes shell redirection. This is layer 2 of the three-layer read-only model; layers 1 and 3 are unchanged.
+- **`clink` prompt preparation could raise `AttributeError` on an omitted `cli_name`.** `prepare_prompt()` passed the raw value to `get_client()`, whose parameter is annotated `str` and immediately calls `.lower()`. Client resolution is now centralised in a single helper used by every entry point, which raises an actionable error instead.
+- **The `clink` tool description advertised Qwen**, which has never been a configured target. It no longer names any CLI; the `cli_name` enum is the authoritative list.
+
 ## [12.0.0] - 2026-07-12
 
 ### Security

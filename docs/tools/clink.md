@@ -78,7 +78,7 @@ You can make your own custom roles in `conf/cli_clients/` or tweak any of the sh
 ## Tool Parameters
 
 - `prompt`: Your question or task for the external CLI (required)
-- `cli_name`: Which CLI to use - `gemini` (default), `claude`, `codex`, or add your own in `conf/cli_clients/`
+- `cli_name`: Which CLI to use - `aider`, `amp`, `claude`, `codex`, `crush`, `gemini`, `opencode`, or add your own in `conf/cli_clients/`. **Required** when more than one CLI is configured; it may be omitted only in a single-CLI deployment, where that CLI is used. There is no vendor-preferred default.
 - `role`: Preset role - `default`, `planner`, `codereviewer` (default: `default`)
 - `files`: Optional file paths for context (references only, CLI opens files itself)
 - `images`: Optional image paths for visual context

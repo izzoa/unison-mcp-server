@@ -70,8 +70,18 @@ def test_registry_lists_roles():
 
 
 @pytest.mark.asyncio
-async def test_clink_tool_defaults_to_first_cli(monkeypatch):
+async def test_clink_tool_defaults_to_sole_cli_when_only_one_configured(monkeypatch):
+    """A single-client deployment may omit cli_name; that one client is used.
+
+    Previously the default was hardcoded to gemini whenever gemini happened to
+    be configured. Selection now depends only on how many clients there are,
+    not on which they are.
+    """
     tool = CLinkTool()
+
+    # Simulate a single-client registry without rebuilding the whole registry.
+    monkeypatch.setattr(tool, "_cli_names", ["gemini"])
+    monkeypatch.setattr(tool, "_default_cli_name", "gemini")
 
     async def fake_run(**kwargs):
         return AgentOutput(
@@ -100,8 +110,26 @@ async def test_clink_tool_defaults_to_first_cli(monkeypatch):
     result = await tool.execute(arguments)
     payload = json.loads(result[0].text)
     metadata = payload.get("metadata", {})
-    assert metadata.get("cli_name") == tool._default_cli_name
+    assert metadata.get("cli_name") == "gemini"
     assert metadata.get("events_removed_for_normal") is True
+
+
+@pytest.mark.asyncio
+async def test_clink_tool_rejects_omitted_cli_name_when_many_configured():
+    """With several clients configured, omitting cli_name is an explicit error.
+
+    The generated schema has always marked cli_name required in this case; this
+    asserts runtime agrees rather than silently picking a client.
+    """
+    from tools.shared.exceptions import ToolExecutionError
+
+    tool = CLinkTool()
+    assert len(tool._cli_names) > 1
+
+    with pytest.raises(ToolExecutionError) as excinfo:
+        await tool.execute({"prompt": "Hello", "absolute_file_paths": [], "images": []})
+
+    assert "cli_name" in str(excinfo.value)
 
 
 @pytest.mark.asyncio
@@ -131,7 +159,7 @@ async def test_clink_tool_truncates_large_output(monkeypatch):
 
     arguments = {
         "prompt": "Summarize",
-        "cli_name": tool._default_cli_name,
+        "cli_name": "codex",
         "absolute_file_paths": [],
         "images": [],
     }
@@ -327,7 +355,7 @@ async def test_clink_tool_truncates_without_summary(monkeypatch):
 
     arguments = {
         "prompt": "Summarize",
-        "cli_name": tool._default_cli_name,
+        "cli_name": "codex",
         "absolute_file_paths": [],
         "images": [],
     }
