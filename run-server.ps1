@@ -87,7 +87,7 @@
     Windows blocks unsigned scripts by default, so this script may fail
     before its first line with "running scripts is disabled on this system".
     Allow it for the current process only:
-        Set-ExecutionPolicy -Scope Process -Bypass
+        Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process
 
     A process-scoped policy expires with the shell and needs no administrator
     rights, but it CANNOT override a MachinePolicy or UserPolicy set by Group
@@ -125,6 +125,14 @@ param(
 
 # Set error action preference
 $ErrorActionPreference = "Stop"
+
+# uv validates TLS against bundled roots by default, which fails behind
+# corporate TLS-intercepting proxies whose CA lives in the OS store (pip
+# already trusts the OS store). Opt uv into the system trust store for every
+# uv invocation this script makes. UV_NATIVE_TLS is the deprecated alias,
+# kept for older uv versions.
+$env:UV_SYSTEM_CERTS = "true"
+$env:UV_NATIVE_TLS = "1"
 
 # ----------------------------------------------------------------------------
 # Constants and Configuration  
@@ -501,6 +509,15 @@ function Cleanup-Docker {
     New-Item -Path $DOCKER_CLEANED_FLAG -ItemType File -Force | Out-Null
 }
 
+# True when an .env value is present and is not the template placeholder for
+# the given variable name (placeholders look like your_<name-lowercase>_here)
+function Test-ApiKeyValueConfigured {
+    param([string]$Name, [string]$Value)
+    if ([string]::IsNullOrWhiteSpace($Value)) { return $false }
+    if ($Value -eq "your_$($Name.ToLower())_here") { return $false }
+    return $true
+}
+
 # Validate API keys
 function Test-ApiKeys {
     Write-Step "Validating API Keys"
@@ -513,23 +530,44 @@ function Test-ApiKeys {
     $envContent = Get-Content ".env"
     $hasValidKey = $false
     
-    $keyPatterns = @{
-        "GEMINI_API_KEY"     = "AIza[0-9A-Za-z-_]{35}"
-        "OPENAI_API_KEY"     = "sk-[a-zA-Z0-9]{20}T3BlbkFJ[a-zA-Z0-9]{20}"
-        "XAI_API_KEY"        = "xai-[a-zA-Z0-9-_]+"
-        "OPENROUTER_API_KEY" = "sk-or-[a-zA-Z0-9-_]+"
-    }
+    # Native API-key providers recognized in .env. A value equal to its
+    # template placeholder is unconfigured. Provider key-format regexes are
+    # deliberately NOT enforced here: formats change (e.g. current OpenAI
+    # sk-proj-... keys) and a stale pattern would reject real credentials.
+    $apiKeyNames = @(
+        "GEMINI_API_KEY"
+        "OPENAI_API_KEY"
+        "XAI_API_KEY"
+        "OPENROUTER_API_KEY"
+        "DIAL_API_KEY"
+    )
     
+    $envValues = @{}
     foreach ($line in $envContent) {
         if ($line -match '^([^#][^=]*?)=(.*)$') {
-            $key = $matches[1].Trim()
-            $value = $matches[2].Trim() -replace '^["'']|["'']$', ''
-            
-            if ($keyPatterns.ContainsKey($key) -and $value -ne "your_${key.ToLower()}_here" -and $value.Length -gt 10) {
-                Write-Success "Found valid $key"
-                $hasValidKey = $true
-            }
+            $envValues[$matches[1].Trim()] = $matches[2].Trim() -replace '^["'']|["'']$', ''
         }
+    }
+
+    foreach ($name in $apiKeyNames) {
+        if ($envValues.ContainsKey($name) -and (Test-ApiKeyValueConfigured -Name $name -Value $envValues[$name])) {
+            Write-Success "Found valid $name"
+            $hasValidKey = $true
+        }
+    }
+
+    # Azure OpenAI is configured as a key + endpoint pair
+    if ((Test-ApiKeyValueConfigured -Name "AZURE_OPENAI_API_KEY" -Value $envValues["AZURE_OPENAI_API_KEY"]) -and
+        (Test-ApiKeyValueConfigured -Name "AZURE_OPENAI_ENDPOINT" -Value $envValues["AZURE_OPENAI_ENDPOINT"])) {
+        Write-Success "Found Azure OpenAI configuration"
+        $hasValidKey = $true
+    }
+
+    # Custom endpoints (Ollama, vLLM, ...) may be keyless: a real
+    # CUSTOM_API_URL alone is a configured provider
+    if (Test-ApiKeyValueConfigured -Name "CUSTOM_API_URL" -Value $envValues["CUSTOM_API_URL"]) {
+        Write-Success "Found custom API endpoint (CUSTOM_API_URL)"
+        $hasValidKey = $true
     }
     
     if (!$hasValidKey) {
@@ -575,6 +613,7 @@ function Initialize-Environment {
                 Write-Success "Environment created with uv"
                 return Get-AbsolutePath "$VENV_PATH\Scripts\python.exe"
             }
+            Write-Warning "uv could not create the environment (exit code $LASTEXITCODE) - falling back to a system Python venv"
         }
         catch {
             Write-Warning "uv failed, falling back to venv"
@@ -743,13 +782,13 @@ function Install-Dependencies {
             foreach ($file in $requirementsFiles) {
                 Write-Info "Installing from $file with uv..."
                 $uv = (Get-Command uv -ErrorAction Stop).Source
-                $arguments = @('pip', 'install', '-r', $file, '--python', $PythonPath)
-                $proc = Start-Process -FilePath $uv -ArgumentList $arguments -NoNewWindow -Wait -PassThru
-
-                if ($proc.ExitCode -ne 0) { 
-                    throw "uv failed to install $file with exit code $($proc.ExitCode)" 
+                # Direct invocation passes each argument intact; Start-Process
+                # -ArgumentList joins elements unquoted, splitting paths that
+                # contain spaces (e.g. "OneDrive - Vendor") into fragments.
+                & $uv pip install -r $file --python $PythonPath
+                if ($LASTEXITCODE -ne 0) {
+                    throw "uv failed to install $file with exit code $LASTEXITCODE"
                 }
-
             }
             Write-Success "Dependencies installed successfully with uv"
             return
@@ -765,8 +804,12 @@ function Install-Dependencies {
     $pipCmd = Join-Path (Split-Path $PythonPath -Parent) "pip.exe"
     
     try {
-        # Upgrade pip first
-        & $pipCmd install --upgrade pip | Out-Null
+        # Upgrade pip via the interpreter; pip.exe cannot modify itself on
+        # Windows and always errors when asked to
+        & $PythonPath -m pip install --upgrade pip *> $null
+        if ($LASTEXITCODE -ne 0) {
+            Write-Warning "Could not upgrade pip, continuing..."
+        }
     }
     catch {
         Write-Warning "Could not upgrade pip, continuing..."
@@ -2320,6 +2363,27 @@ function Import-EnvFile {
 # Workflow Functions
 # ----------------------------------------------------------------------------
 
+# Post-install smoke test: the server module must import with the venv
+# interpreter before any MCP client is configured or success is reported.
+# Handler registration happens at import time, so this catches broken
+# installs (missing or incompatible packages) at setup instead of at the
+# first client launch. No API key is needed: provider configuration only
+# happens in the server's main().
+function Test-ServerImport {
+    param([Parameter(Mandatory = $true)][string]$PythonPath)
+
+    Write-Step "Verifying Server Installation"
+    Write-Info "Checking that the server module imports..."
+    & $PythonPath -c "import server"
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "Server import check failed (exit code $LASTEXITCODE) - see the error above."
+        Write-Info "MCP clients were NOT configured. Fix the error and run .\run-server.ps1 again."
+        return $false
+    }
+    Write-Success "Server module imports cleanly"
+    return $true
+}
+
 # Docker deployment workflow
 function Invoke-DockerWorkflow {
     Write-Step "Starting Docker Workflow"
@@ -2336,7 +2400,7 @@ function Invoke-DockerWorkflow {
     if (!(Initialize-DockerEnvironment)) { exit 1 }
     
     Import-EnvFile
-    Test-ApiKeys
+    $null = Test-ApiKeys
     
     if (!(Build-DockerImage -Force:$Force)) { exit 1 }
     
@@ -2391,7 +2455,7 @@ function Invoke-PythonWorkflow {
     Clear-PythonCache
     Initialize-EnvFile
     Import-EnvFile
-    Test-ApiKeys
+    $null = Test-ApiKeys
     
     try {
         $pythonPath = Initialize-Environment
@@ -2408,7 +2472,11 @@ function Invoke-PythonWorkflow {
         Write-Error "Failed to install dependencies: $_"
         exit 1
     }
-    
+
+    if (!(Test-ServerImport -PythonPath $pythonPath)) {
+        exit 1
+    }
+
     $serverPath = Get-AbsolutePath "server.py"
     
     # Configure MCP clients for Python

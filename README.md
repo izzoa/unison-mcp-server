@@ -311,17 +311,18 @@ cd unison-mcp-server
 
 **On Windows, use `run-server.ps1` instead — WSL is not required.** It is native PowerShell and invokes no bash.
 
+> **Requires PowerShell 7.0+.** The Windows PowerShell 5.1 that ships with Windows 10/11 cannot parse this script. Install it with `winget install --id Microsoft.PowerShell --source winget`, then run `pwsh` rather than `powershell`.
+
 ```powershell
 git clone https://github.com/izzoa/unison-mcp-server.git
 cd unison-mcp-server
 
 # Windows blocks unsigned scripts by default; allow it for this shell only
-Set-ExecutionPolicy -Scope Process -Bypass
+Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process
 
 .\run-server.ps1
 ```
 
-> **Requires PowerShell 7.0+.** The Windows PowerShell 5.1 that ships with Windows 10/11 cannot parse this script. Install it with `winget install --id Microsoft.PowerShell --source winget`, then run `pwsh` rather than `powershell`.
 >
 > `Set-ExecutionPolicy -Scope Process` applies to the current shell only and needs no administrator rights, but it **cannot** override a `MachinePolicy` or `UserPolicy` set by Group Policy — those take precedence. On a managed machine, contact your administrator.
 
