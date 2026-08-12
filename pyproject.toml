@@ -58,6 +58,28 @@ observability = [
 [project.scripts]
 unison-mcp-server = "server:run"
 
+# Dev/test tooling (PEP 735). Locked via uv.lock together with runtime deps;
+# pip consumers install the exported requirements-dev.lock.txt instead.
+[dependency-groups]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.0",
+    "pytest-mock>=3.11.0",
+    "black>=23.0.0",
+    "ruff>=0.1.0",
+    "isort>=5.12.0",
+    "mypy>=1.10",
+    "types-requests>=2.31.0",
+    "python-semantic-release>=10.3.0",
+    "build>=1.0.0",
+    # Docs-tool deps for scripts/build_mockups.py (README terminal mockup generator)
+    "jinja2>=3.1.0",
+    "pyyaml>=6.0",
+    "fonttools>=4.40.0",
+    "types-PyYAML>=6.0",
+]
+
 [tool.black]
 line-length = 120
 target-version = ['py310', 'py311', 'py312', 'py313']

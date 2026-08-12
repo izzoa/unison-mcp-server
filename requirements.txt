@@ -6,7 +6,7 @@ python-dotenv>=1.0.0
 litellm>=1.50.0  # Model metadata discovery (model_cost, get_model_info)
 tiktoken>=0.7.0  # OpenAI-compatible token counting (also available via openai SDK)
 
-# Development dependencies (install with pip install -r requirements-dev.txt)
-# pytest>=7.4.0
-# pytest-asyncio>=0.21.0
-# pytest-mock>=3.11.0
+# Development dependencies live in pyproject.toml [dependency-groups] dev.
+# Installs consume the committed lock exports instead of these ranges:
+#   runtime: pip install -r requirements.lock.txt
+#   dev:     pip install -r requirements-dev.lock.txt

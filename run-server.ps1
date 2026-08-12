@@ -763,14 +763,14 @@ function Install-Dependencies {
     Write-Step "Installing Dependencies"
 
     # Build requirements files list
-    $requirementsFiles = @("requirements.txt")
+    $requirementsFiles = @("requirements.lock.txt")
     if ($InstallDevDependencies) {
-        if (Test-Path "requirements-dev.txt") {
-            $requirementsFiles += "requirements-dev.txt"
-            Write-Info "Including development dependencies from requirements-dev.txt"
+        if (Test-Path "requirements-dev.lock.txt") {
+            $requirementsFiles += "requirements-dev.lock.txt"
+            Write-Info "Including development dependencies from requirements-dev.lock.txt"
         }
         else {
-            Write-Warning "Development dependencies requested but requirements-dev.txt not found"
+            Write-Warning "Development dependencies requested but requirements-dev.lock.txt not found"
         }
     }
 

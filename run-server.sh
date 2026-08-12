@@ -946,19 +946,9 @@ install_dependencies() {
         return 1
     fi
 
-    # Check required packages
-    local packages=("mcp" "google.genai" "openai" "pydantic" "dotenv")
-    for package in "${packages[@]}"; do
-        if ! check_package "$python_cmd" "$package"; then
-            deps_needed=true
-            break
-        fi
-    done
-
-    if [[ "$deps_needed" == false ]]; then
-        print_success "Dependencies already installed"
-        return 0
-    fi
+    # Always install from the committed lock: an import-existence check cannot
+    # see version drift, so existing environments must converge to the locked
+    # versions on every setup run (fast no-op when already satisfied).
 
     echo ""
     print_info "Setting up Unison MCP Server..."
@@ -977,11 +967,11 @@ install_dependencies() {
 
     if command -v uv &> /dev/null && [[ -f "$VENV_PATH/uv_created" ]]; then
         print_info "Using uv for faster package installation..."
-        install_output=$(uv pip install -q -r requirements.txt --python "$python_cmd" 2>&1) || exit_code=$?
+        install_output=$(uv pip install -q -r requirements.lock.txt --python "$python_cmd" 2>&1) || exit_code=$?
     elif [[ -n "${VIRTUAL_ENV:-}" ]] || [[ "$python_cmd" == *"$VENV_PATH"* ]]; then
-        install_output=$("$python_cmd" -m pip install -q -r requirements.txt 2>&1) || exit_code=$?
+        install_output=$("$python_cmd" -m pip install -q -r requirements.lock.txt 2>&1) || exit_code=$?
     else
-        install_output=$("$python_cmd" -m pip install -q --user -r requirements.txt 2>&1) || exit_code=$?
+        install_output=$("$python_cmd" -m pip install -q --user -r requirements.lock.txt 2>&1) || exit_code=$?
     fi
 
     if [[ $exit_code -ne 0 ]]; then
@@ -1015,14 +1005,14 @@ install_dependencies() {
             print_error "Permission denied during installation"
             echo ""
             echo "Try using a virtual environment or install with --user flag:"
-            echo "  $python_cmd -m pip install --user -r requirements.txt"
+            echo "  $python_cmd -m pip install --user -r requirements.lock.txt"
         else
             echo "Try running manually:"
             if [[ "$use_uv" == true ]]; then
-                echo "  uv pip install -r requirements.txt --python $python_cmd"
+                echo "  uv pip install -r requirements.lock.txt --python $python_cmd"
                 echo "Or fallback to pip:"
             fi
-            echo "  $python_cmd -m pip install -r requirements.txt"
+            echo "  $python_cmd -m pip install -r requirements.lock.txt"
             echo ""
             echo "Or install individual packages:"
             echo "  $python_cmd -m pip install \"mcp>=1.0.0,<2\" google-genai openai pydantic python-dotenv"

@@ -42,7 +42,7 @@ done
 
 if [ "$DEV_DEPS_NEEDED" = true ]; then
     echo "📦 Installing development dependencies..."
-    $PIP_CMD install -q -r requirements-dev.txt
+    $PIP_CMD install -q -r requirements-dev.lock.txt
     echo "✅ Development dependencies installed"
 else
     echo "✅ Development dependencies already installed"

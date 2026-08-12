@@ -137,7 +137,7 @@ foreach ($tool in $devTools) {
 if ($devDepsNeeded) {
     Write-Emoji "📦" "Installing development dependencies..." -Color Yellow
     try {
-        & $pipCmd install -q -r requirements-dev.txt
+        & $pipCmd install -q -r requirements-dev.lock.txt
         if ($LASTEXITCODE -ne 0) {
             throw "Failed to install dev dependencies"
         }

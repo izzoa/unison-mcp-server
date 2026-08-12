@@ -24,8 +24,8 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install -r requirements-dev.txt
+          pip install -r requirements.lock.txt
+          pip install -r requirements-dev.lock.txt
 
       - name: Check README mockup drift
         run: |
@@ -63,6 +63,9 @@ jobs:
 
       - name: Wheel smoke test
         run: |
+          # Deliberately resolves open pyproject ranges (NOT the lock): this is
+          # the canary that catches upstream releases breaking pip/uvx users,
+          # exactly how the mcp 2.0.0 breakage would have surfaced in CI.
           python -m pip install build
           rm -rf dist/ build/ unison_mcp_server.egg-info/
           python -m build --wheel --sdist --outdir dist/
@@ -85,7 +88,25 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements-dev.txt
+          pip install -r requirements-dev.lock.txt
+
+      - name: Install uv (pinned — lockfile schema stability)
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "0.8.12"
+
+      - name: Lockfile drift check
+        run: |
+          # uv.lock must match pyproject.toml, and the committed pip exports
+          # must match uv.lock. On mismatch, regenerate with:
+          #   uv lock
+          #   uv export --format requirements.txt --no-emit-project --no-hashes --no-default-groups -o requirements.lock.txt
+          #   uv export --format requirements.txt --no-emit-project --no-hashes --only-group dev -o requirements-dev.lock.txt
+          uv lock --check
+          uv export --format requirements.txt --no-emit-project --no-hashes --no-default-groups \
+            | grep -v '^#' | diff - <(grep -v '^#' requirements.lock.txt)
+          uv export --format requirements.txt --no-emit-project --no-hashes --only-group dev \
+            | grep -v '^#' | diff - <(grep -v '^#' requirements-dev.lock.txt)
 
       - name: Run black formatter check
         run: black --check . --exclude="test_simulation_files/"
@@ -95,7 +116,7 @@ jobs:
 
       - name: Run mypy type checking
         run: |
-          pip install -r requirements.txt
+          pip install -r requirements.lock.txt
           mypy \
             utils/circuit_breaker.py utils/fs_snapshot.py utils/tool_execution_context.py utils/token_utils.py \
             providers/shared/provider_type.py providers/shared/model_response.py \

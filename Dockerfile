@@ -12,8 +12,8 @@ RUN apt-get update && apt-get install -y \
 # Set working directory
 WORKDIR /app
 
-# Copy requirements files
-COPY requirements.txt ./
+# Copy the committed dependency lock (installs are reproducible, not resolved)
+COPY requirements.lock.txt ./
 
 # Create virtual environment and install dependencies
 RUN python -m venv /opt/venv
@@ -21,7 +21,7 @@ ENV PATH="/opt/venv/bin:$PATH"
 
 # Install Python dependencies
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
-    pip install --no-cache-dir -r requirements.txt
+    pip install --no-cache-dir -r requirements.lock.txt
 
 # ===========================================
 # STAGE 2: Runtime image

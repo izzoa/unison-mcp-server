@@ -6,6 +6,7 @@ on:
     paths:
       - '**.py'
       - 'requirements*.txt'
+      - 'uv.lock'
       - 'pyproject.toml'
       - 'Dockerfile'
       - 'docker-compose.yml'
