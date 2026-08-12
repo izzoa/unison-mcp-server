@@ -1025,7 +1025,7 @@ install_dependencies() {
             echo "  $python_cmd -m pip install -r requirements.txt"
             echo ""
             echo "Or install individual packages:"
-            echo "  $python_cmd -m pip install mcp google-genai openai pydantic python-dotenv"
+            echo "  $python_cmd -m pip install \"mcp>=1.0.0,<2\" google-genai openai pydantic python-dotenv"
         fi
         return 1
     else
