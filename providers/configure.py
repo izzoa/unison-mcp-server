@@ -117,13 +117,24 @@ def configure_providers(registry=None):
 
     # Special case: Custom provider (Ollama, vLLM, etc.)
     custom_url = get_env("CUSTOM_API_URL")
+    if custom_url == "your_custom_api_url_here":
+        # The default .env template's placeholder is unconfigured — same
+        # treatment as the placeholder checks on every provider path above.
+        # Without this, a fresh .env registers the placeholder as a real
+        # endpoint and the server crashes in URL validation at startup.
+        logger.debug("Custom API URL is placeholder value")
+        custom_url = None
     if custom_url:
         # IMPORTANT: Always read CUSTOM_API_KEY even if empty
         # - Some providers (vLLM, LM Studio, enterprise APIs) require authentication
         # - Others (Ollama) work without authentication (empty key)
         # - DO NOT remove this variable - it's needed for provider factory function
         custom_key = get_env("CUSTOM_API_KEY", "") or ""  # Default to empty (Ollama doesn't need auth)
+        if custom_key == "your_custom_api_key_here":
+            custom_key = ""  # Placeholder means keyless, not a bearer token
         custom_model = get_env("CUSTOM_MODEL_NAME", "llama3.2") or "llama3.2"
+        if custom_model == "your_custom_model_name_here":
+            custom_model = "llama3.2"
         valid_providers.append(f"Custom API ({custom_url})")
         has_custom = True
         logger.info(f"Custom API endpoint found: {custom_url} with model {custom_model}")

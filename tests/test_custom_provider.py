@@ -319,3 +319,45 @@ class TestConfigureProvidersFunction:
         ):
             with pytest.raises(ValueError, match="At least one API configuration is required"):
                 configure_providers()
+
+
+class TestPlaceholderCustomUrlTreatedAsUnconfigured:
+    """The .env template's CUSTOM_* placeholders must not register a provider.
+
+    A fresh default .env previously crashed the server at startup: the
+    CUSTOM_API_URL placeholder was the only provider value without a
+    placeholder check, so it registered as a real endpoint and failed URL
+    validation during provider instantiation.
+    """
+
+    TEMPLATE_PLACEHOLDERS = {
+        "GEMINI_API_KEY": "your_gemini_api_key_here",
+        "OPENAI_API_KEY": "your_openai_api_key_here",
+        "XAI_API_KEY": "your_xai_api_key_here",
+        "OPENROUTER_API_KEY": "your_openrouter_api_key_here",
+        "DIAL_API_KEY": "your_dial_api_key_here",
+        "CUSTOM_API_URL": "your_custom_api_url_here",
+        "CUSTOM_API_KEY": "your_custom_api_key_here",
+        "CUSTOM_MODEL_NAME": "your_custom_model_name_here",
+    }
+
+    def test_fresh_template_env_raises_the_clean_no_provider_error(self):
+        """An untouched template .env gets the actionable error, not a URL crash."""
+        from providers.configure import configure_providers
+
+        with patch.dict(os.environ, self.TEMPLATE_PLACEHOLDERS, clear=True):
+            with pytest.raises(ValueError, match="At least one API configuration is required"):
+                configure_providers()
+
+    def test_real_custom_url_still_registers_the_custom_provider(self):
+        """A real endpoint among otherwise-placeholder values registers normally."""
+        from providers.configure import configure_providers
+
+        env = dict(self.TEMPLATE_PLACEHOLDERS)
+        env["CUSTOM_API_URL"] = "http://localhost:11434/v1"
+        env["CUSTOM_API_KEY"] = ""
+        with patch.dict(os.environ, env, clear=True):
+            configure_providers()
+            provider = get_default_registry().get_provider(ProviderType.CUSTOM)
+            assert provider is not None
+            assert provider.base_url == "http://localhost:11434/v1"
