@@ -18,7 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **BREAKING: minimum supported Python is now 3.10.** The floor was declared three different ways — `requires-python = ">=3.9"`, setup scripts enforcing 3.10+, Black/Ruff targeting 3.9 while mypy targeted 3.10. It is now 3.10 everywhere: that is what the setup scripts already enforced and what the mcp 2.x SDK line requires. `requires-python`, Black, and Ruff targets are aligned, annotations were mechanically modernized for the new target (`ruff check --fix`), and the dead `importlib-resources; python_version<"3.9"` requirement marker was removed.
+- **BREAKING: minimum supported Python is now 3.10.** The floor was declared three different ways — `requires-python = ">=3.9"`, setup scripts enforcing 3.10+, Black/Ruff targeting 3.9 while mypy targeted 3.10. It is now 3.10 everywhere: that is what the setup scripts already enforced and what the mcp 2.x SDK line requires. `requires-python`, Black, and Ruff targets are aligned, and the dead `importlib-resources; python_version<"3.9"` requirement marker was removed.
+- **Annotations modernized for the py310 target.** Mechanical `ruff check --fix` sweep (383 fixes — PEP 604 unions and related pyupgrade rules) plus one explicit `zip(..., strict=False)` preserving existing behavior; no functional changes.
 - **`run-server.ps1` now declares `#Requires -Version 7.0`.** It previously declared 5.1 while using the PowerShell 7 ternary operator, and PowerShell parses a script in full before executing any of it — so on the Windows PowerShell 5.1 shipped with Windows 10/11 the script failed with an unexplained parse error rather than a version message. Windows users need PowerShell 7 (`winget install --id Microsoft.PowerShell`); they already did, they just weren't told. WSL remains unnecessary — the script is native PowerShell.
 
 ### Added

@@ -8,7 +8,6 @@ analysis with proper investigation guidance and expert analysis integration.
 """
 
 import json
-from typing import Optional
 
 from .conversation_base_test import ConversationBaseTest
 
@@ -524,7 +523,7 @@ REQUIREMENTS:
             self.logger.error(f"Certain confidence test failed: {e}")
             return False
 
-    def call_mcp_tool(self, tool_name: str, params: dict) -> tuple[Optional[str], Optional[str]]:
+    def call_mcp_tool(self, tool_name: str, params: dict) -> tuple[str | None, str | None]:
         """Call an MCP tool in-process - override for precommit-specific response handling"""
         # Use in-process implementation to maintain conversation memory
         response_text, _ = self.call_mcp_tool_direct(tool_name, params)
@@ -537,7 +536,7 @@ REQUIREMENTS:
 
         return response_text, continuation_id
 
-    def _extract_precommit_continuation_id(self, response_text: str) -> Optional[str]:
+    def _extract_precommit_continuation_id(self, response_text: str) -> str | None:
         """Extract continuation_id from precommit response"""
         try:
             # Parse the response

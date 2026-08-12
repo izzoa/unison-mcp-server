@@ -157,7 +157,7 @@ class ModelSchemaBuilder:
         return display
 
     @staticmethod
-    def _format_context_window(tokens: int) -> Optional[str]:
+    def _format_context_window(tokens: int) -> str | None:
         """Convert a raw context window into a short display string."""
 
         if not tokens or tokens <= 0:
@@ -275,7 +275,7 @@ class ModelSchemaBuilder:
 
         return summaries, len(filtered), bool(allowed_map)
 
-    def _get_restriction_note(self) -> Optional[str]:
+    def _get_restriction_note(self) -> str | None:
         """Return a string describing active per-provider allowlists, if any."""
         from utils.env import get_env
 

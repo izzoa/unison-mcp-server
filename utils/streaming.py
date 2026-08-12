@@ -8,7 +8,6 @@ rate limiting to avoid flooding the client with excessive notifications.
 
 import logging
 import time
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +45,7 @@ class StreamProgressNotifier:
     def __init__(
         self,
         server: object,
-        progress_token: Optional[object] = None,
+        progress_token: object | None = None,
         min_interval: float = _MIN_NOTIFY_INTERVAL_SECONDS,
         min_chunk_size: int = _MIN_CHUNK_SIZE,
     ) -> None:

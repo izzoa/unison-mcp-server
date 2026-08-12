@@ -9,7 +9,6 @@ import json
 import logging
 import os
 import subprocess
-from typing import Optional
 
 from .log_utils import LogUtils
 
@@ -124,7 +123,7 @@ class Calculator:
         self.test_files = {"python": os.path.abspath(test_py), "config": os.path.abspath(test_config)}
         self.logger.debug(f"Created test files with absolute paths: {list(self.test_files.values())}")
 
-    def call_mcp_tool(self, tool_name: str, params: dict) -> tuple[Optional[str], Optional[str]]:
+    def call_mcp_tool(self, tool_name: str, params: dict) -> tuple[str | None, str | None]:
         """Call an MCP tool via standalone server"""
         try:
             # Auto-inject working_directory_absolute_path for the chat tool
@@ -202,7 +201,7 @@ class Calculator:
             self.logger.error(f"MCP tool call failed: {e}")
             return None, None
 
-    def _parse_mcp_response(self, stdout: str, expected_id: int = 2) -> Optional[str]:
+    def _parse_mcp_response(self, stdout: str, expected_id: int = 2) -> str | None:
         """Parse MCP JSON-RPC response from stdout"""
         try:
             lines = stdout.strip().split("\n")
@@ -238,7 +237,7 @@ class Calculator:
             self.logger.debug(f"Stdout that failed to parse: {stdout}")
             return None
 
-    def _extract_continuation_id(self, response_text: str) -> Optional[str]:
+    def _extract_continuation_id(self, response_text: str) -> str | None:
         """Extract continuation_id from response metadata"""
         try:
             # Parse the response text as JSON to look for continuation metadata
@@ -302,7 +301,7 @@ class Calculator:
     # Log Utility Methods (delegate to LogUtils)
     # ============================================================================
 
-    def get_server_logs_since(self, since_time: Optional[str] = None) -> str:
+    def get_server_logs_since(self, since_time: str | None = None) -> str:
         """Get server logs from both main and activity log files."""
         return LogUtils.get_server_logs_since(since_time)
 
@@ -338,9 +337,7 @@ class Calculator:
         """Validate that logs show file deduplication behavior."""
         return LogUtils.validate_file_deduplication_in_logs(logs, tool_name, test_file)
 
-    def search_logs_for_pattern(
-        self, pattern: str, logs: Optional[str] = None, case_sensitive: bool = False
-    ) -> list[str]:
+    def search_logs_for_pattern(self, pattern: str, logs: str | None = None, case_sensitive: bool = False) -> list[str]:
         """Search logs for a specific pattern."""
         return LogUtils.search_logs_for_pattern(pattern, logs, case_sensitive)
 

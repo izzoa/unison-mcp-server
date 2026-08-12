@@ -8,7 +8,6 @@ step-by-step thinking with expert analysis integration.
 """
 
 import json
-from typing import Optional
 
 from .conversation_base_test import ConversationBaseTest
 
@@ -502,7 +501,7 @@ class ThinkDeepWorkflowValidationTest(ConversationBaseTest):
             self.logger.error(f"Certain confidence test failed: {e}")
             return False
 
-    def call_mcp_tool(self, tool_name: str, params: dict) -> tuple[Optional[str], Optional[str]]:
+    def call_mcp_tool(self, tool_name: str, params: dict) -> tuple[str | None, str | None]:
         """Call an MCP tool in-process - override for thinkdeep-specific response handling"""
         # Use in-process implementation to maintain conversation memory
         response_text, _ = self.call_mcp_tool_direct(tool_name, params)
@@ -515,7 +514,7 @@ class ThinkDeepWorkflowValidationTest(ConversationBaseTest):
 
         return response_text, continuation_id
 
-    def _extract_thinkdeep_continuation_id(self, response_text: str) -> Optional[str]:
+    def _extract_thinkdeep_continuation_id(self, response_text: str) -> str | None:
         """Extract continuation_id from thinkdeep response"""
         try:
             # Parse the response

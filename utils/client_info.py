@@ -9,12 +9,12 @@ identification across the application.
 """
 
 import logging
-from typing import Any, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 # Global cache for client information
-_client_info_cache: Optional[dict[str, Any]] = None
+_client_info_cache: dict[str, Any] | None = None
 
 # Mapping of known client names to friendly names
 # This is case-insensitive and checks if the key is contained in the client name
@@ -69,7 +69,7 @@ def get_friendly_name(client_name: str) -> str:
     return DEFAULT_FRIENDLY_NAME
 
 
-def get_cached_client_info() -> Optional[dict[str, Any]]:
+def get_cached_client_info() -> dict[str, Any] | None:
     """
     Get cached client information if available.
 
@@ -80,7 +80,7 @@ def get_cached_client_info() -> Optional[dict[str, Any]]:
     return _client_info_cache
 
 
-def get_client_info_from_context(server: Any) -> Optional[dict[str, Any]]:
+def get_client_info_from_context(server: Any) -> dict[str, Any] | None:
     """
     Extract client information from the MCP server's request context.
 
@@ -192,7 +192,7 @@ def get_client_info_from_context(server: Any) -> Optional[dict[str, Any]]:
         return None
 
 
-def format_client_info(client_info: Optional[dict[str, Any]], use_friendly_name: bool = True) -> str:
+def format_client_info(client_info: dict[str, Any] | None, use_friendly_name: bool = True) -> str:
     """
     Format client information for display.
 
@@ -236,7 +236,7 @@ def get_client_friendly_name() -> str:
     return DEFAULT_FRIENDLY_NAME
 
 
-def log_client_info(server: Any, logger_instance: Optional[logging.Logger] = None) -> None:
+def log_client_info(server: Any, logger_instance: logging.Logger | None = None) -> None:
     """
     Log client information extracted from the server.
 

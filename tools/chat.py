@@ -43,11 +43,11 @@ class ChatRequest(ToolRequest):
     """Request model for Chat tool"""
 
     prompt: str = Field(..., description=CHAT_FIELD_DESCRIPTIONS["prompt"])
-    absolute_file_paths: Optional[list[str]] = Field(
+    absolute_file_paths: list[str] | None = Field(
         default_factory=list,
         description=CHAT_FIELD_DESCRIPTIONS["absolute_file_paths"],
     )
-    images: Optional[list[str]] = Field(default_factory=list, description=CHAT_FIELD_DESCRIPTIONS["images"])
+    images: list[str] | None = Field(default_factory=list, description=CHAT_FIELD_DESCRIPTIONS["images"])
     working_directory_absolute_path: str = Field(
         ...,
         description=CHAT_FIELD_DESCRIPTIONS["working_directory_absolute_path"],
@@ -67,7 +67,7 @@ class ChatTool(SimpleTool):
 
     def __init__(self) -> None:
         super().__init__()
-        self._last_recordable_response: Optional[str] = None
+        self._last_recordable_response: str | None = None
 
     def get_name(self) -> str:
         return "chat"
@@ -78,7 +78,7 @@ class ChatTool(SimpleTool):
             "getting second opinions, and exploring ideas. Use for ideas, validations, questions, and thoughtful explanations."
         )
 
-    def get_annotations(self) -> Optional[dict[str, Any]]:
+    def get_annotations(self) -> dict[str, Any] | None:
         """Chat writes generated artifacts when code-generation is enabled."""
 
         return {"readOnlyHint": False}
@@ -198,7 +198,7 @@ class ChatTool(SimpleTool):
         # Use SimpleTool's Chat-style prompt preparation
         return self.prepare_chat_style_prompt(request)
 
-    def _validate_file_paths(self, request) -> Optional[str]:
+    def _validate_file_paths(self, request) -> str | None:
         """Extend validation to cover the working directory path."""
 
         files = self.get_request_files(request)
@@ -246,13 +246,13 @@ class ChatTool(SimpleTool):
                 )
         return None
 
-    def format_response(self, response: str, request: ChatRequest, model_info: Optional[dict] = None) -> str:
+    def format_response(self, response: str, request: ChatRequest, model_info: dict | None = None) -> str:
         """
         Format the chat response to match the original Chat tool exactly.
         """
         self._last_recordable_response = None
         body = response
-        recordable_override: Optional[str] = None
+        recordable_override: str | None = None
 
         if self._model_supports_code_generation():
             block, remainder, _ = self._extract_generated_code_block(response)
@@ -311,7 +311,7 @@ class ChatTool(SimpleTool):
         return final_output
 
     def _record_assistant_turn(
-        self, continuation_id: str, response_text: str, request, model_info: Optional[dict]
+        self, continuation_id: str, response_text: str, request, model_info: dict | None
     ) -> None:
         recordable = self._last_recordable_response if self._last_recordable_response is not None else response_text
         try:
@@ -331,7 +331,7 @@ class ChatTool(SimpleTool):
 
         return bool(capabilities.allow_code_generation)
 
-    def _extract_generated_code_block(self, text: str) -> tuple[Optional[str], str, int]:
+    def _extract_generated_code_block(self, text: str) -> tuple[str | None, str, int]:
         matches = list(re.finditer(r"<GENERATED-CODE>.*?</GENERATED-CODE>", text, flags=re.DOTALL | re.IGNORECASE))
         if not matches:
             return None, text, 0

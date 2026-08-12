@@ -21,7 +21,7 @@ Key Features:
 import logging
 import threading
 import time
-from typing import Optional, Protocol, runtime_checkable
+from typing import Protocol, runtime_checkable
 
 from utils.env import get_env
 
@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 class StorageBackend(Protocol):
     """Protocol defining the interface for conversation storage backends."""
 
-    def get(self, key: str) -> Optional[str]: ...
+    def get(self, key: str) -> str | None: ...
 
     def set_with_ttl(self, key: str, ttl_seconds: int, value: str) -> None: ...
 
@@ -69,7 +69,7 @@ class InMemoryStorage:
             self._store[key] = (value, expires_at)
             logger.debug(f"Stored key {key} with TTL {ttl_seconds}s")
 
-    def get(self, key: str) -> Optional[str]:
+    def get(self, key: str) -> str | None:
         """Retrieve value if not expired"""
         with self._lock:
             if key in self._store:
@@ -145,7 +145,7 @@ def create_storage_backend() -> StorageBackend:
     return InMemoryStorage()
 
 
-def get_storage_backend(backend: Optional[StorageBackend] = None) -> StorageBackend:
+def get_storage_backend(backend: StorageBackend | None = None) -> StorageBackend:
     """Get the global storage instance (singleton pattern).
 
     Args:

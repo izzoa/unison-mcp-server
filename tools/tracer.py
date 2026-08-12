@@ -20,7 +20,7 @@ structural relationship analysis, architectural understanding, and code comprehe
 """
 
 import logging
-from typing import TYPE_CHECKING, Any, Literal, Optional
+from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import Field, field_validator
 
@@ -101,24 +101,22 @@ class TracerRequest(WorkflowRequest):
     relevant_context: list[str] = Field(
         default_factory=list, description=TRACER_WORKFLOW_FIELD_DESCRIPTIONS["relevant_context"]
     )
-    confidence: Optional[str] = Field("exploring", description=TRACER_WORKFLOW_FIELD_DESCRIPTIONS["confidence"])
+    confidence: str | None = Field("exploring", description=TRACER_WORKFLOW_FIELD_DESCRIPTIONS["confidence"])
 
     # Tracer-specific fields (used in step 1 to initialize)
-    trace_mode: Optional[Literal["precision", "dependencies", "ask"]] = Field(
+    trace_mode: Literal["precision", "dependencies", "ask"] | None = Field(
         "ask", description=TRACER_WORKFLOW_FIELD_DESCRIPTIONS["trace_mode"]
     )
-    target_description: Optional[str] = Field(
-        None, description=TRACER_WORKFLOW_FIELD_DESCRIPTIONS["target_description"]
-    )
-    images: Optional[list[str]] = Field(default=None, description=TRACER_WORKFLOW_FIELD_DESCRIPTIONS["images"])
+    target_description: str | None = Field(None, description=TRACER_WORKFLOW_FIELD_DESCRIPTIONS["target_description"])
+    images: list[str] | None = Field(default=None, description=TRACER_WORKFLOW_FIELD_DESCRIPTIONS["images"])
 
     # Exclude fields not relevant to tracing workflow
     issues_found: list[dict] = Field(default_factory=list, exclude=True, description="Tracing doesn't track issues")
-    hypothesis: Optional[str] = Field(default=None, exclude=True, description="Tracing doesn't use hypothesis")
+    hypothesis: str | None = Field(default=None, exclude=True, description="Tracing doesn't use hypothesis")
     # Exclude other non-tracing fields
-    temperature: Optional[float] = Field(default=None, exclude=True)
-    thinking_mode: Optional[str] = Field(default=None, exclude=True)
-    use_assistant_model: Optional[bool] = Field(default=False, exclude=True, description="Tracing is self-contained")
+    temperature: float | None = Field(default=None, exclude=True)
+    thinking_mode: str | None = Field(default=None, exclude=True)
+    use_assistant_model: bool | None = Field(default=False, exclude=True, description="Tracing is self-contained")
 
     @field_validator("step_number")
     @classmethod

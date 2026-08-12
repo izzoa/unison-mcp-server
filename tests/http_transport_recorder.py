@@ -18,7 +18,7 @@ import hashlib
 import json
 import logging
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import httpx
 
@@ -278,7 +278,7 @@ class ReplayTransport(httpx.MockTransport):
             request=request,
         )
 
-    def _find_matching_interaction(self, request: httpx.Request) -> Optional[dict[str, Any]]:
+    def _find_matching_interaction(self, request: httpx.Request) -> dict[str, Any] | None:
         """Find interaction that matches the request."""
         request_signature = self._get_request_signature(request)
 
@@ -409,7 +409,7 @@ class TransportFactory:
             return RecordingTransport(cassette_path)
 
     @staticmethod
-    def should_record(cassette_path: str, api_key: Optional[str] = None) -> bool:
+    def should_record(cassette_path: str, api_key: str | None = None) -> bool:
         """Determine if we should record based on cassette and API key availability."""
         cassette_file = Path(cassette_path)
 

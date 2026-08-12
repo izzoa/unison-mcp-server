@@ -2,7 +2,7 @@
 
 import logging
 import threading
-from typing import ClassVar, Optional
+from typing import ClassVar
 
 from utils.env import get_env
 
@@ -158,10 +158,10 @@ class DIALModelProvider(RegistryBackedProviderMixin, OpenAICompatibleProvider):
         self,
         prompt: str,
         model_name: str,
-        system_prompt: Optional[str] = None,
+        system_prompt: str | None = None,
         temperature: float = 0.3,
-        max_output_tokens: Optional[int] = None,
-        images: Optional[list[str]] = None,
+        max_output_tokens: int | None = None,
+        images: list[str] | None = None,
         **kwargs,
     ) -> ModelResponse:
         """Generate content using DIAL's deployment-specific endpoint.

@@ -12,7 +12,7 @@ import re
 from copy import deepcopy
 from dataclasses import dataclass
 from re import Pattern
-from typing import Any, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +35,7 @@ class PIIPattern:
 class PIISanitizer:
     """Sanitizes PII from various data structures while preserving format."""
 
-    def __init__(self, patterns: Optional[list[PIIPattern]] = None):
+    def __init__(self, patterns: list[PIIPattern] | None = None):
         """Initialize with optional custom patterns."""
         self.patterns: list[PIIPattern] = patterns or []
         self.sanitize_enabled = True

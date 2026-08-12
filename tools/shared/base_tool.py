@@ -208,7 +208,7 @@ class BaseTool(ABC):
         suffix = "" if base_prompt.endswith("\n\n") else "\n\n"
         return f"{base_prompt}{suffix}{addition_text}"
 
-    def get_annotations(self) -> Optional[dict[str, Any]]:
+    def get_annotations(self) -> dict[str, Any] | None:
         """
         Return optional annotations for this tool.
 
@@ -250,7 +250,7 @@ class BaseTool(ABC):
         return self._model_schema_builder._format_available_models_list()
 
     @staticmethod
-    def _format_context_window(tokens: int) -> Optional[str]:
+    def _format_context_window(tokens: int) -> str | None:
         """Delegates to ModelSchemaBuilder."""
         return ModelSchemaBuilder._format_context_window(tokens)
 
@@ -267,7 +267,7 @@ class BaseTool(ABC):
         """Delegates to ModelSchemaBuilder."""
         return self._model_schema_builder._get_ranked_model_summaries(limit)
 
-    def _get_restriction_note(self) -> Optional[str]:
+    def _get_restriction_note(self) -> str | None:
         """Delegates to ModelSchemaBuilder."""
         return self._model_schema_builder._get_restriction_note()
 
@@ -347,7 +347,7 @@ class BaseTool(ABC):
         """
         pass
 
-    def validate_file_paths(self, request) -> Optional[str]:
+    def validate_file_paths(self, request) -> str | None:
         """
         Validate that all file paths in the request are absolute.
 
@@ -424,11 +424,11 @@ class BaseTool(ABC):
 
     # === CONVERSATION AND FILE HANDLING METHODS ===
 
-    def get_conversation_embedded_files(self, continuation_id: Optional[str]) -> list[str]:
+    def get_conversation_embedded_files(self, continuation_id: str | None) -> list[str]:
         """Delegates to FileProcessor."""
         return self._file_processor.get_conversation_embedded_files(continuation_id)
 
-    def filter_new_files(self, requested_files: list[str], continuation_id: Optional[str]) -> list[str]:
+    def filter_new_files(self, requested_files: list[str], continuation_id: str | None) -> list[str]:
         """Delegates to FileProcessor."""
         return self._file_processor.filter_new_files(requested_files, continuation_id)
 
@@ -436,7 +436,7 @@ class BaseTool(ABC):
         """Delegates to ConversationHandler."""
         return self._conversation_handler.format_conversation_turn(turn)
 
-    def handle_prompt_file(self, files: Optional[list[str]]) -> tuple[Optional[str], Optional[list[str]]]:
+    def handle_prompt_file(self, files: list[str] | None) -> tuple[str | None, list[str] | None]:
         """Delegates to FileProcessor."""
         return self._file_processor.handle_prompt_file(files)
 
@@ -444,20 +444,20 @@ class BaseTool(ABC):
         """Delegates to ConversationHandler."""
         return self._conversation_handler.get_prompt_content_for_size_validation(user_content)
 
-    def check_prompt_size(self, text: str) -> Optional[dict[str, Any]]:
+    def check_prompt_size(self, text: str) -> dict[str, Any] | None:
         """Delegates to ConversationHandler."""
         return self._conversation_handler.check_prompt_size(text)
 
     def _prepare_file_content_for_prompt(
         self,
         request_files: list[str],
-        continuation_id: Optional[str],
+        continuation_id: str | None,
         context_description: str = "New files",
-        max_tokens: Optional[int] = None,
+        max_tokens: int | None = None,
         reserve_tokens: int = 1_000,
-        remaining_budget: Optional[int] = None,
-        arguments: Optional[dict] = None,
-        model_context: Optional[Any] = None,
+        remaining_budget: int | None = None,
+        arguments: dict | None = None,
+        model_context: Any | None = None,
     ) -> tuple[str, list[str]]:
         """Delegates to FileProcessor."""
         return self._file_processor._prepare_file_content_for_prompt(
@@ -471,7 +471,7 @@ class BaseTool(ABC):
             model_context,
         )
 
-    def get_websearch_instruction(self, tool_specific: Optional[str] = None) -> str:
+    def get_websearch_instruction(self, tool_specific: str | None = None) -> str:
         """
         Generate standardized web search instruction.
 
@@ -745,11 +745,11 @@ When recommending searches, be specific about what information you need and why 
             return temperature, [f"Temperature validation failed: {e}"]
 
     def _validate_image_limits(
-        self, images: Optional[list[str]], model_context: Optional[Any] = None, continuation_id: Optional[str] = None
-    ) -> Optional[dict]:
+        self, images: list[str] | None, model_context: Any | None = None, continuation_id: str | None = None
+    ) -> dict | None:
         """Delegates to FileProcessor."""
         return self._file_processor._validate_image_limits(images, model_context, continuation_id)
 
-    def _parse_response(self, raw_text: str, request, model_info: Optional[dict] = None):
+    def _parse_response(self, raw_text: str, request, model_info: dict | None = None):
         """Delegates to ResponseFormatter."""
         return self._response_formatter._parse_response(raw_text, request, model_info)
