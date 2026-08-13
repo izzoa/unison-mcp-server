@@ -31,6 +31,10 @@ You need at least one API key. Choose based on your needs:
 - Visit [OpenAI Platform](https://platform.openai.com/api-keys)
 - Generate an API key for GPT-5.2, GPT-5.1-Codex, GPT-5, O3 access
 
+**Anthropic (Claude):**
+- Visit [Anthropic Console](https://console.anthropic.com/)
+- Generate an API key for native Claude access (Fable 5, Opus 5/4.8, Sonnet 5/4.6, Haiku 4.5) with extended thinking
+
 **X.AI (Grok):**
 - Visit [X.AI Console](https://console.x.ai/)
 - Generate an API key for Grok models
@@ -288,6 +292,7 @@ Add your API keys (at least one required):
 # Choose your providers (at least one required)
 GEMINI_API_KEY=your-gemini-api-key-here      # For Gemini models  
 OPENAI_API_KEY=your-openai-api-key-here      # For GPT-5.2, GPT-5.1-Codex, O3
+ANTHROPIC_API_KEY=your-anthropic-api-key-here  # For native Claude (Fable, Opus, Sonnet, Haiku)
 XAI_API_KEY=your-xai-api-key-here            # For Grok models
 OPENROUTER_API_KEY=your-openrouter-key       # For multiple models
 

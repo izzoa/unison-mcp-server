@@ -49,6 +49,19 @@ class TestModelRestrictionService:
             assert service.is_allowed(ProviderType.GOOGLE, "gemini-2.5-pro")
             assert service.is_allowed(ProviderType.OPENROUTER, "anthropic/claude-opus-4")
 
+    def test_anthropic_allowed_models_restriction(self):
+        """ANTHROPIC_ALLOWED_MODELS drives the service like every sibling provider."""
+        with patch.dict(os.environ, {"ANTHROPIC_ALLOWED_MODELS": "Claude-Sonnet-5, haiku"}):
+            service = ModelRestrictionService()
+
+            assert service.has_restrictions(ProviderType.ANTHROPIC)
+            assert service.is_allowed(ProviderType.ANTHROPIC, "claude-sonnet-5")
+            assert service.is_allowed(ProviderType.ANTHROPIC, "claude-haiku-4-5", "haiku")
+            assert not service.is_allowed(ProviderType.ANTHROPIC, "claude-opus-5")
+
+            # Other providers remain unrestricted
+            assert service.is_allowed(ProviderType.OPENAI, "o3")
+
     def test_load_multiple_models_restriction(self):
         """Test loading multiple allowed models."""
         with patch.dict(os.environ, {"OPENAI_ALLOWED_MODELS": "o3-mini,o4-mini", "GOOGLE_ALLOWED_MODELS": "flash,pro"}):

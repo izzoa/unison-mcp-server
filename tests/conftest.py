@@ -54,6 +54,7 @@ if sys.platform == "win32":
 # Provider Registry Setup
 # ---------------------------------------------------------------------------
 
+from providers.anthropic import AnthropicModelProvider  # noqa: E402
 from providers.gemini import GeminiModelProvider  # noqa: E402
 from providers.openai import OpenAIModelProvider  # noqa: E402
 from providers.registry import ModelProviderRegistry, set_default_registry  # noqa: E402
@@ -167,6 +168,8 @@ def mock_provider_availability(request, monkeypatch, _fresh_default_registry):
         registry.register_provider(ProviderType.OPENAI, OpenAIModelProvider)
     if ProviderType.XAI not in registry._providers:
         registry.register_provider(ProviderType.XAI, XAIModelProvider)
+    if ProviderType.ANTHROPIC not in registry._providers:
+        registry.register_provider(ProviderType.ANTHROPIC, AnthropicModelProvider)
 
     # Ensure CUSTOM provider is registered if needed for integration tests
     if (
@@ -219,6 +222,7 @@ def clear_model_restriction_env(monkeypatch):
     restriction_vars = [
         "OPENAI_ALLOWED_MODELS",
         "GOOGLE_ALLOWED_MODELS",
+        "ANTHROPIC_ALLOWED_MODELS",
         "XAI_ALLOWED_MODELS",
         "OPENROUTER_ALLOWED_MODELS",
         "DIAL_ALLOWED_MODELS",

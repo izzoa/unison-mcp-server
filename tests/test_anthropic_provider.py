@@ -154,6 +154,12 @@ class TestRegistrationAndPrecedence:
         configure_providers(registry)
         return registry
 
+    def test_priority_order_places_native_before_openrouter(self):
+        """Lock ANTHROPIC's slot in the priority order: native wins alias collisions."""
+        order = list(ModelProviderRegistry.PROVIDER_PRIORITY_ORDER)
+        assert ProviderType.ANTHROPIC in order
+        assert order.index(ProviderType.ANTHROPIC) < order.index(ProviderType.OPENROUTER)
+
     def test_anthropic_key_registers_and_exposes_catalog(self):
         _reset_restrictions()
         with patch.dict(os.environ, {**BASE_ENV, "ANTHROPIC_API_KEY": "sk-ant-real"}, clear=True):

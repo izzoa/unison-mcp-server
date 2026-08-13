@@ -58,7 +58,14 @@ def configure_providers(registry=None):
 
     # Log environment variable status for debugging
     logger.debug("Checking environment variables for API keys...")
-    api_keys_to_check = ["OPENAI_API_KEY", "OPENROUTER_API_KEY", "GEMINI_API_KEY", "XAI_API_KEY", "CUSTOM_API_URL"]
+    api_keys_to_check = [
+        "OPENAI_API_KEY",
+        "OPENROUTER_API_KEY",
+        "GEMINI_API_KEY",
+        "ANTHROPIC_API_KEY",
+        "XAI_API_KEY",
+        "CUSTOM_API_URL",
+    ]
     for key in api_keys_to_check:
         value = get_env(key)
         logger.debug(f"  {key}: {'[PRESENT]' if value else '[MISSING]'}")
@@ -228,7 +235,13 @@ def configure_providers(registry=None):
 
         # Validate restrictions against known models
         provider_instances = {}
-        provider_types_to_validate = [ProviderType.GOOGLE, ProviderType.OPENAI, ProviderType.XAI, ProviderType.DIAL]
+        provider_types_to_validate = [
+            ProviderType.GOOGLE,
+            ProviderType.OPENAI,
+            ProviderType.ANTHROPIC,
+            ProviderType.XAI,
+            ProviderType.DIAL,
+        ]
         for provider_type in provider_types_to_validate:
             provider = registry.get_provider(provider_type)
             if provider:

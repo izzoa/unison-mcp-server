@@ -77,6 +77,7 @@ The available models depend on your configuration:
 **API Keys Required:**
 - `GEMINI_API_KEY` - Enables Gemini Pro and Flash models
 - `OPENAI_API_KEY` - Enables OpenAI O3, O4-mini, and GPT models
+- `ANTHROPIC_API_KEY` - Enables native Claude models (Fable, Opus, Sonnet, Haiku)
 - `OPENROUTER_API_KEY` - Enables access to multiple providers through OpenRouter
 - `CUSTOM_API_URL` - Enables local/custom models (Ollama, vLLM, etc.)
 

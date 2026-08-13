@@ -47,6 +47,10 @@ Regardless of your default configuration, you can specify models per request:
 | **`gpt5`** (GPT-5) | OpenAI | 400K tokens | Advanced model with reasoning support | Complex problems requiring advanced reasoning |
 | **`gpt5-mini`** (GPT-5 Mini) | OpenAI | 400K tokens | Efficient variant with reasoning | Balanced performance and capability |
 | **`gpt5-nano`** (GPT-5 Nano) | OpenAI | 400K tokens | Fastest, cheapest GPT-5 variant | Summarization and classification tasks |
+| **`fable`** (Claude Fable 5) | Anthropic | 1M tokens | Anthropic's most capable model, extended thinking | Hardest reasoning, deep architectural analysis |
+| **`opus`** (Claude Opus 5) | Anthropic | 1M tokens | Flagship Claude with extended thinking | Complex analysis, critical code reviews |
+| **`sonnet`** (Claude Sonnet 5) | Anthropic | 1M tokens | Balanced Claude, extended thinking + vision | Everyday deep work, agentic flows |
+| **`haiku`** (Claude Haiku 4.5) | Anthropic | 200K tokens | Fast, cost-efficient Claude | Quick checks, summaries |
 | **`grok-4`** | X.AI | 256K tokens | Latest flagship Grok model with reasoning, vision | Complex analysis, reasoning tasks |
 | **`grok-4.1-fast-reasoning`** | X.AI | 2M tokens | High-performance Grok 4.1 Fast Reasoning with vision | Fast responses and light reasoning |
 | **`llama`** (Llama 3.2) | Custom/Local | 128K tokens | Local inference, privacy | On-device analysis, cost-free processing |
@@ -61,6 +65,10 @@ cloud models (expensive/powerful) AND local models (free/private) in the same co
   - **Flash 2.5**: Ultra-fast with thinking support (24K thinking tokens)
   - **Flash 2.0**: Latest fast model with audio/video input (24K thinking tokens)
   - **Flash Lite 2.0**: Text-only lightweight model (no thinking support)
+- **Claude Models (native)**: Extended-thinking budgets mapped from thinking modes, vision support
+  - **Fable 5 / Opus 5 / Sonnet 5**: 1M context, up to 128K output, deep extended thinking
+  - **Opus 4.8 / Sonnet 4.6**: previous generation, still first-class
+  - **Haiku 4.5**: 200K context, fast and cost-efficient
 - **O3/O4 Models**: Excellent reasoning, systematic analysis, 200K context
 - **GPT-4.1**: Extended context window (1M tokens), general capabilities
 - **GPT-5.2 Series**: Latest flagship reasoning models, 400K context
@@ -166,7 +174,7 @@ All tools that work with files support **both individual files and entire direct
 **`analyze`** - Analyze files or directories
 - `files`: List of file paths or directories (required)
 - `question`: What to analyze (required)  
-- `model`: auto|pro|flash|flash-2.0|flashlite|o3|o3-mini|o4-mini|gpt4.1|gpt5.2|gpt5.1-codex|gpt5.1-codex-mini|gpt5|gpt5-mini|gpt5-nano (default: server default)
+- `model`: auto|pro|flash|flash-2.0|flashlite|o3|o3-mini|o4-mini|gpt4.1|gpt5.2|gpt5.1-codex|gpt5.1-codex-mini|gpt5|gpt5-mini|gpt5-nano|opus|sonnet|haiku|fable (default: server default)
 - `analysis_type`: architecture|performance|security|quality|general
 - `output_format`: summary|detailed|actionable
 - `thinking_mode`: minimal|low|medium|high|max (default: medium, Gemini only)
@@ -181,7 +189,7 @@ All tools that work with files support **both individual files and entire direct
 
 **`codereview`** - Review code files or directories
 - `files`: List of file paths or directories (required)
-- `model`: auto|pro|flash|flash-2.0|flashlite|o3|o3-mini|o4-mini|gpt4.1|gpt5.2|gpt5.1-codex|gpt5.1-codex-mini|gpt5|gpt5-mini|gpt5-nano (default: server default)
+- `model`: auto|pro|flash|flash-2.0|flashlite|o3|o3-mini|o4-mini|gpt4.1|gpt5.2|gpt5.1-codex|gpt5.1-codex-mini|gpt5|gpt5-mini|gpt5-nano|opus|sonnet|haiku|fable (default: server default)
 - `review_type`: full|security|performance|quick
 - `focus_on`: Specific aspects to focus on
 - `standards`: Coding standards to enforce
@@ -197,7 +205,7 @@ All tools that work with files support **both individual files and entire direct
 
 **`debug`** - Debug with file context
 - `error_description`: Description of the issue (required)
-- `model`: auto|pro|flash|flash-2.0|flashlite|o3|o3-mini|o4-mini|gpt4.1|gpt5.2|gpt5.1-codex|gpt5.1-codex-mini|gpt5|gpt5-mini|gpt5-nano (default: server default)
+- `model`: auto|pro|flash|flash-2.0|flashlite|o3|o3-mini|o4-mini|gpt4.1|gpt5.2|gpt5.1-codex|gpt5.1-codex-mini|gpt5|gpt5-mini|gpt5-nano|opus|sonnet|haiku|fable (default: server default)
 - `error_context`: Stack trace or logs
 - `files`: Files or directories related to the issue
 - `runtime_info`: Environment details
@@ -213,7 +221,7 @@ All tools that work with files support **both individual files and entire direct
 
 **`thinkdeep`** - Extended analysis with file context
 - `current_analysis`: Your current thinking (required)
-- `model`: auto|pro|flash|flash-2.0|flashlite|o3|o3-mini|o4-mini|gpt4.1|gpt5.2|gpt5.1-codex|gpt5.1-codex-mini|gpt5|gpt5-mini|gpt5-nano (default: server default)
+- `model`: auto|pro|flash|flash-2.0|flashlite|o3|o3-mini|o4-mini|gpt4.1|gpt5.2|gpt5.1-codex|gpt5.1-codex-mini|gpt5|gpt5-mini|gpt5-nano|opus|sonnet|haiku|fable (default: server default)
 - `problem_context`: Additional context
 - `focus_areas`: Specific aspects to focus on
 - `files`: Files or directories for context
@@ -229,7 +237,7 @@ All tools that work with files support **both individual files and entire direct
 **`testgen`** - Comprehensive test generation with edge case coverage
 - `files`: Code files or directories to generate tests for (required)
 - `prompt`: Description of what to test, testing objectives, and scope (required)
-- `model`: auto|pro|flash|flash-2.0|flashlite|o3|o3-mini|o4-mini|gpt4.1|gpt5.2|gpt5.1-codex|gpt5.1-codex-mini|gpt5|gpt5-mini|gpt5-nano (default: server default)
+- `model`: auto|pro|flash|flash-2.0|flashlite|o3|o3-mini|o4-mini|gpt4.1|gpt5.2|gpt5.1-codex|gpt5.1-codex-mini|gpt5|gpt5-mini|gpt5-nano|opus|sonnet|haiku|fable (default: server default)
 - `test_examples`: Optional existing test files as style/pattern reference
 - `thinking_mode`: minimal|low|medium|high|max (default: medium, Gemini only)
 
@@ -244,7 +252,7 @@ All tools that work with files support **both individual files and entire direct
 - `files`: Code files or directories to analyze for refactoring opportunities (required)
 - `prompt`: Description of refactoring goals, context, and specific areas of focus (required)
 - `refactor_type`: codesmells|decompose|modernize|organization (required)
-- `model`: auto|pro|flash|flash-2.0|flashlite|o3|o3-mini|o4-mini|gpt4.1|gpt5.2|gpt5.1-codex|gpt5.1-codex-mini|gpt5|gpt5-mini|gpt5-nano (default: server default)
+- `model`: auto|pro|flash|flash-2.0|flashlite|o3|o3-mini|o4-mini|gpt4.1|gpt5.2|gpt5.1-codex|gpt5.1-codex-mini|gpt5|gpt5-mini|gpt5-nano|opus|sonnet|haiku|fable (default: server default)
 - `focus_areas`: Specific areas to focus on (e.g., 'performance', 'readability', 'maintainability', 'security')
 - `style_guide_examples`: Optional existing code files to use as style/pattern reference
 - `thinking_mode`: minimal|low|medium|high|max (default: medium, Gemini only)
@@ -346,6 +354,7 @@ The Unison MCP server supports vision-capable models for analyzing images, diagr
 **Supported Models:**
 - **Gemini 3.0 Pro & Flash**: Excellent for diagrams, architecture analysis, UI mockups (up to 20MB total)
 - **OpenAI O3/O4 series**: Strong for visual debugging, error screenshots (up to 20MB total)
+- **Claude models (native)**: All six curated models (Fable, Opus, Sonnet, Haiku) are vision-capable via `ANTHROPIC_API_KEY`
 - **Claude models via OpenRouter**: Good for code screenshots, visual analysis (up to 5MB total)
 - **Custom models**: Support varies by model, with 40MB maximum enforced for abuse prevention
 

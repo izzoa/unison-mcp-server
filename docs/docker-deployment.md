@@ -38,6 +38,9 @@ GEMINI_API_KEY=your_gemini_api_key_here
 # OpenAI
 OPENAI_API_KEY=your_openai_api_key_here
 
+# Anthropic (Claude) - native Messages API
+ANTHROPIC_API_KEY=your_anthropic_api_key_here
+
 # X.AI GROK
 XAI_API_KEY=your_xai_api_key_here
 

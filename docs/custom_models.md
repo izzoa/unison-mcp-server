@@ -21,7 +21,7 @@ This guide covers setting up multiple AI model providers including OpenRouter, c
 - **Private/enterprise APIs** that use OpenAI-compatible format
 - **Cost control** with local hardware
 
-**Use native APIs (Gemini/OpenAI) when you want:**
+**Use native APIs (Gemini/OpenAI/Anthropic/X.AI) when you want:**
 - Direct access to specific providers without intermediary
 - Potentially lower latency and costs
 - Access to the latest model features immediately upon release
@@ -31,7 +31,7 @@ This guide covers setting up multiple AI model providers including OpenRouter, c
 - Custom URLs for local models (Ollama Llama)
 - Native APIs for specific providers (Gemini Pro with extended thinking)
 
-**Note:** When multiple providers offer the same model name, native APIs take priority over OpenRouter.
+**Note:** When multiple providers offer the same model name, native APIs take priority over OpenRouter. Concretely: the `opus`, `sonnet`, and `haiku` aliases exist in both the OpenRouter catalogue (below) and the native Anthropic catalogue — with `ANTHROPIC_API_KEY` set, those aliases route to native Claude (`claude-opus-5`, `claude-sonnet-5`, `claude-haiku-4-5`) instead of the OpenRouter entries.
 
 ## Model Aliases
 
@@ -39,6 +39,7 @@ Unison ships multiple registries:
 
 - `conf/openai_models.json` – native OpenAI catalogue (override with `OPENAI_MODELS_CONFIG_PATH`)
 - `conf/gemini_models.json` – native Google Gemini catalogue (`GEMINI_MODELS_CONFIG_PATH`)
+- `conf/anthropic_models.json` – native Anthropic (Claude) catalogue (`ANTHROPIC_MODELS_CONFIG_PATH`)
 - `conf/xai_models.json` – native X.AI / GROK catalogue (`XAI_MODELS_CONFIG_PATH`)
 - `conf/openrouter_models.json` – OpenRouter catalogue (`OPENROUTER_MODELS_CONFIG_PATH`)
 - `conf/dial_models.json` – DIAL aggregation catalogue (`DIAL_MODELS_CONFIG_PATH`)
@@ -75,7 +76,7 @@ Consult the JSON file for the full list, aliases, and capability flags. Add new 
 
 View the baseline OpenRouter catalogue in [`conf/openrouter_models.json`](conf/openrouter_models.json) and populate [`conf/custom_models.json`](conf/custom_models.json) with your local models.
 
-Native catalogues (`conf/openai_models.json`, `conf/gemini_models.json`, `conf/xai_models.json`, `conf/dial_models.json`) follow the same schema. Updating those files lets you:
+Native catalogues (`conf/openai_models.json`, `conf/gemini_models.json`, `conf/anthropic_models.json`, `conf/xai_models.json`, `conf/dial_models.json`) follow the same schema. Updating those files lets you:
 
 - Expose new aliases (e.g., map `enterprise-pro` to `gpt-5.2-pro`)
 - Advertise support for JSON mode or vision if the upstream provider adds it

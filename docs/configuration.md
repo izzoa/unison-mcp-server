@@ -34,6 +34,10 @@ GEMINI_API_KEY=your_gemini_api_key_here
 OPENAI_API_KEY=your_openai_api_key_here
 # Get from: https://platform.openai.com/api-keys
 
+# Anthropic (Claude) API — native Messages API with extended thinking
+ANTHROPIC_API_KEY=your_anthropic_api_key_here
+# Get from: https://console.anthropic.com/
+
 # X.AI GROK API
 XAI_API_KEY=your_xai_api_key_here
 # Get from: https://console.x.ai/
@@ -70,6 +74,7 @@ DEFAULT_MODEL=auto  # Claude picks best model for each task (recommended)
 - **Available Models:** The canonical capability data for native providers lives in JSON manifests under `conf/`:
   - `conf/openai_models.json` – OpenAI catalogue (can be overridden with `OPENAI_MODELS_CONFIG_PATH`)
   - `conf/gemini_models.json` – Gemini catalogue (`GEMINI_MODELS_CONFIG_PATH`)
+  - `conf/anthropic_models.json` – native Anthropic (Claude) catalogue (`ANTHROPIC_MODELS_CONFIG_PATH`)
   - `conf/xai_models.json` – X.AI / GROK catalogue (`XAI_MODELS_CONFIG_PATH`)
   - `conf/openrouter_models.json` – OpenRouter catalogue (`OPENROUTER_MODELS_CONFIG_PATH`)
   - `conf/dial_models.json` – DIAL aggregation catalogue (`DIAL_MODELS_CONFIG_PATH`)
@@ -83,6 +88,7 @@ DEFAULT_MODEL=auto  # Claude picks best model for each task (recommended)
   |----------|-----------------|-----------------|
   | OpenAI | `gpt-5.2`, `gpt-5.1-codex`, `gpt-5.1-codex-mini`, `gpt-5`, `gpt-5.2-pro`, `gpt-5-mini`, `gpt-5-nano`, `gpt-5-codex`, `gpt-4.1`, `o3`, `o3-mini`, `o3-pro`, `o4-mini` | `gpt5.2`, `gpt-5.2`, `5.2`, `gpt5.1-codex`, `codex-5.1`, `codex-mini`, `gpt5`, `gpt5pro`, `mini`, `nano`, `codex`, `o3mini`, `o3pro`, `o4mini` |
   | Gemini | `gemini-2.5-pro`, `gemini-2.5-flash`, `gemini-2.0-flash`, `gemini-2.0-flash-lite` | `pro`, `gemini-pro`, `flash`, `flash-2.0`, `flashlite` |
+  | Anthropic | `claude-fable-5`, `claude-opus-5`, `claude-opus-4-8`, `claude-sonnet-5`, `claude-sonnet-4-6`, `claude-haiku-4-5` | `fable`, `opus`, `sonnet`, `claude`, `haiku`, `opus4`, `sonnet4` |
   | X.AI | `grok-4`, `grok-4.1-fast` | `grok`, `grok4`, `grok-4.1-fast-reasoning` |
   | OpenRouter | See `conf/openrouter_models.json` for the continually evolving catalogue | e.g., `opus`, `sonnet`, `flash`, `pro`, `mistral` |
   | Custom | User-managed entries such as `llama3.2` | Define your own aliases per entry |
@@ -178,6 +184,9 @@ OPENAI_ALLOWED_MODELS=gpt-5.1-codex-mini,gpt-5-mini,o3-mini,o4-mini,mini
 # Gemini model restrictions  
 GOOGLE_ALLOWED_MODELS=flash,pro
 
+# Anthropic (Claude) model restrictions
+ANTHROPIC_ALLOWED_MODELS=opus,sonnet,haiku
+
 # X.AI GROK model restrictions
 XAI_ALLOWED_MODELS=grok-4,grok-4.1-fast-reasoning
 
@@ -218,10 +227,18 @@ XAI_ALLOWED_MODELS=grok,grok-4.1-fast-reasoning
 # Override default location of built-in catalogues
 OPENAI_MODELS_CONFIG_PATH=/path/to/openai_models.json
 GEMINI_MODELS_CONFIG_PATH=/path/to/gemini_models.json
+ANTHROPIC_MODELS_CONFIG_PATH=/path/to/anthropic_models.json
 XAI_MODELS_CONFIG_PATH=/path/to/xai_models.json
 OPENROUTER_MODELS_CONFIG_PATH=/path/to/openrouter_models.json
 DIAL_MODELS_CONFIG_PATH=/path/to/dial_models.json
 CUSTOM_MODELS_CONFIG_PATH=/path/to/custom_models.json
+```
+
+**Anthropic Gateway Override:**
+```env
+# Route the native Anthropic provider through a gateway/proxy instead of
+# https://api.anthropic.com (placeholder values count as unset)
+ANTHROPIC_API_URL=https://your-gateway.example.com
 ```
 
 **Conversation Settings:**

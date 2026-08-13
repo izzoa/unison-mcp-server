@@ -1060,6 +1060,7 @@ setup_env_file() {
     local api_keys=(
         "GEMINI_API_KEY:your_gemini_api_key_here"
         "OPENAI_API_KEY:your_openai_api_key_here"
+        "ANTHROPIC_API_KEY:your_anthropic_api_key_here"
         "XAI_API_KEY:your_xai_api_key_here"
         "DIAL_API_KEY:your_dial_api_key_here"
         "OPENROUTER_API_KEY:your_openrouter_api_key_here"
@@ -1104,6 +1105,7 @@ check_api_keys() {
     local api_keys=(
         "GEMINI_API_KEY:your_gemini_api_key_here"
         "OPENAI_API_KEY:your_openai_api_key_here"
+        "ANTHROPIC_API_KEY:your_anthropic_api_key_here"
         "XAI_API_KEY:your_xai_api_key_here"
         "DIAL_API_KEY:your_dial_api_key_here"
         "OPENROUTER_API_KEY:your_openrouter_api_key_here"
@@ -1134,6 +1136,7 @@ check_api_keys() {
         echo "To add API keys, edit .env and add at least one:"
         echo "  GEMINI_API_KEY=your-actual-key"
         echo "  OPENAI_API_KEY=your-actual-key"
+        echo "  ANTHROPIC_API_KEY=your-actual-key"
         echo "  XAI_API_KEY=your-actual-key"
         echo "  DIAL_API_KEY=your-actual-key"
         echo "  OPENROUTER_API_KEY=your-actual-key"
@@ -1190,6 +1193,7 @@ parse_env_variables() {
             "XAI_API_KEY"
             "DIAL_API_KEY"
             "OPENROUTER_API_KEY"
+            "ANTHROPIC_API_KEY"
             "CUSTOM_API_URL"
             "CUSTOM_API_KEY"
             "CUSTOM_MODEL_NAME"

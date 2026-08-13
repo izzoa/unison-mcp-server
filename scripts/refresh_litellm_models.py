@@ -51,6 +51,11 @@ LITELLM_URL = "https://raw.githubusercontent.com/BerriAI/litellm/main/" "model_p
 CONF_DIR = REPO_ROOT / "conf"
 
 # Map litellm_provider values → (ProviderType, conf filename)
+#
+# ProviderType.ANTHROPIC is deliberately absent: conf/anthropic_models.json is
+# hand-curated to the latest two generations per Claude family, so the weekly
+# LiteLLM refresh must not add or enrich entries there (the same reason the
+# provider is absent from providers/litellm_adapter.py's discovery maps).
 PROVIDER_MAP: dict[str, tuple[ProviderType, str]] = {
     "openai": (ProviderType.OPENAI, "openai_models.json"),
     "gemini": (ProviderType.GOOGLE, "gemini_models.json"),
