@@ -11,7 +11,7 @@ import logging
 from dataclasses import dataclass
 from typing import Any
 
-from utils.env import get_env
+from utils.env import get_custom_api_url, get_env
 
 logger = logging.getLogger(__name__)
 
@@ -118,14 +118,9 @@ def configure_providers(registry=None):
             logger.warning(f"Failed to load Azure OpenAI models: {exc}")
 
     # Special case: Custom provider (Ollama, vLLM, etc.)
-    custom_url = get_env("CUSTOM_API_URL")
-    if custom_url == "your_custom_api_url_here":
-        # The default .env template's placeholder is unconfigured — same
-        # treatment as the placeholder checks on every provider path above.
-        # Without this, a fresh .env registers the placeholder as a real
-        # endpoint and the server crashes in URL validation at startup.
-        logger.debug("Custom API URL is placeholder value")
-        custom_url = None
+    # get_custom_api_url treats the .env template placeholder as unset — the
+    # same rule listmodels applies, so registration and introspection agree.
+    custom_url = get_custom_api_url()
     if custom_url:
         # IMPORTANT: Always read CUSTOM_API_KEY even if empty
         # - Some providers (vLLM, LM Studio, enterprise APIs) require authentication
@@ -147,7 +142,7 @@ def configure_providers(registry=None):
 
         # Factory function that creates CustomProvider with proper parameters
         def custom_provider_factory(api_key=None):
-            base_url = get_env("CUSTOM_API_URL", "") or ""
+            base_url = get_custom_api_url() or ""
             return CustomProvider(api_key=api_key or "", base_url=base_url)
 
         registry.register_provider(ProviderType.CUSTOM, custom_provider_factory)

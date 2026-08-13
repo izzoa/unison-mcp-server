@@ -16,7 +16,7 @@ from providers.registries.openrouter import OpenRouterModelRegistry
 from tools.models import ToolModelCategory, ToolOutput
 from tools.shared.base_models import ToolRequest
 from tools.shared.base_tool import BaseTool
-from utils.env import get_env
+from utils.env import get_custom_api_url, get_env
 
 logger = logging.getLogger(__name__)
 
@@ -326,8 +326,9 @@ class ListModelsTool(BaseTool):
 
         output_lines.append("")
 
-        # Check Custom API
-        custom_url = get_env("CUSTOM_API_URL")
+        # Check Custom API (placeholder-aware: the .env template value counts
+        # as unset, matching provider registration in providers/configure.py)
+        custom_url = get_custom_api_url()
 
         output_lines.append(f"## Custom/Local API {'✅' if custom_url else '❌'}")
 

@@ -9,6 +9,8 @@ managed by ``tools.registry.ToolRegistry``.
 
 import asyncio
 import logging
+import os
+from pathlib import Path
 
 from mcp.server import Server
 from mcp.server.models import InitializationOptions
@@ -154,8 +156,38 @@ async def main():
         )
 
 
+def _resolve_pathological_cwd(cwd: Path | None = None) -> Path | None:
+    """Return the directory the server should switch into, or None to stay put.
+
+    GUI-launched MCP hosts spawn servers from non-workspace directories —
+    Claude Desktop uses C:\\Windows\\System32 on Windows and / on macOS. Every
+    downstream consumer of the process cwd (clink subagent spawns, clink's
+    read-only snapshot verifier, version's installation path) then points at a
+    system tree: the repo becomes invisible and the verifier attributes OS
+    writes (e.g. Windows event logs) to the model. Fall back to the server's
+    own directory for those cwds; a deliberate workspace cwd (Claude Code
+    launches the server from the project root) is preserved.
+    """
+    current = cwd if cwd is not None else Path.cwd()
+    server_root = Path(__file__).resolve().parent
+    if current == server_root:
+        return None
+    if current == Path(current.anchor):  # filesystem root: "/" or a bare drive
+        return server_root
+    system_root = os.environ.get("SystemRoot") or os.environ.get("windir")
+    if system_root:
+        base = Path(system_root)
+        if current in (base, base / "System32", base / "SysWOW64"):
+            return server_root
+    return None
+
+
 def run():
     """Console script entry point for unison-mcp-server."""
+    target = _resolve_pathological_cwd()
+    if target is not None:
+        logger.info(f"Launched from non-workspace directory {Path.cwd()}; working directory set to {target}")
+        os.chdir(target)
     try:
         asyncio.run(main())
     except KeyboardInterrupt:

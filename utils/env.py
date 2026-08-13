@@ -75,6 +75,24 @@ def get_env(key: str, default: str | None = None) -> str | None:
     return os.getenv(key, default)
 
 
+CUSTOM_API_URL_PLACEHOLDER = "your_custom_api_url_here"
+
+
+def get_custom_api_url() -> str | None:
+    """CUSTOM_API_URL with the .env template placeholder treated as unset.
+
+    Every reader must apply the same rule: provider registration refuses the
+    placeholder, so any surface reading the raw variable (listmodels, setup
+    diagnostics) would report a provider that registration never created and
+    contradict the registry-backed introspection in front of the user.
+    """
+
+    value = (get_env("CUSTOM_API_URL") or "").strip()
+    if not value or value == CUSTOM_API_URL_PLACEHOLDER:
+        return None
+    return value
+
+
 def get_env_bool(key: str, default: bool = False) -> bool:
     """Boolean helper that respects override semantics."""
 

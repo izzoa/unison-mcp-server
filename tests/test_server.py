@@ -2,6 +2,8 @@
 Tests for the main server functionality
 """
 
+from pathlib import Path
+
 import pytest
 
 from server import handle_call_tool
@@ -107,3 +109,46 @@ class TestServerTools:
         assert "## Server Information" in content
         assert "## Configuration" in content
         assert "Current Version" in content
+
+
+class TestResolvePathologicalCwd:
+    """The server must not trust a GUI-host cwd like System32 or /."""
+
+    def test_filesystem_root_falls_back_to_server_dir(self):
+        import server as server_module
+
+        target = server_module._resolve_pathological_cwd(Path("/"))
+        assert target == Path(server_module.__file__).resolve().parent
+
+    def test_windows_system_dirs_fall_back(self, tmp_path, monkeypatch):
+        import server as server_module
+
+        fake_root = tmp_path / "Windows"
+        (fake_root / "System32").mkdir(parents=True)
+        monkeypatch.setenv("SystemRoot", str(fake_root))
+
+        for cwd in (fake_root, fake_root / "System32", fake_root / "SysWOW64"):
+            assert server_module._resolve_pathological_cwd(cwd) is not None
+
+    def test_workspace_cwd_is_preserved(self, tmp_path, monkeypatch):
+        import server as server_module
+
+        monkeypatch.delenv("SystemRoot", raising=False)
+        monkeypatch.delenv("windir", raising=False)
+        assert server_module._resolve_pathological_cwd(tmp_path) is None
+
+    def test_server_root_is_preserved(self):
+        import server as server_module
+
+        server_root = Path(server_module.__file__).resolve().parent
+        assert server_module._resolve_pathological_cwd(server_root) is None
+
+
+class TestVersionProviderDisplay:
+    """Every ProviderType must have a row in the version tool's table."""
+
+    def test_display_names_cover_all_provider_types(self):
+        from providers.shared import ProviderType
+        from tools.version import PROVIDER_DISPLAY_NAMES
+
+        assert set(PROVIDER_DISPLAY_NAMES) == set(ProviderType)

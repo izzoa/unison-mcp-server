@@ -137,6 +137,26 @@ class TestListModelsTool:
             assert "Local models via Ollama" in content
 
     @pytest.mark.asyncio
+    async def test_custom_api_placeholder_counts_as_unconfigured(self, tool):
+        """The .env template placeholder must not present Custom/Local as live.
+
+        Provider registration already refuses the placeholder; listmodels
+        reading the raw env var made the two introspection tools contradict
+        each other (version said not configured, listmodels said configured).
+        """
+        env_vars = {"CUSTOM_API_URL": "your_custom_api_url_here", "DEFAULT_MODEL": "auto"}
+
+        with patch.dict(os.environ, env_vars, clear=True):
+            result = await tool.execute({})
+
+            response = json.loads(result[0].text)
+            content = response["content"]
+
+            assert "Custom/Local API ❌" in content
+            assert "your_custom_api_url_here" not in content
+            assert "**Configured Providers**: 0" in content
+
+    @pytest.mark.asyncio
     async def test_output_includes_usage_tips(self, tool):
         """Test that output includes helpful usage tips"""
         result = await tool.execute({})

@@ -24,11 +24,26 @@ except ImportError:
 from mcp.types import TextContent
 
 from config import __author__, __updated__, __version__
+from providers.shared import ProviderType
 from tools.models import ToolModelCategory, ToolOutput
 from tools.shared.base_models import ToolRequest
 from tools.shared.base_tool import BaseTool
 
 logger = logging.getLogger(__name__)
+
+# Display names for the provider-configuration table. The table iterates the
+# ProviderType enum itself so a newly added provider can never be silently
+# missing from `version` output (the enum value is the fallback label).
+PROVIDER_DISPLAY_NAMES: dict[ProviderType, str] = {
+    ProviderType.GOOGLE: "Google Gemini",
+    ProviderType.OPENAI: "OpenAI",
+    ProviderType.ANTHROPIC: "Anthropic",
+    ProviderType.AZURE: "Azure OpenAI",
+    ProviderType.XAI: "X.AI",
+    ProviderType.DIAL: "DIAL",
+    ProviderType.OPENROUTER: "OpenRouter",
+    ProviderType.CUSTOM: "Custom/Local",
+}
 
 
 def parse_version(version_str: str) -> tuple[int, int, int]:
@@ -308,22 +323,11 @@ class VersionTool(BaseTool):
         # Check for configured providers
         try:
             from providers.registry import get_default_registry
-            from providers.shared import ProviderType
 
             provider_status = []
 
-            # Check each provider type
-            provider_types = [
-                ProviderType.GOOGLE,
-                ProviderType.OPENAI,
-                ProviderType.XAI,
-                ProviderType.DIAL,
-                ProviderType.OPENROUTER,
-                ProviderType.CUSTOM,
-            ]
-            provider_names = ["Google Gemini", "OpenAI", "X.AI", "DIAL", "OpenRouter", "Custom/Local"]
-
-            for provider_type, provider_name in zip(provider_types, provider_names, strict=False):
+            for provider_type in ProviderType:
+                provider_name = PROVIDER_DISPLAY_NAMES.get(provider_type, provider_type.value)
                 provider = get_default_registry().get_provider(provider_type)
                 status = "✅ Configured" if provider is not None else "❌ Not configured"
                 provider_status.append(f"- **{provider_name}**: {status}")
