@@ -1147,18 +1147,48 @@ function Test-Docker {
 # MCP Client Configuration System
 # ----------------------------------------------------------------------------
 
+# Locate the config file of an MSIX-packaged Claude Desktop, or $null when no
+# package is present. Package folder names under %LOCALAPPDATA%\Packages are
+# NOT stable across distributions — observed as AnthropicPBC.Claude* (Store)
+# and Claude_<publisherhash> (MSIX installer) — so discovery is content-based:
+# any package whose LocalCache contains the app's virtualized Roaming\Claude
+# userData. Name-based fallbacks cover a package that has never been launched.
+function Get-ClaudeDesktopMsixConfigPath {
+    $packagesRoot = "$env:LOCALAPPDATA\Packages"
+    if (!(Test-Path $packagesRoot)) { return $null }
+
+    $dataDirs = @()
+    foreach ($pkg in Get-ChildItem -Path $packagesRoot -Directory -ErrorAction SilentlyContinue) {
+        $dataDir = Join-Path $pkg.FullName "LocalCache\Roaming\Claude"
+        if (Test-Path $dataDir) { $dataDirs += Get-Item $dataDir }
+    }
+    if ($dataDirs.Count -gt 0) {
+        # If several packages carry Claude data (e.g. a stale Store install
+        # next to the current one), prefer the most recently active.
+        $live = $dataDirs | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+        return (Join-Path $live.FullName "claude_desktop_config.json")
+    }
+
+    foreach ($filter in @("AnthropicPBC.Claude*", "Claude_*")) {
+        $pkg = Get-ChildItem -Path $packagesRoot -Directory -Filter $filter -ErrorAction SilentlyContinue |
+            Select-Object -First 1
+        if ($pkg) {
+            return (Join-Path $pkg.FullName "LocalCache\Roaming\Claude\claude_desktop_config.json")
+        }
+    }
+    return $null
+}
+
 function Get-ClaudeDesktopConfigPath {
-    # MSIX/Store installs of Claude Desktop virtualize %APPDATA% writes into
-    # the package's LocalCache, and once a virtualized copy of the config
-    # exists it shadows the real %APPDATA%\Claude file for the Store app.
+    # MSIX installs of Claude Desktop virtualize %APPDATA% writes into the
+    # package's LocalCache, and once a virtualized copy of the config exists
+    # it shadows the real %APPDATA%\Claude file for the packaged app.
     # Classic installs read %APPDATA%\Claude directly.
-    $msix = Get-ChildItem -Path "$env:LOCALAPPDATA\Packages" -Directory -Filter "AnthropicPBC.Claude*" -ErrorAction SilentlyContinue |
-        Select-Object -First 1
-    if ($msix) {
-        $msixFile = Join-Path $msix.FullName "LocalCache\Roaming\Claude\claude_desktop_config.json"
-        # An existing virtualized copy always wins (it shadows %APPDATA% for
-        # the Store app). Otherwise target the virtualized path only when
-        # there is no classic data dir a classic install would be reading.
+    $msixFile = Get-ClaudeDesktopMsixConfigPath
+    if ($msixFile) {
+        # An existing virtualized copy always wins. Otherwise target the
+        # virtualized path only when there is no classic data dir a classic
+        # install would be reading.
         if ((Test-Path $msixFile) -or -not (Test-Path "$env:APPDATA\Claude")) {
             return $msixFile
         }
@@ -1176,13 +1206,18 @@ function Get-ClaudeDesktopConfigPath {
 function Sync-ClaudeDesktopConfigMirror {
     param([Parameter(Mandatory = $true)][string]$WrittenPath)
 
-    $msix = Get-ChildItem -Path "$env:LOCALAPPDATA\Packages" -Directory -Filter "AnthropicPBC.Claude*" -ErrorAction SilentlyContinue |
-        Select-Object -First 1
-    if (!$msix) { return }
+    $msixFile = Get-ClaudeDesktopMsixConfigPath
+    if (!$msixFile) { return }
 
     $classicFile = "$env:APPDATA\Claude\claude_desktop_config.json"
-    $msixFile = Join-Path $msix.FullName "LocalCache\Roaming\Claude\claude_desktop_config.json"
     $mirror = if ($WrittenPath -eq $msixFile) { $classicFile } else { $msixFile }
+
+    if ($mirror -eq $msixFile -and (Test-Path $msixFile)) {
+        # The virtualized copy is the packaged app's live config; primary
+        # selection targets it whenever it exists, so never overwrite it with
+        # content merged from the classic side.
+        return
+    }
 
     try {
         $mirrorDir = Split-Path $mirror -Parent
@@ -1207,16 +1242,19 @@ $script:McpClientDefinitions = @(
         Name           = "Claude Desktop"
         # Claude Desktop install layouts vary: classic installs keep app data
         # at %APPDATA%\Claude (updater under %LOCALAPPDATA%\AnthropicClaude,
-        # some builds use %LOCALAPPDATA%\Claude); MSIX/Store deployments live
-        # under %LOCALAPPDATA%\Packages\AnthropicPBC.Claude*. Detect any of
-        # them — never the MCP config file itself, which only exists once MCP
-        # has been configured. The writer creates the config file (and its
-        # directory) at the path the installed variant actually reads.
+        # some builds use %LOCALAPPDATA%\Claude); MSIX deployments live under
+        # %LOCALAPPDATA%\Packages with a distribution-dependent package name —
+        # observed as AnthropicPBC.Claude* (Store) and Claude_<publisherhash>
+        # (MSIX installer). Detect any of them — never the MCP config file
+        # itself, which only exists once MCP has been configured. The writer
+        # creates the config file (and its directory) at the path the
+        # installed variant actually reads.
         DetectionPaths = @(
             "$env:APPDATA\Claude"
             "$env:LOCALAPPDATA\Claude"
             "$env:LOCALAPPDATA\AnthropicClaude"
             "$env:LOCALAPPDATA\Packages\AnthropicPBC.Claude*"
+            "$env:LOCALAPPDATA\Packages\Claude_*"
         )
         DetectionType  = "Path"
         ConfigPath     = (Get-ClaudeDesktopConfigPath)
