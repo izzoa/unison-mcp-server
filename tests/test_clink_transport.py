@@ -385,3 +385,45 @@ class TestHostCancellationReapsSubprocess:
         with pytest.raises(asyncio.CancelledError):
             await task
         assert reaped.get("proc") is process
+
+
+# ---------------------------------------------------------------------------
+# Nonzero exits surface the CLI's own stderr in the error message
+# ---------------------------------------------------------------------------
+
+
+class TestNonzeroExitErrorMessage:
+    @pytest.mark.asyncio
+    async def test_stderr_excerpt_reaches_error_message(self, monkeypatch) -> None:
+        agent, role = _make_agent()
+        process = _StubProcess(
+            stdout=b"",
+            stderr=b"Error: Access denied by policy settings (Request ID: X)\nYour Copilot CLI policy...\n",
+            returncode=1,
+        )
+
+        async def fake_exec(*args, **kwargs):
+            return process
+
+        monkeypatch.setattr(asyncio, "create_subprocess_exec", fake_exec)
+        monkeypatch.setattr(shutil, "which", lambda name: f"/usr/bin/{name}")
+
+        with pytest.raises(CLIAgentError) as exc_info:
+            await agent.run(role=role, prompt="x", files=[], images=[])
+        assert "exited with status 1" in str(exc_info.value)
+        assert "Access denied by policy settings" in str(exc_info.value)
+
+    @pytest.mark.asyncio
+    async def test_empty_stderr_keeps_plain_message(self, monkeypatch) -> None:
+        agent, role = _make_agent()
+        process = _StubProcess(stdout=b"", stderr=b"", returncode=2)
+
+        async def fake_exec(*args, **kwargs):
+            return process
+
+        monkeypatch.setattr(asyncio, "create_subprocess_exec", fake_exec)
+        monkeypatch.setattr(shutil, "which", lambda name: f"/usr/bin/{name}")
+
+        with pytest.raises(CLIAgentError) as exc_info:
+            await agent.run(role=role, prompt="x", files=[], images=[])
+        assert str(exc_info.value).endswith("exited with status 2")

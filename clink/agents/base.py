@@ -387,8 +387,16 @@ class BaseCLIAgent:
                 return recovered
 
         if return_code != 0:
+            # Lead with the CLI's own explanation. A bare "exited with status 1"
+            # invites the caller to guess (fast policy denials have been misread
+            # as timeouts); the full stdout/stderr remain in the error metadata.
+            message = f"CLI '{self.client.name}' exited with status {return_code}"
+            stderr_detail = stderr_text.strip()
+            if stderr_detail:
+                excerpt = " ".join(stderr_detail.splitlines()[:3])[:400]
+                message = f"{message}: {excerpt}"
             raise CLIAgentError(
-                f"CLI '{self.client.name}' exited with status {return_code}",
+                message,
                 returncode=return_code,
                 stdout=stdout_text,
                 stderr=stderr_text,
