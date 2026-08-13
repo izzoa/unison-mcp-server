@@ -1134,11 +1134,15 @@ function Test-Docker {
 $script:McpClientDefinitions = @(
     @{
         Name           = "Claude Desktop"
-        DetectionPath  = "$env:APPDATA\Claude\claude_desktop_config.json"
+        # Detect the app's data directory, NOT the MCP config file: a fresh
+        # Claude Desktop install has no claude_desktop_config.json until MCP
+        # is first configured, so keying detection on that file skipped every
+        # machine this integration exists for. The directory appears on first
+        # app launch; the generic writer creates the config file when missing.
+        DetectionPath  = "$env:APPDATA\Claude"
         DetectionType  = "Path"
         ConfigPath     = "$env:APPDATA\Claude\claude_desktop_config.json"
         ConfigJsonPath = "mcpServers.unison"
-        NeedsConfigDir = $true
     },
     @{
         # VS Code reads MCP servers from a user-profile `mcp.json` with a
