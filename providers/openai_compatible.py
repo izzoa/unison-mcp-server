@@ -39,8 +39,8 @@ class EmptyContentError(RuntimeError):
         self,
         message: str,
         *,
-        finish_reason: Optional[str] = None,
-        reasoning_tokens: Optional[int] = None,
+        finish_reason: str | None = None,
+        reasoning_tokens: int | None = None,
     ) -> None:
         super().__init__(message)
         self.finish_reason = finish_reason
