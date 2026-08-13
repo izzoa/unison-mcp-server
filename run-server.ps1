@@ -134,6 +134,11 @@ $ErrorActionPreference = "Stop"
 $env:UV_SYSTEM_CERTS = "true"
 $env:UV_NATIVE_TLS = "1"
 
+# uv installs by hardlinking from its cache, which OneDrive-synced folders
+# reject ("incompatible hardlinks", os error 396) — corporate checkouts often
+# live under OneDrive. Copying is slightly slower but always works.
+$env:UV_LINK_MODE = "copy"
+
 # ----------------------------------------------------------------------------
 # Constants and Configuration  
 # ----------------------------------------------------------------------------
@@ -608,7 +613,9 @@ function Initialize-Environment {
         
         try {
             Write-Info "Creating virtual environment with uv..."
-            uv venv $VENV_PATH --python 3.12
+            # --seed installs pip into the venv: uv-created venvs are pip-less
+            # by default, which would strand the pip fallback path
+            uv venv --seed $VENV_PATH --python 3.12
             if ($LASTEXITCODE -eq 0) {
                 Write-Success "Environment created with uv"
                 return Get-AbsolutePath "$VENV_PATH\Scripts\python.exe"
@@ -802,6 +809,16 @@ function Install-Dependencies {
     # Fallback to pip
     Write-Info "Installing dependencies with pip..."
     $pipCmd = Join-Path (Split-Path $PythonPath -Parent) "pip.exe"
+    if (!(Test-Path $pipCmd)) {
+        # A venv created by uv without --seed has no pip at all; bootstrap it
+        # so the fallback can proceed.
+        Write-Info "pip not present in venv - bootstrapping via ensurepip..."
+        & $PythonPath -m ensurepip --upgrade *> $null
+        if (!(Test-Path $pipCmd)) {
+            Write-Error "pip is unavailable in the virtual environment and ensurepip could not install it."
+            exit 1
+        }
+    }
     
     try {
         # Upgrade pip via the interpreter; pip.exe cannot modify itself on
