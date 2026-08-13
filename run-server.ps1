@@ -196,6 +196,22 @@ function Test-Command {
     }
 }
 
+# Write text as UTF-8 guaranteed WITHOUT a byte-order mark, regardless of
+# PowerShell version or $PSDefaultParameterValues encoding overrides (Windows
+# PowerShell 5.1's `-Encoding UTF8` prepends a BOM; pwsh 7 defaults can be
+# reconfigured). Node-based MCP hosts (Claude Desktop, Gemini CLI, Qwen CLI,
+# Cursor, ...) load their JSON configs with JSON.parse, which rejects a
+# leading BOM — the whole config is then silently ignored and the server
+# never appears in the host.
+function Write-Utf8NoBom {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][AllowEmptyString()][string]$Content
+    )
+    $resolved = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Path)
+    [System.IO.File]::WriteAllText($resolved, $Content, (New-Object System.Text.UTF8Encoding($false)))
+}
+
 # Alternative method to force remove locked directories
 function Remove-LockedDirectory {
     param([string]$Path)
@@ -984,7 +1000,7 @@ DEFAULT_THINKING_MODE_THINKDEEP=high
 #TZ=UTC
 "@
         
-        $defaultEnv | Out-File -FilePath ".env" -Encoding UTF8
+        Write-Utf8NoBom -Path ".env" -Content $defaultEnv
         Write-Success "Default .env file created"
         Write-Warning "Please edit .env file with your actual API keys"
     }
@@ -1132,16 +1148,57 @@ function Test-Docker {
 # ----------------------------------------------------------------------------
 
 function Get-ClaudeDesktopConfigPath {
-    # MSIX/Store installs of Claude Desktop virtualize their app data, so the
-    # app reads its config from inside the package's LocalCache — a file
-    # written to the real %APPDATA%\Claude would be invisible to it. Classic
-    # installs read %APPDATA%\Claude directly.
+    # MSIX/Store installs of Claude Desktop virtualize %APPDATA% writes into
+    # the package's LocalCache, and once a virtualized copy of the config
+    # exists it shadows the real %APPDATA%\Claude file for the Store app.
+    # Classic installs read %APPDATA%\Claude directly.
     $msix = Get-ChildItem -Path "$env:LOCALAPPDATA\Packages" -Directory -Filter "AnthropicPBC.Claude*" -ErrorAction SilentlyContinue |
         Select-Object -First 1
-    if ($msix -and -not (Test-Path "$env:APPDATA\Claude")) {
-        return (Join-Path $msix.FullName "LocalCache\Roaming\Claude\claude_desktop_config.json")
+    if ($msix) {
+        $msixFile = Join-Path $msix.FullName "LocalCache\Roaming\Claude\claude_desktop_config.json"
+        # An existing virtualized copy always wins (it shadows %APPDATA% for
+        # the Store app). Otherwise target the virtualized path only when
+        # there is no classic data dir a classic install would be reading.
+        if ((Test-Path $msixFile) -or -not (Test-Path "$env:APPDATA\Claude")) {
+            return $msixFile
+        }
     }
     return "$env:APPDATA\Claude\claude_desktop_config.json"
+}
+
+# Keep the Store (MSIX) and classic Claude Desktop config locations identical.
+# An MSIX package may or may not virtualize %APPDATA% depending on its
+# manifest (unvirtualizedResources), so from outside the package there is no
+# way to know whether the app reads the real %APPDATA%\Claude file or the
+# package's LocalCache copy. Whenever a Store package is present, mirror the
+# freshly written config to the other candidate location so the server
+# registration is visible regardless of the package's virtualization mode.
+function Sync-ClaudeDesktopConfigMirror {
+    param([Parameter(Mandatory = $true)][string]$WrittenPath)
+
+    $msix = Get-ChildItem -Path "$env:LOCALAPPDATA\Packages" -Directory -Filter "AnthropicPBC.Claude*" -ErrorAction SilentlyContinue |
+        Select-Object -First 1
+    if (!$msix) { return }
+
+    $classicFile = "$env:APPDATA\Claude\claude_desktop_config.json"
+    $msixFile = Join-Path $msix.FullName "LocalCache\Roaming\Claude\claude_desktop_config.json"
+    $mirror = if ($WrittenPath -eq $msixFile) { $classicFile } else { $msixFile }
+
+    try {
+        $mirrorDir = Split-Path $mirror -Parent
+        if (!(Test-Path $mirrorDir)) {
+            New-Item -ItemType Directory -Path $mirrorDir -Force | Out-Null
+        }
+        if (Test-Path $mirror) {
+            Manage-ConfigBackups -ConfigFilePath $mirror | Out-Null
+        }
+        Copy-Item -Path $WrittenPath -Destination $mirror -Force
+        Write-Host "  Mirrored to:  $mirror" -ForegroundColor Gray
+        Write-Host "  (Store and classic installs read different locations; both were updated)" -ForegroundColor Gray
+    }
+    catch {
+        Write-Warning "Could not mirror Claude Desktop config to $mirror : $_"
+    }
 }
 
 # Centralized MCP client definitions
@@ -1526,12 +1583,25 @@ function Configure-McpClient {
     # Check if already configured and analyze existing configuration
     $existingConfig = Get-ExistingMcpConfigType -Client $Client -ConfigPath $configPath
     $newConfigType = if ($UseDocker) { "Docker" } else { "Python" }
-    
-    if ($existingConfig.Exists) {
+
+    # Earlier versions of this script wrote configs with PowerShell 5.1's
+    # `-Encoding UTF8`, which prepends a UTF-8 BOM that Node-based hosts fail
+    # to JSON.parse — the server silently never appears. Repair such files
+    # without prompting: content is preserved, only the encoding changes.
+    $hasBom = $false
+    if (Test-Path $configPath) {
+        $rawBytes = [System.IO.File]::ReadAllBytes($configPath)
+        $hasBom = ($rawBytes.Length -ge 3 -and $rawBytes[0] -eq 0xEF -and $rawBytes[1] -eq 0xBB -and $rawBytes[2] -eq 0xBF)
+    }
+
+    if ($existingConfig.Exists -and $hasBom) {
+        Write-Warning "Existing config has a UTF-8 byte-order mark that breaks $($Client.Name)'s JSON parser - rewriting it without one"
+    }
+    elseif ($existingConfig.Exists) {
         Write-Info "Found existing Unison MCP configuration in $($Client.Name)"
         Write-Info "  Current: $($existingConfig.Details)"
         Write-Info "  New: $newConfigType configuration"
-        
+
         if ($existingConfig.Type -eq $newConfigType) {
             Write-Warning "Same configuration type ($($existingConfig.Type)) already exists"
             $response = Read-Host "`nOverwrite existing $($existingConfig.Type) configuration? (y/N)"
@@ -1639,11 +1709,26 @@ function Configure-McpClient {
 
         $targetObject | Add-Member -MemberType NoteProperty -Name $palKey -Value $serverConfig -Force
 
-        # Write config
-        $config | ConvertTo-Json -Depth 10 | Out-File $configPath -Encoding UTF8
+        # Write config (UTF-8 without BOM — a BOM breaks the host's JSON.parse)
+        Write-Utf8NoBom -Path $configPath -Content ($config | ConvertTo-Json -Depth 10)
+
+        # Read back through the JSON parser so an unparseable write is caught
+        # here instead of surfacing as the server silently missing in the host.
+        $verify = Get-Content $configPath -Raw | ConvertFrom-Json -ErrorAction SilentlyContinue
+        if ($null -eq $verify) {
+            Write-Warning "Written config failed JSON validation - please inspect $configPath"
+        }
+
         Write-Success "Successfully configured $($Client.Name)"
         Write-Host "  Config: $configPath" -ForegroundColor Gray
-        Write-Host "  Restart $($Client.Name) to use the new MCP server" -ForegroundColor Gray
+        if ($Client.Name -eq "Claude Desktop") {
+            Sync-ClaudeDesktopConfigMirror -WrittenPath $configPath
+            Write-Host "  Fully quit Claude Desktop (system tray icon -> Quit; closing the window is not enough), then relaunch" -ForegroundColor Gray
+            Write-Host "  The server appears under Settings -> Developer, and via the tools icon in chat" -ForegroundColor Gray
+        }
+        else {
+            Write-Host "  Restart $($Client.Name) to use the new MCP server" -ForegroundColor Gray
+        }
 
     }
     catch {
@@ -1773,7 +1858,7 @@ if exist ".unison_venv\Scripts\python.exe" (
 
         if ($needsWrite) {
             Manage-ConfigBackups -ConfigFilePath $geminiConfig | Out-Null
-            $config | ConvertTo-Json -Depth 10 | Out-File $geminiConfig -Encoding UTF8
+            Write-Utf8NoBom -Path $geminiConfig -Content ($config | ConvertTo-Json -Depth 10)
             Write-Success "Updated Gemini CLI configuration (cleaned legacy entries)"
             Write-Host "  Config: $geminiConfig" -ForegroundColor Gray
             Write-Host "  Restart Gemini CLI to use Unison MCP Server" -ForegroundColor Gray
@@ -1825,8 +1910,8 @@ if exist ".unison_venv\Scripts\python.exe" (
         $config.mcpServers | Add-Member -MemberType NoteProperty -Name "unison" -Value $palConfig -Force
         
         # Write updated config
-        $config | ConvertTo-Json -Depth 10 | Out-File $geminiConfig -Encoding UTF8
-        
+        Write-Utf8NoBom -Path $geminiConfig -Content ($config | ConvertTo-Json -Depth 10)
+
         Write-Success "Successfully configured Gemini CLI"
         Write-Host "  Config: $geminiConfig" -ForegroundColor Gray
         Write-Host "  Restart Gemini CLI to use Unison MCP Server" -ForegroundColor Gray
@@ -2035,7 +2120,7 @@ function Test-QwenCliIntegration {
         New-Item -ItemType Directory -Path $configDir -Force | Out-Null
     }
 
-    if (Test-Path $configPath -and $configStatus -ne "missing") {
+    if ((Test-Path $configPath) -and $configStatus -ne "missing") {
         Manage-ConfigBackups $configPath | Out-Null
     }
 
@@ -2061,7 +2146,7 @@ function Test-QwenCliIntegration {
         $config['mcpServers']['unison'] = $palConfig
 
         $json = ($config | ConvertTo-Json -Depth 20)
-        Set-Content -Path $configPath -Value $json -Encoding UTF8
+        Write-Utf8NoBom -Path $configPath -Content $json
 
         Write-Success "Successfully configured Qwen CLI"
         Write-Host "  Config: $configPath" -ForegroundColor Gray
@@ -2357,7 +2442,7 @@ function Initialize-EnvFile {
     
     if (!(Test-Path ".env")) {
         Write-Info "Creating default .env file..."
-        @"
+        $defaultEnvContent = @"
 # API keys — the server enables one provider per REAL value below. ONLY these
 # variables activate providers; placeholder values count as unset.
 GEMINI_API_KEY=your_gemini_api_key_here
@@ -2392,8 +2477,9 @@ DEFAULT_THINKING_MODE_THINKDEEP=high
 #DISABLED_TOOLS=
 #MAX_MCP_OUTPUT_TOKENS=
 #TZ=UTC
-"@ | Out-File -FilePath ".env" -Encoding UTF8
-        
+"@
+        Write-Utf8NoBom -Path ".env" -Content $defaultEnvContent
+
         Write-Success "Default .env file created"
         Write-Warning "Please edit .env file with your actual API keys"
     }
