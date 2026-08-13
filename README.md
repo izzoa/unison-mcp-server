@@ -28,11 +28,12 @@ Gemini · OpenAI · Anthropic · Grok · Azure · Ollama · OpenRouter · DIAL �
 
 ## What this fork adds over PAL
 
-Unison forks [BeehiveInnovations/pal-mcp-server](https://github.com/BeehiveInnovations/pal-mcp-server) and preserves every PAL tool, provider, and workflow. On top of that, it changes what's possible in four ways:
+Unison forks [BeehiveInnovations/pal-mcp-server](https://github.com/BeehiveInnovations/pal-mcp-server) and preserves every PAL tool, provider, and workflow. On top of that, it changes what's possible in six ways:
 
 - 🔗 **CLI-to-CLI orchestration.** The new [`clink`](docs/tools/clink.md) tool spawns **eight** subagents — Claude Code, Codex, Gemini CLI, opencode, Aider, Crush, Amp, and GitHub Copilot CLI — in isolated contexts with role presets, read-only enforcement (native CLI flags + post-call filesystem-snapshot diff), and a cross-cutting recursion guard for MCP-aware CLIs. **PAL has no equivalent.**
 - 🌐 **75+ providers through one integration.** clink + opencode routes a single call to OpenAI, Anthropic, Google, Ollama, OpenRouter, xAI, Mistral, Groq, DeepSeek, and ~70 more via `provider/model` syntax. No per-provider implementation work.
 - 🧠 **2000+ models, auto-discovered.** Every model from every authenticated provider appears at startup via [LiteLLM](https://github.com/BerriAI/litellm); a **weekly CI workflow** opens a PR with the latest catalog. Auto-mode picks the smartest available model using `intelligence_score`, not hardcoded preference lists that go stale.
+- ⚡ **Native Anthropic provider.** `ANTHROPIC_API_KEY` activates Claude directly over the Messages API — a curated latest-two-generations catalog (Fable 5, Opus 5 / 4.8, Sonnet 5 / 4.6, Haiku 4.5) with real extended-thinking budgets mapped from Unison's thinking modes. The `opus` / `sonnet` / `haiku` / `claude` aliases resolve natively ahead of OpenRouter. **PAL reaches Claude only through OpenRouter.**
 - 🛡️ **Production reliability.** Optional **SQLite conversation backend** survives restarts; a **per-provider circuit breaker** fails fast on outages so consensus doesn't hang on a dead provider.
 - 🔌 **Pip-installable tool plugins.** Third-party packages add tools via `[project.entry-points."unison.tools"]` — validated, quarantined on failure, never able to crash the server ([guide](docs/plugins.md)). Opt-in **structured observability**: JSON activity logs (`UNISON_JSON_LOGS`) and OpenTelemetry spans/metrics per tool call (`UNISON_OTEL_ENABLED`), credential-redacted end to end.
 
@@ -249,7 +250,7 @@ and review into consideration to aid with its final pre-commit review.
 
 For best results when using [Claude Code](https://claude.ai/code):  
 
-- **Sonnet 4.5** - All agentic work and orchestration
+- **Sonnet 4.6 / Sonnet 5** - All agentic work and orchestration
 - **Gemini 3.0 Pro** OR **GPT-5.2 / Pro** - Deep thinking, additional code reviews, debugging and validations, pre-commit analysis
 </details>
 
@@ -271,6 +272,7 @@ Unison inherits the entire PAL feature set. Every row below is an addition or ha
 | **CLI-to-CLI orchestration** | — | **`clink`** spawns **8 CLIs** as subagents — Claude, Codex, Gemini, opencode, Aider, Crush, Amp, GitHub Copilot — with role presets (`planner`, `codereviewer`), optional `supported_models` allowlist per CLI, and a cross-cutting recursion guard for MCP-aware targets |
 | **Read-only mode for sub-CLIs** | — | Native CLI flags (`--sandbox read-only`, `--approval-mode plan`, `--permission-mode plan`, `--dry-run`) + prompt instruction + full-tree post-call filesystem-snapshot diff; `read_only_enforced` metadata reflects whether a real sandbox flag was applied; CLI bookkeeping (e.g. `.opencode/`) classified separately so it doesn't drown out genuine model writes |
 | **Provider reach via one integration** | One provider per implementation | **75+ providers** through opencode via `provider/model` syntax (OpenAI, Anthropic, Google, Ollama, OpenRouter, xAI, Mistral, Groq, DeepSeek, …) |
+| **Native Anthropic (Claude) provider** | — (Claude reachable only via OpenRouter) | `ANTHROPIC_API_KEY` activates the Messages API directly: latest-two-generations catalog (Fable 5, Opus 5/4.8, Sonnet 5/4.6, Haiku 4.5), extended-thinking budgets per thinking mode, `ANTHROPIC_ALLOWED_MODELS` restrictions, `ANTHROPIC_API_URL` gateway override |
 | **Model catalog** | Static JSON files, manually curated — go stale the day a provider ships a new model | **2000+ models auto-discovered** via [LiteLLM](https://github.com/BerriAI/litellm) at startup, with curated overrides for tuned metadata |
 | **Discovered vs curated** | All models treated equally | `listmodels` distinguishes curated (hand-tuned `intelligence_score`, aliases) from auto-discovered |
 | **Auto-mode model selection** | Hardcoded preference lists per provider | Data-driven using `intelligence_score` and capability flags — newly discovered high-scoring models surface automatically |
@@ -357,7 +359,7 @@ Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process
 ```
 
 👉 **[Complete Setup Guide](docs/getting-started.md)** with detailed installation, configuration for Gemini / Codex / Qwen, and troubleshooting
-👉 **[Cursor & VS Code Setup](docs/getting-started.md#ide-clients)** for IDE integration instructions
+👉 **[Cursor & VS Code Setup](docs/getting-started.md#ide-clients-cursor--vs-code)** for IDE integration instructions
 📺 **[Watch tools in action](#-watch-tools-in-action)** to see real-world examples
 
 ## Provider Configuration
@@ -402,7 +404,7 @@ Unison activates any provider that has credentials in your `.env`. See `.env.exa
 To optimize context window usage, only essential tools are enabled by default:
 
 **Enabled by default:**
-- `chat`, `thinkdeep`, `planner`, `consensus` - Core collaboration tools
+- `clink`, `chat`, `thinkdeep`, `planner`, `consensus` - Core collaboration tools
 - `codereview`, `precommit`, `debug` - Essential code quality tools
 - `apilookup` - Rapid API/SDK information lookup
 - `challenge` - Critical thinking utility
@@ -582,8 +584,8 @@ DISABLED_TOOLS=
 - **[Context revival](docs/context-revival.md)** - Continue conversations even after context resets
 
 **Model Support**
-- **Multiple providers** - Gemini, OpenAI, Azure, X.AI, OpenRouter, DIAL, Ollama
-- **Latest models** - GPT-5, Gemini 3.0 Pro, O3, Grok-4, local Llama
+- **Multiple providers** - Gemini, OpenAI, Anthropic, Azure, X.AI, OpenRouter, DIAL, Ollama
+- **Latest models** - Claude Fable 5 / Opus 5, GPT-5, Gemini 3.0 Pro, O3, Grok-4, local Llama
 - **Automatic model discovery** - New models appear at startup via [LiteLLM](https://github.com/BerriAI/litellm) integration, no manual config needed
 - **[Thinking modes](docs/advanced-usage.md#thinking-modes)** - Control reasoning depth vs cost
 - **Vision support** - Analyze images, diagrams, screenshots
