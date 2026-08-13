@@ -82,7 +82,7 @@ Continue with clink gemini - implement the recommended feature
 
 ## How to clink
 
-The `clink` tool takes four parameters that matter day-to-day: `cli_name`, `role`, `model`, and `read_only`. Everything else (file attachments, continuation IDs) works the same as any other Unison tool.
+The `clink` tool takes five parameters that matter day-to-day: `cli_name`, `role`, `model`, `read_only`, and `working_dir`. Everything else (file attachments, continuation IDs) works the same as any other Unison tool.
 
 ### Basic invocation
 
@@ -100,6 +100,11 @@ clink with opencode using openai/gpt-5 to write a property-based test suite
 
 # Read-only mode (analysis without file writes)
 clink with claude codereviewer in read-only mode to review PR #482
+
+# Point the spawned CLI at your project/worktree root so it can see your files
+# (important when the MCP server runs elsewhere — e.g. spawned by Claude Desktop,
+#  or when you work in a git worktree; Copilot's file tools are rooted at its cwd)
+clink with copilot working_dir="/abs/path/to/your/repo" to summarize this codebase
 ```
 
 ### Supported CLIs

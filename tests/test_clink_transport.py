@@ -306,3 +306,44 @@ class TestEndToEndDispatch:
 
         assert "path" in captured_path
         assert not Path(captured_path["path"]).exists()
+
+
+# ---------------------------------------------------------------------------
+# Per-call working_dir override
+# ---------------------------------------------------------------------------
+
+
+class TestWorkingDirOverride:
+    _STDOUT = b'{"type":"item.completed","item":{"id":"x","type":"agent_message","text":"ok"}}\n'
+
+    @pytest.mark.asyncio
+    async def test_per_call_working_dir_reaches_subprocess_cwd(self, monkeypatch, tmp_path) -> None:
+        agent, role = _make_agent()
+        process = _StubProcess(stdout=self._STDOUT)
+        captured: dict[str, Any] = {}
+
+        async def fake_exec(*args, **kwargs):
+            captured["cwd"] = kwargs.get("cwd")
+            return process
+
+        monkeypatch.setattr(asyncio, "create_subprocess_exec", fake_exec)
+        monkeypatch.setattr(shutil, "which", lambda name: f"/usr/bin/{name}")
+
+        await agent.run(role=role, prompt="hello", files=[], images=[], working_dir=tmp_path)
+        assert captured["cwd"] == str(tmp_path)
+
+    @pytest.mark.asyncio
+    async def test_omitted_working_dir_inherits_server_cwd(self, monkeypatch) -> None:
+        agent, role = _make_agent()  # synthetic client has working_dir=None
+        process = _StubProcess(stdout=self._STDOUT)
+        captured: dict[str, Any] = {}
+
+        async def fake_exec(*args, **kwargs):
+            captured["cwd"] = kwargs.get("cwd")
+            return process
+
+        monkeypatch.setattr(asyncio, "create_subprocess_exec", fake_exec)
+        monkeypatch.setattr(shutil, "which", lambda name: f"/usr/bin/{name}")
+
+        await agent.run(role=role, prompt="hello", files=[], images=[])
+        assert captured["cwd"] is None

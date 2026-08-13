@@ -80,6 +80,9 @@ You can make your own custom roles in `conf/cli_clients/` or tweak any of the sh
 - `prompt`: Your question or task for the external CLI (required)
 - `cli_name`: Which CLI to use - `aider`, `amp`, `claude`, `codex`, `copilot`, `crush`, `gemini`, `opencode`, or add your own in `conf/cli_clients/`. **Required** when more than one CLI is configured; it may be omitted only in a single-CLI deployment, where that CLI is used. There is no vendor-preferred default.
 - `role`: Preset role - `default`, `planner`, `codereviewer` (default: `default`)
+- `model`: Optional model forwarded to the CLI (e.g. `sonnet` for claude, `provider/model` for opencode/crush, named modes for amp)
+- `working_dir`: Optional **absolute path** the spawned CLI runs in. Pass your project or worktree root — some CLIs (Copilot) root their file tools at their cwd and refuse paths outside it. Defaults to the CLI manifest's `working_dir`, then the MCP server's own working directory. The effective directory is reported back as `metadata.working_dir`
+- `read_only`: Restrict the CLI to read-only operations (sandbox flags + prompt instruction + post-execution snapshot verification)
 - `files`: Optional file paths for context (references only, CLI opens files itself)
 - `images`: Optional image paths for visual context
 - `continuation_id`: Continue previous clink conversations

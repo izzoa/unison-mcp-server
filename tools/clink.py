@@ -114,6 +114,16 @@ class CLinkRequest(BaseModel):
             "otherwise invalid model strings surface as CLI-level errors in response metadata."
         ),
     )
+    working_dir: str | None = Field(
+        default=None,
+        description=(
+            "Absolute path to the directory the spawned CLI should run in. Pass your project or "
+            "worktree root so the CLI can see your files — some CLIs (e.g. Copilot) root their "
+            "file tools at their working directory and refuse paths outside it. When omitted, "
+            "falls back to the CLI manifest's working_dir, then the MCP server's own working "
+            "directory."
+        ),
+    )
 
 
 class CLinkTool(SimpleTool):
@@ -256,6 +266,15 @@ class CLinkTool(SimpleTool):
                     "response metadata unless the manifest declares a 'supported_models' allowlist."
                 ),
             },
+            "working_dir": {
+                "type": "string",
+                "description": (
+                    "Absolute path to the directory the spawned CLI should run in. Pass your "
+                    "project or worktree root so the CLI can see your files (some CLIs root "
+                    "their file tools at their cwd). Omit to use the CLI manifest's working_dir, "
+                    "then the server's own working directory."
+                ),
+            },
         }
 
         schema = {
@@ -311,6 +330,16 @@ class CLinkTool(SimpleTool):
                     f"'{client_config.name}'. Allowed values: {allowed}."
                 )
 
+        working_dir_override: Path | None = None
+        raw_working_dir = (request.working_dir or "").strip()
+        if raw_working_dir:
+            candidate = Path(raw_working_dir)
+            if not candidate.is_absolute():
+                self._raise_tool_error(f"working_dir must be an absolute path, got: {raw_working_dir}")
+            if not candidate.is_dir():
+                self._raise_tool_error(f"working_dir does not exist or is not a directory: {raw_working_dir}")
+            working_dir_override = candidate
+
         absolute_file_paths = self.get_request_files(request)
         images = self.get_request_images(request)
         continuation_id = self.get_request_continuation_id(request)
@@ -335,10 +364,12 @@ class CLinkTool(SimpleTool):
             logger.exception("Failed to prepare clink prompt")
             self._raise_tool_error(f"Failed to prepare prompt: {exc}")
 
-        # Capture pre-execution filesystem snapshot for read-only verification
+        # Capture pre-execution filesystem snapshot for read-only verification.
+        # Rooted at the same directory the CLI will actually run in.
         pre_snapshot = None
         read_only = getattr(request, "read_only", False)
-        snapshot_dir = str(client_config.working_dir) if client_config.working_dir else "."
+        effective_working_dir = working_dir_override or client_config.working_dir
+        snapshot_dir = str(effective_working_dir) if effective_working_dir else "."
         if read_only:
             # Full-depth, include gitignored/transient so a deep or gitignored
             # write (e.g. to .env) cannot silently evade read-only verification.
@@ -354,6 +385,7 @@ class CLinkTool(SimpleTool):
                 images=images,
                 read_only=read_only,
                 model=requested_model,
+                working_dir=working_dir_override,
             )
         except CLIAgentError as exc:
             metadata = self._build_error_metadata(client_config, exc)
@@ -364,6 +396,9 @@ class CLinkTool(SimpleTool):
 
         metadata = self._build_success_metadata(client_config, role_config, result, requested_model=requested_model)
         metadata = self._prune_metadata(metadata, client_config, reason="normal")
+
+        # Report where the CLI actually ran so callers never have to ask it.
+        metadata["working_dir"] = str(effective_working_dir) if effective_working_dir else os.getcwd()
 
         # Post-execution read-only verification
         if read_only and pre_snapshot is not None:

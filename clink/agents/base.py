@@ -233,6 +233,7 @@ class BaseCLIAgent:
         images: Sequence[str],
         read_only: bool = False,
         model: str | None = None,
+        working_dir: Path | None = None,
     ) -> AgentOutput:
         # The runner simply executes the configured CLI command for the selected role.
         command = self._build_command(role=role, system_prompt=system_prompt, model=model)
@@ -254,7 +255,12 @@ class BaseCLIAgent:
 
         sanitized_command = list(command)
 
-        cwd = str(self.client.working_dir) if self.client.working_dir else None
+        # Per-call working_dir wins over the manifest's; with neither, the
+        # subprocess inherits the server process cwd. CLIs like Copilot root
+        # their file tools at their cwd, so where this lands decides which
+        # files the spawned CLI can see at all.
+        effective_working_dir = working_dir if working_dir is not None else self.client.working_dir
+        cwd = str(effective_working_dir) if effective_working_dir else None
         limit = DEFAULT_STREAM_LIMIT
 
         stdout_text = ""
