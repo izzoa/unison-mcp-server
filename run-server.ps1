@@ -1130,18 +1130,38 @@ function Test-Docker {
 # MCP Client Configuration System
 # ----------------------------------------------------------------------------
 
+function Get-ClaudeDesktopConfigPath {
+    # MSIX/Store installs of Claude Desktop virtualize their app data, so the
+    # app reads its config from inside the package's LocalCache — a file
+    # written to the real %APPDATA%\Claude would be invisible to it. Classic
+    # installs read %APPDATA%\Claude directly.
+    $msix = Get-ChildItem -Path "$env:LOCALAPPDATA\Packages" -Directory -Filter "AnthropicPBC.Claude*" -ErrorAction SilentlyContinue |
+        Select-Object -First 1
+    if ($msix -and -not (Test-Path "$env:APPDATA\Claude")) {
+        return (Join-Path $msix.FullName "LocalCache\Roaming\Claude\claude_desktop_config.json")
+    }
+    return "$env:APPDATA\Claude\claude_desktop_config.json"
+}
+
 # Centralized MCP client definitions
 $script:McpClientDefinitions = @(
     @{
         Name           = "Claude Desktop"
-        # Detect the app's data directory, NOT the MCP config file: a fresh
-        # Claude Desktop install has no claude_desktop_config.json until MCP
-        # is first configured, so keying detection on that file skipped every
-        # machine this integration exists for. The directory appears on first
-        # app launch; the generic writer creates the config file when missing.
-        DetectionPath  = "$env:APPDATA\Claude"
+        # Claude Desktop install layouts vary: classic installs keep app data
+        # at %APPDATA%\Claude (updater under %LOCALAPPDATA%\AnthropicClaude,
+        # some builds use %LOCALAPPDATA%\Claude); MSIX/Store deployments live
+        # under %LOCALAPPDATA%\Packages\AnthropicPBC.Claude*. Detect any of
+        # them — never the MCP config file itself, which only exists once MCP
+        # has been configured. The writer creates the config file (and its
+        # directory) at the path the installed variant actually reads.
+        DetectionPaths = @(
+            "$env:APPDATA\Claude"
+            "$env:LOCALAPPDATA\Claude"
+            "$env:LOCALAPPDATA\AnthropicClaude"
+            "$env:LOCALAPPDATA\Packages\AnthropicPBC.Claude*"
+        )
         DetectionType  = "Path"
-        ConfigPath     = "$env:APPDATA\Claude\claude_desktop_config.json"
+        ConfigPath     = (Get-ClaudeDesktopConfigPath)
         ConfigJsonPath = "mcpServers.unison"
     },
     @{
@@ -1411,8 +1431,16 @@ function Configure-McpClient {
     if ($Client.DetectionType -eq "Command" -and (Test-Command $Client.DetectionCommand)) {
         $detected = $true
     }
-    elseif ($Client.DetectionType -eq "Path" -and (Test-Path ($Client.DetectionPath -as [string]))) {
-        $detected = $true
+    elseif ($Client.DetectionType -eq "Path") {
+        $candidatePaths = @()
+        if ($Client.DetectionPaths) { $candidatePaths += $Client.DetectionPaths }
+        elseif ($Client.DetectionPath) { $candidatePaths += $Client.DetectionPath }
+        foreach ($candidate in $candidatePaths) {
+            if ($candidate -and (Test-Path ($candidate -as [string]))) {
+                $detected = $true
+                break
+            }
+        }
     }
 
     if (!$detected) {
