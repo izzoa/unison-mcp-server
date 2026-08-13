@@ -21,7 +21,14 @@ from tools.models import ToolModelCategory, ToolOutput
 from tools.shared.base_models import COMMON_FIELD_DESCRIPTIONS
 from tools.shared.exceptions import ToolExecutionError
 from tools.simple.base import SchemaBuilder, SimpleTool
-from utils.fs_snapshot import capture_snapshot, classify_changes, diff_snapshots
+from utils.env import get_env
+from utils.fs_snapshot import SnapshotStats, capture_snapshot, classify_changes, diff_snapshots
+
+# Wall-clock ceiling for each read-only verification snapshot. Observed live:
+# an unbounded walk of a large OneDrive-synced repo took 60-90s per snapshot
+# (twice per call), starving the actual CLI run of the MCP host's tool-timeout
+# budget. Override with CLINK_SNAPSHOT_BUDGET_SECONDS.
+_DEFAULT_SNAPSHOT_BUDGET_SECONDS = 30.0
 
 logger = logging.getLogger(__name__)
 
@@ -370,10 +377,20 @@ class CLinkTool(SimpleTool):
         read_only = getattr(request, "read_only", False)
         effective_working_dir = working_dir_override or client_config.working_dir
         snapshot_dir = str(effective_working_dir) if effective_working_dir else "."
+        snapshot_budget = self._snapshot_budget_seconds()
+        pre_stats = SnapshotStats()
         if read_only:
             # Full-depth, include gitignored/transient so a deep or gitignored
             # write (e.g. to .env) cannot silently evade read-only verification.
-            pre_snapshot = capture_snapshot(snapshot_dir, include_ignored=True)
+            # Bulk dirs (.git, node_modules, ...) are pruned and the walk is
+            # time-budgeted so verification can never starve the CLI call
+            # itself of the host's tool-timeout budget.
+            pre_snapshot = capture_snapshot(
+                snapshot_dir,
+                include_ignored=True,
+                time_budget_seconds=snapshot_budget,
+                stats=pre_stats,
+            )
 
         agent = create_agent(client_config)
         try:
@@ -402,7 +419,13 @@ class CLinkTool(SimpleTool):
 
         # Post-execution read-only verification
         if read_only and pre_snapshot is not None:
-            post_snapshot = capture_snapshot(snapshot_dir, include_ignored=True)
+            post_stats = SnapshotStats()
+            post_snapshot = capture_snapshot(
+                snapshot_dir,
+                include_ignored=True,
+                time_budget_seconds=snapshot_budget,
+                stats=post_stats,
+            )
             diff = diff_snapshots(pre_snapshot, post_snapshot)
             sandbox_flags = agent.get_read_only_args()
             # Report enforcement honestly. `read_only_enforced` reflects whether a
@@ -419,7 +442,17 @@ class CLinkTool(SimpleTool):
                 "prompt_instruction": True,
                 "post_execution_verification": True,
             }
-            metadata["read_only_verification_coverage"] = "working_dir_subtree"
+            verification_partial = pre_stats.truncated or post_stats.truncated
+            metadata["read_only_verification_coverage"] = (
+                "working_dir_subtree (partial)" if verification_partial else "working_dir_subtree"
+            )
+            metadata["read_only_verification_stats"] = {
+                "pre_entries": pre_stats.entry_count,
+                "post_entries": post_stats.entry_count,
+                "pre_elapsed_seconds": round(pre_stats.elapsed_seconds, 2),
+                "post_elapsed_seconds": round(post_stats.elapsed_seconds, 2),
+                "truncated": verification_partial,
+            }
             by_model, by_bookkeeping = classify_changes(diff, agent.fs_violation_ignore_patterns)
             metadata["read_only_violations"] = {
                 "by_model": by_model.to_dict(),
@@ -655,6 +688,20 @@ class CLinkTool(SimpleTool):
                 type(events).__name__,
             )
         return cleaned
+
+    def _snapshot_budget_seconds(self) -> float:
+        """Wall-clock budget per read-only verification snapshot."""
+        raw = (get_env("CLINK_SNAPSHOT_BUDGET_SECONDS") or "").strip()
+        if raw:
+            try:
+                value = float(raw)
+            except ValueError:
+                logger.warning("Ignoring invalid CLINK_SNAPSHOT_BUDGET_SECONDS=%r (not a number)", raw)
+            else:
+                if value > 0:
+                    return value
+                logger.warning("Ignoring invalid CLINK_SNAPSHOT_BUDGET_SECONDS=%r (must be positive)", raw)
+        return _DEFAULT_SNAPSHOT_BUDGET_SECONDS
 
     def _build_error_metadata(self, client: ResolvedCLIClient, exc: CLIAgentError) -> dict[str, Any]:
         """Assemble metadata for failed CLI calls.

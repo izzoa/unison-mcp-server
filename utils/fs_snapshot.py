@@ -11,6 +11,7 @@ from __future__ import annotations
 import fnmatch
 import logging
 import os
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -27,6 +28,57 @@ TRANSIENT_PATTERNS: list[str] = [
     "*~",
     ".pytest_cache",
 ]
+
+# Bulk directories pruned from snapshot traversal by default. These are
+# dependency stores, VCS internals, and build outputs: they routinely hold
+# tens of thousands of entries that exhaust the entry cap (destroying coverage
+# of the files that matter) and dominate wall-clock cost — observed at 60-90s
+# per snapshot on a large OneDrive-synced repo, which starved the actual CLI
+# call of the host's tool-timeout budget. Security tradeoff, stated honestly:
+# a CLI write hidden inside one of these directories goes undetected — but
+# under the entry cap on any large repo it already did, while also making the
+# rest of the verification blind. Pass ``prune_dir_names=frozenset()`` to
+# disable pruning.
+PRUNED_DIR_NAMES: frozenset[str] = frozenset(
+    {
+        ".git",
+        "node_modules",
+        ".venv",
+        "venv",
+        "__pycache__",
+        ".tox",
+        ".mypy_cache",
+        ".ruff_cache",
+        ".pytest_cache",
+        ".cache",
+        ".next",
+        ".turbo",
+        ".gradle",
+        "dist",
+        "build",
+        "target",
+    }
+)
+
+
+@dataclass
+class SnapshotStats:
+    """Out-parameter describing how a snapshot traversal actually went.
+
+    Callers that report verification coverage pass an instance to
+    :func:`capture_snapshot`, which fills it in. Kept separate from the
+    returned mapping so existing callers (and test doubles returning plain
+    dicts) stay valid.
+    """
+
+    entry_count: int = 0
+    truncated_by_entries: bool = False
+    truncated_by_time: bool = False
+    elapsed_seconds: float = 0.0
+
+    @property
+    def truncated(self) -> bool:
+        return self.truncated_by_entries or self.truncated_by_time
 
 
 @dataclass
@@ -148,6 +200,9 @@ def capture_snapshot(
     *,
     include_ignored: bool = False,
     max_entries: int = 50_000,
+    time_budget_seconds: float | None = None,
+    prune_dir_names: frozenset[str] = PRUNED_DIR_NAMES,
+    stats: SnapshotStats | None = None,
 ) -> dict[str, tuple[int, int, int]]:
     """Capture a filesystem snapshot of a directory.
 
@@ -155,8 +210,13 @@ def capture_snapshot(
     tuples. ``ctime_ns`` is included so a content edit that restores the
     original mtime and byte length (an evasion of the old ``(mtime_ns, size)``
     key) still registers as a change — ctime updates on any write and cannot be
-    portably restored. Symlinks are recorded (via ``lstat``, never followed) so
+    portably restored. Symlinks are recorded (never followed) so
     creating/retargeting/deleting one is detected.
+
+    The walk uses ``os.scandir`` (type/stat data comes from the directory read
+    on most platforms instead of per-entry syscalls) and prunes bulk
+    directories (:data:`PRUNED_DIR_NAMES`) by default — both matter enormously
+    on network/cloud-synced filesystems where each stat is slow.
 
     Args:
         directory: Root directory to snapshot.
@@ -171,6 +231,15 @@ def capture_snapshot(
             noise.
         max_entries: Safety cap on the number of files recorded; if exceeded a
             warning is logged and coverage becomes partial (never silent).
+        time_budget_seconds: Optional wall-clock ceiling for the traversal.
+            When exceeded the walk stops where it is, a warning is logged, and
+            coverage becomes partial — a bounded verification delay instead of
+            an unbounded stall that can outlive the caller's own timeout.
+        prune_dir_names: Directory basenames skipped entirely (not recorded,
+            not descended into). Defaults to :data:`PRUNED_DIR_NAMES`; pass
+            ``frozenset()`` for the previous unpruned behavior.
+        stats: Optional :class:`SnapshotStats` the traversal fills in, for
+            callers that report verification coverage.
 
     Returns:
         Dict of ``{relative_path: (mtime_ns, ctime_ns, size)}``.
@@ -181,25 +250,33 @@ def capture_snapshot(
 
     gitignore_patterns: list[str] = [] if include_ignored else _load_gitignore_patterns(root)
     snapshot: dict[str, tuple[int, int, int]] = {}
-    truncated = False
+    truncated_entries = False
+    truncated_time = False
+    started = time.monotonic()
+    root_str = str(root)
 
-    def _walk(current: Path, depth: int) -> None:
-        nonlocal truncated
+    def _out_of_time() -> bool:
+        return time_budget_seconds is not None and (time.monotonic() - started) >= time_budget_seconds
+
+    def _walk(current: str, depth: int) -> None:
+        nonlocal truncated_entries, truncated_time
         if max_depth is not None and depth > max_depth:
             return
         try:
-            entries = sorted(current.iterdir())
+            with os.scandir(current) as scanner:
+                entries = sorted(scanner, key=lambda e: e.name)
         except OSError:
             return
 
         for entry in entries:
             if len(snapshot) >= max_entries:
-                truncated = True
+                truncated_entries = True
                 return
-            try:
-                rel = str(entry.relative_to(root))
-            except ValueError:
-                continue
+            if _out_of_time():
+                truncated_time = True
+                return
+
+            rel = os.path.relpath(entry.path, root_str)
 
             if not include_ignored:
                 if _is_gitignored(rel, gitignore_patterns):
@@ -207,37 +284,47 @@ def capture_snapshot(
                 if _is_transient(rel):
                     continue
 
-            if entry.is_symlink():
-                # Record the link itself without following it, so a symlink
-                # created/retargeted/deleted by the CLI is detected instead of
-                # being an invisible write channel.
-                try:
-                    st = entry.lstat()
-                    snapshot[rel] = (st.st_mtime_ns, st.st_ctime_ns, st.st_size)
-                except OSError:
-                    pass
-                continue
-
             try:
-                is_file = entry.is_file()
+                if entry.is_symlink():
+                    # Record the link itself without following it, so a symlink
+                    # created/retargeted/deleted by the CLI is detected instead
+                    # of being an invisible write channel.
+                    st = entry.stat(follow_symlinks=False)
+                    snapshot[rel] = (st.st_mtime_ns, st.st_ctime_ns, st.st_size)
+                elif entry.is_file():
+                    st = entry.stat()
+                    snapshot[rel] = (st.st_mtime_ns, st.st_ctime_ns, st.st_size)
+                elif entry.is_dir():
+                    if entry.name in prune_dir_names:
+                        continue
+                    _walk(entry.path, depth + 1)
             except OSError:
                 continue
 
-            if is_file:
-                try:
-                    st = entry.stat()
-                    snapshot[rel] = (st.st_mtime_ns, st.st_ctime_ns, st.st_size)
-                except OSError:
-                    pass
-            elif entry.is_dir():
-                _walk(entry, depth + 1)
+            if truncated_entries or truncated_time:
+                return
 
-    _walk(root, 1)
-    if truncated:
+    _walk(root_str, 1)
+
+    if stats is not None:
+        stats.entry_count = len(snapshot)
+        stats.truncated_by_entries = truncated_entries
+        stats.truncated_by_time = truncated_time
+        stats.elapsed_seconds = time.monotonic() - started
+
+    if truncated_entries:
         logger.warning(
             "Filesystem snapshot of %s hit the %d-entry cap; read-only verification coverage is partial",
             root,
             max_entries,
+        )
+    if truncated_time:
+        logger.warning(
+            "Filesystem snapshot of %s exceeded the %.1fs time budget after %d entries; "
+            "read-only verification coverage is partial",
+            root,
+            time_budget_seconds,
+            len(snapshot),
         )
     return snapshot
 

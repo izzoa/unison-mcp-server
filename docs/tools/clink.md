@@ -168,6 +168,8 @@ Three layers can end a clink call — know which one fired:
 2. **Your MCP host's tool-call timeout** — often much shorter than ours (for Claude Code, raise it with the `MCP_TOOL_TIMEOUT` env var, in milliseconds; Claude Desktop exposes no knob). When the host cancels, clink reaps the CLI subprocess so it never keeps running orphaned.
 3. **The CLI's own internal limits** — some CLIs abort long runs themselves and report it in their output; clink surfaces that as the CLI's error, not a clink timeout.
 
+**Read-only snapshot cost:** `read_only` verification walks the CLI's working directory before and after the run. The walk prunes bulk directories (`.git`, `node_modules`, virtualenvs, build outputs) and honors a wall-clock budget — `CLINK_SNAPSHOT_BUDGET_SECONDS`, default 30s per snapshot — so verification can never starve the CLI call itself of the host's tool-timeout budget (observed live: an unbounded walk of a large OneDrive repo took 60-90s per snapshot). When the budget or the 50,000-entry cap truncates the walk, `metadata.read_only_verification_coverage` reads `working_dir_subtree (partial)` and `read_only_verification_stats` carries entry counts and elapsed times.
+
 > **Why `--yolo` for Gemini?** The Gemini CLI currently requires automatic approvals to execute its own tools (for example `run_shell_command`). Without the flag it errors with `Tool "run_shell_command" not found in registry`. See [issue #5382](https://github.com/google-gemini/gemini-cli/issues/5382) for more details.
 
 **Adding new CLIs**: Drop a JSON config into `conf/cli_clients/`, create role prompts in `systemprompts/clink/`, and register a parser/agent if the CLI outputs a new format.

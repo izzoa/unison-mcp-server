@@ -22,6 +22,11 @@ from tools.shared.exceptions import ToolExecutionError
 
 def _dummy_agent(captured: dict):
     class DummyAgent:
+        fs_violation_ignore_patterns: tuple = ()
+
+        def get_read_only_args(self):
+            return ["--fake-read-only"]
+
         async def run(self, **kwargs):
             captured.update(kwargs)
             return AgentOutput(
@@ -97,6 +102,33 @@ async def test_omitted_working_dir_defaults_to_server_cwd(monkeypatch):
     payload = json.loads(result[0].text)
     assert captured["working_dir"] is None
     assert payload["metadata"]["working_dir"] == os.getcwd()
+
+
+@pytest.mark.asyncio
+async def test_read_only_verification_stats_reported(monkeypatch, tmp_path):
+    """Read-only verification reports entry counts, elapsed time, and coverage."""
+    captured: dict = {}
+    monkeypatch.setattr("tools.clink.create_agent", lambda c: _dummy_agent(captured))
+    (tmp_path / "file.txt").write_text("hello")
+
+    tool = CLinkTool()
+    result = await tool.execute(
+        {
+            "prompt": "hi",
+            "cli_name": "gemini",
+            "working_dir": str(tmp_path),
+            "read_only": True,
+            "absolute_file_paths": [],
+            "images": [],
+        }
+    )
+    payload = json.loads(result[0].text)
+    metadata = payload["metadata"]
+    assert metadata["read_only_verification_coverage"] == "working_dir_subtree"
+    stats = metadata["read_only_verification_stats"]
+    assert stats["pre_entries"] == 1
+    assert stats["post_entries"] == 1
+    assert stats["truncated"] is False
 
 
 # ---------------------------------------------------------------------------
