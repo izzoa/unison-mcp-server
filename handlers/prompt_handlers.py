@@ -1,30 +1,32 @@
 """
 MCP prompt handler implementations for the Unison MCP Server.
 
-Contains the list_prompts and get_prompt handler logic, wired onto the
-MCP server instance via the register() function.
+Contains the list_prompts and get_prompt handler logic. build_handlers()
+returns the on_* adapters server.py passes to the mcp 2.x Server constructor.
 """
 
 import logging
 from typing import Any
 
-from mcp.types import GetPromptResult, Prompt, PromptMessage
+from mcp.types import GetPromptResult, ListPromptsResult, Prompt, PromptMessage
 
 from conf.prompt_templates import PROMPT_TEMPLATES
+from utils.mcp_context import reset_current_request_context, set_current_request_context
 
 logger = logging.getLogger(__name__)
 
 
-def register(server, tool_registry) -> None:
+def build_handlers(tool_registry):
     """
-    Register list_prompts and get_prompt handlers on the MCP server.
+    Build list_prompts and get_prompt handlers for the mcp 2.x server.
 
     Args:
-        server: The MCP Server instance.
         tool_registry: A ToolRegistry for checking tool existence.
+
+    Returns:
+        Tuple of (on_list_prompts, on_get_prompt) constructor adapters.
     """
 
-    @server.list_prompts()
     async def handle_list_prompts() -> list[Prompt]:
         """
         List all available prompts for CLI Code shortcuts.
@@ -68,7 +70,6 @@ def register(server, tool_registry) -> None:
         logger.debug("Returning %d prompts to MCP client", len(prompts))
         return prompts
 
-    @server.get_prompt()
     async def handle_get_prompt(name: str, arguments: dict[str, Any] = None) -> GetPromptResult:
         """
         Get prompt details and generate the actual prompt text.
@@ -146,12 +147,13 @@ def register(server, tool_registry) -> None:
         else:
             tool_instruction = prompt_text
 
+        # mcp 2.x GetPromptResult has no "prompt" field (1.x models allowed
+        # unknown extras and leaked one onto the wire); populate the spec's
+        # top-level description instead. Reviewed deviation: prompts/get
+        # responses gain "description"/"resultType" and lose the nonstandard
+        # "prompt" object.
         return GetPromptResult(
-            prompt=Prompt(
-                name=name,
-                description=template_info["description"],
-                arguments=[],
-            ),
+            description=template_info["description"],
             messages=[
                 PromptMessage(
                     role="user",
@@ -159,3 +161,19 @@ def register(server, tool_registry) -> None:
                 )
             ],
         )
+
+    async def on_list_prompts(ctx, params) -> ListPromptsResult:
+        token = set_current_request_context(ctx)
+        try:
+            return ListPromptsResult(prompts=await handle_list_prompts())
+        finally:
+            reset_current_request_context(token)
+
+    async def on_get_prompt(ctx, params) -> GetPromptResult:
+        token = set_current_request_context(ctx)
+        try:
+            return await handle_get_prompt(params.name, params.arguments)
+        finally:
+            reset_current_request_context(token)
+
+    return on_list_prompts, on_get_prompt

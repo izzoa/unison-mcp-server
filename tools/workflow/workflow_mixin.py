@@ -26,12 +26,13 @@ import logging
 import os
 import re
 from abc import ABC, abstractmethod
-from typing import Any, Optional
+from typing import Any
 
 from mcp.types import TextContent
 
 from config import MCP_PROMPT_SIZE_LIMIT
 from utils.conversation_memory import add_turn, create_thread
+from utils.observability import instrument_generate as _instrument_generate
 
 from ..shared.base_models import ConsolidatedFindings
 from ..shared.exceptions import ToolExecutionError
@@ -71,7 +72,7 @@ class BaseWorkflowMixin(ABC):
         super().__init__()
         self.work_history: list[dict[str, Any]] = []
         self.consolidated_findings: ConsolidatedFindings = ConsolidatedFindings()
-        self.initial_request: Optional[str] = None
+        self.initial_request: str | None = None
 
     # ================================================================================
     # Abstract Methods - Required Implementation by BaseTool or Subclasses
@@ -116,13 +117,13 @@ class BaseWorkflowMixin(ABC):
     def _prepare_file_content_for_prompt(
         self,
         request_files: list[str],
-        continuation_id: Optional[str],
+        continuation_id: str | None,
         context_description: str = "New files",
-        max_tokens: Optional[int] = None,
+        max_tokens: int | None = None,
         reserve_tokens: int = 1_000,
-        remaining_budget: Optional[int] = None,
-        arguments: Optional[dict[str, Any]] = None,
-        model_context: Optional[Any] = None,
+        remaining_budget: int | None = None,
+        arguments: dict[str, Any] | None = None,
+        model_context: Any | None = None,
     ) -> tuple[str, list[str]]:
         """Prepare file content for prompts. Usually provided by BaseTool."""
         pass
@@ -483,7 +484,7 @@ class BaseWorkflowMixin(ABC):
             self._reference_workflow_files(request)
 
     def _should_embed_files_in_workflow_step(
-        self, step_number: int, continuation_id: Optional[str], is_final_step: bool
+        self, step_number: int, continuation_id: str | None, is_final_step: bool
     ) -> bool:
         """
         Determine whether to embed file content based on workflow context.
@@ -935,7 +936,7 @@ class BaseWorkflowMixin(ABC):
         except AttributeError:
             return []
 
-    def get_request_hypothesis(self, request: Any) -> Optional[str]:
+    def get_request_hypothesis(self, request: Any) -> str | None:
         """Get hypothesis from request. Override for custom field mapping."""
         try:
             return request.hypothesis
@@ -986,7 +987,7 @@ class BaseWorkflowMixin(ABC):
         except AttributeError:
             return "flash"
 
-    def get_request_continuation_id(self, request: Any) -> Optional[str]:
+    def get_request_continuation_id(self, request: Any) -> str | None:
         """Get continuation ID from request. Override for custom continuation handling."""
         try:
             return request.continuation_id
@@ -1486,7 +1487,7 @@ class BaseWorkflowMixin(ABC):
         system_prompt: str = "",
         temperature: float = 0.3,
         thinking_mode: str = "high",
-        images: Optional[list[str]] = None,
+        images: list[str] | None = None,
     ) -> str:
         """Call ``provider.generate_content_stream()`` and relay chunks to
         MCP progress notifications while accumulating the full response.
@@ -1527,13 +1528,19 @@ class BaseWorkflowMixin(ABC):
             """Run the synchronous streaming generator in a worker thread, pushing
             each chunk onto the loop's queue as it is produced."""
             try:
-                for chunk in provider.generate_content_stream(
-                    prompt=prompt,
-                    model_name=model_name,
-                    system_prompt=system_prompt,
-                    temperature=temperature,
-                    thinking_mode=thinking_mode,
-                    images=images,
+                from utils.observability import instrument_stream
+
+                for chunk in instrument_stream(
+                    provider,
+                    provider.generate_content_stream(
+                        prompt=prompt,
+                        model_name=model_name,
+                        system_prompt=system_prompt,
+                        temperature=temperature,
+                        thinking_mode=thinking_mode,
+                        images=images,
+                    ),
+                    model=model_name,
                 ):
                     loop.call_soon_threadsafe(queue.put_nowait, chunk)
             except Exception as exc:  # surface to the consumer side
@@ -1573,11 +1580,18 @@ class BaseWorkflowMixin(ABC):
     def _get_progress_token(self):
         """Return the progress token from the current MCP request, or ``None``."""
         try:
-            from server import server
+            from utils.mcp_context import get_current_request_context
 
-            ctx = server.request_context
-            if ctx.meta and ctx.meta.progressToken is not None:
-                return ctx.meta.progressToken
+            ctx = get_current_request_context()
+            if ctx is None:
+                return None
+            meta = getattr(ctx, "meta", None)
+            if not meta:
+                return None
+            # mcp 2.x carries request meta as a plain dict with snake_case keys
+            if isinstance(meta, dict):
+                return meta.get("progress_token", meta.get("progressToken"))
+            return getattr(meta, "progress_token", None)
         except Exception:
             pass
         return None
@@ -1658,7 +1672,7 @@ class BaseWorkflowMixin(ABC):
                 # analysis). to_thread(generate_content) keeps sync-method stubs
                 # in tests working.
                 model_response = await asyncio.to_thread(
-                    provider.generate_content,
+                    _instrument_generate(provider),
                     prompt=prompt,
                     model_name=model_name,
                     system_prompt=system_prompt,

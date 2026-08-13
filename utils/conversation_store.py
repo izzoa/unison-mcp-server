@@ -14,7 +14,7 @@ focused modules (conversation_store, context_reconstructor, facade).
 import logging
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any
 
 from pydantic import BaseModel
 
@@ -76,12 +76,12 @@ class ConversationTurn(BaseModel):
     role: str  # "user" or "assistant"
     content: str
     timestamp: str
-    files: Optional[list[str]] = None  # Files referenced in this turn
-    images: Optional[list[str]] = None  # Images referenced in this turn
-    tool_name: Optional[str] = None  # Tool used for this turn
-    model_provider: Optional[str] = None  # Model provider (google, openai, etc)
-    model_name: Optional[str] = None  # Specific model used
-    model_metadata: Optional[dict[str, Any]] = None  # Additional model info
+    files: list[str] | None = None  # Files referenced in this turn
+    images: list[str] | None = None  # Images referenced in this turn
+    tool_name: str | None = None  # Tool used for this turn
+    model_provider: str | None = None  # Model provider (google, openai, etc)
+    model_name: str | None = None  # Specific model used
+    model_metadata: dict[str, Any] | None = None  # Additional model info
 
 
 class ThreadContext(BaseModel):
@@ -103,7 +103,7 @@ class ThreadContext(BaseModel):
     """
 
     thread_id: str
-    parent_thread_id: Optional[str] = None  # Parent thread for conversation chains
+    parent_thread_id: str | None = None  # Parent thread for conversation chains
     created_at: str
     last_updated_at: str
     tool_name: str  # Tool that created this thread (preserved for attribution)
@@ -149,7 +149,7 @@ def get_storage():
     return get_storage_backend()
 
 
-def create_thread(tool_name: str, initial_request: dict[str, Any], parent_thread_id: Optional[str] = None) -> str:
+def create_thread(tool_name: str, initial_request: dict[str, Any], parent_thread_id: str | None = None) -> str:
     """
     Create new conversation thread and return thread ID
 
@@ -201,7 +201,7 @@ def create_thread(tool_name: str, initial_request: dict[str, Any], parent_thread
     return thread_id
 
 
-def get_thread(thread_id: str) -> Optional[ThreadContext]:
+def get_thread(thread_id: str) -> ThreadContext | None:
     """
     Retrieve thread context from in-memory storage
 
@@ -241,12 +241,12 @@ def add_turn(
     thread_id: str,
     role: str,
     content: str,
-    files: Optional[list[str]] = None,
-    images: Optional[list[str]] = None,
-    tool_name: Optional[str] = None,
-    model_provider: Optional[str] = None,
-    model_name: Optional[str] = None,
-    model_metadata: Optional[dict[str, Any]] = None,
+    files: list[str] | None = None,
+    images: list[str] | None = None,
+    tool_name: str | None = None,
+    model_provider: str | None = None,
+    model_name: str | None = None,
+    model_metadata: dict[str, Any] | None = None,
 ) -> bool:
     """
     Add turn to existing thread with atomic file ordering.
@@ -309,7 +309,7 @@ def add_turn(
 
     if isinstance(storage, SQLiteStorageBackend):
 
-        def _mutate(current_json: Optional[str]) -> Optional[str]:
+        def _mutate(current_json: str | None) -> str | None:
             if not current_json:
                 logger.debug(f"[FLOW] Thread {thread_id} not found for turn addition")
                 return None

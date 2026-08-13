@@ -78,7 +78,7 @@ You can make your own custom roles in `conf/cli_clients/` or tweak any of the sh
 ## Tool Parameters
 
 - `prompt`: Your question or task for the external CLI (required)
-- `cli_name`: Which CLI to use - `gemini` (default), `claude`, `codex`, or add your own in `conf/cli_clients/`
+- `cli_name`: Which CLI to use - `aider`, `amp`, `claude`, `codex`, `copilot`, `crush`, `gemini`, `opencode`, or add your own in `conf/cli_clients/`. **Required** when more than one CLI is configured; it may be omitted only in a single-CLI deployment, where that CLI is used. There is no vendor-preferred default.
 - `role`: Preset role - `default`, `planner`, `codereviewer` (default: `default`)
 - `files`: Optional file paths for context (references only, CLI opens files itself)
 - `images`: Optional image paths for visual context
@@ -147,6 +147,7 @@ Clink configurations live in `conf/cli_clients/`. We ship presets for the suppor
 | `aider` | `aider --no-pretty --no-stream --no-auto-commits --yes-always` | `--dry-run` (native) | stable |
 | `crush` | `crush run --quiet` | prompt-only + filesystem snapshot | evolving |
 | `amp` | `amp --execute --stream-json` | prompt-only + filesystem snapshot | new |
+| `copilot` | `copilot --output-format json --allow-all-tools --no-color --log-level none --no-auto-update` | `--available-tools view,grep,glob` + `--deny-tool write/shell` (application-level, not an OS sandbox) | new |
 
 **Stability tiers:** `stable` = proven upstream, infrequent flag changes. `evolving` = active development, flags may rev. `new` = recently released, expect changes.
 

@@ -1,15 +1,19 @@
 [project]
 name = "unison-mcp-server"
-version = "12.0.0"
+version = "14.0.0"
 description = "AI-powered MCP server with multiple model providers"
 license = "AGPL-3.0"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dependencies = [
-    "mcp>=1.0.0",
+    "mcp>=2,<3",
+    "jsonschema>=4.20.0",  # Input-schema validation in the call_tool adapter (was the 1.x SDK's job)
+    "anthropic>=0.121,<1",  # Native Anthropic provider (Messages API, extended thinking)  # Input-schema validation in the call_tool adapter (was the 1.x SDK's job)
     "google-genai>=1.19.0",
     "openai>=1.55.2",
     "pydantic>=2.0.0",
     "python-dotenv>=1.0.0",
+    "litellm>=1.50.0",  # Model metadata discovery (model_cost, get_model_info)
+    "tiktoken>=0.7.0",  # OpenAI-compatible token counting (also available via openai SDK)
 ]
 
 [tool.setuptools.packages.find]
@@ -27,6 +31,7 @@ py-modules = ["server", "config"]
 
 [tool.setuptools.data-files]
 "conf" = [
+    "conf/anthropic_models.json",
     "conf/custom_models.json",
     "conf/openrouter_models.json",
     "conf/azure_models.json",
@@ -36,12 +41,51 @@ py-modules = ["server", "config"]
     "conf/dial_models.json",
 ]
 
+# Third-party tool plugins: declare a BaseTool subclass under this group and
+# `pip install` makes it available — the ENTRY-POINT KEY becomes the tool name.
+# Example (in the plugin package's pyproject.toml):
+#
+#   [project.entry-points."unison.tools"]
+#   my_tool = "my_package.tools:MyTool"
+#
+# See docs/plugins.md for the full plugin development guide.
+
+[project.optional-dependencies]
+observability = [
+    "opentelemetry-api>=1.20.0",
+    "opentelemetry-sdk>=1.20.0",
+    "opentelemetry-exporter-otlp-proto-grpc>=1.20.0",
+    "opentelemetry-exporter-otlp-proto-http>=1.20.0",
+]
+
 [project.scripts]
 unison-mcp-server = "server:run"
 
+# Dev/test tooling (PEP 735). Locked via uv.lock together with runtime deps;
+# pip consumers install the exported requirements-dev.lock.txt instead.
+[dependency-groups]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.0",
+    "pytest-mock>=3.11.0",
+    "black>=23.0.0",
+    "ruff>=0.1.0",
+    "isort>=5.12.0",
+    "mypy>=1.10",
+    "types-requests>=2.31.0",
+    "python-semantic-release>=10.3.0",
+    "build>=1.0.0",
+    # Docs-tool deps for scripts/build_mockups.py (README terminal mockup generator)
+    "jinja2>=3.1.0",
+    "pyyaml>=6.0",
+    "fonttools>=4.40.0",
+    "types-PyYAML>=6.0",
+]
+
 [tool.black]
 line-length = 120
-target-version = ['py39', 'py310', 'py311', 'py312', 'py313']
+target-version = ['py310', 'py311', 'py312', 'py313']
 include = '\.pyi?$'
 extend-exclude = '''
 /(
@@ -72,7 +116,7 @@ line_length = 120
 skip_glob = ["venv/*", ".venv/*", ".unison_venv/*"]
 
 [tool.ruff]
-target-version = "py39"
+target-version = "py310"
 line-length = 120
 
 [tool.ruff.lint]
@@ -194,6 +238,11 @@ module = [
     "clink.parsers.crush",
     "clink.agents.amp",
     "clink.parsers.amp",
+    "clink.agents.copilot",
+    "clink.parsers.copilot",
+    "utils.observability",
+    "utils.json_log_formatter",
+    "utils.mcp_context",
     "build_mockups",
 ]
 follow_imports = "normal"
@@ -214,6 +263,7 @@ module = [
     "tiktoken.*",
     "httpx.*",
     "openai.*",
+    "opentelemetry.*",
 ]
 ignore_missing_imports = true
 

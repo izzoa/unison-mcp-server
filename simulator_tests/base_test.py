@@ -9,7 +9,6 @@ import json
 import logging
 import os
 import subprocess
-from typing import Optional
 
 from .log_utils import LogUtils
 
@@ -124,7 +123,7 @@ class Calculator:
         self.test_files = {"python": os.path.abspath(test_py), "config": os.path.abspath(test_config)}
         self.logger.debug(f"Created test files with absolute paths: {list(self.test_files.values())}")
 
-    def call_mcp_tool(self, tool_name: str, params: dict) -> tuple[Optional[str], Optional[str]]:
+    def call_mcp_tool(self, tool_name: str, params: dict) -> tuple[str | None, str | None]:
         """Call an MCP tool via standalone server"""
         try:
             # Auto-inject working_directory_absolute_path for the chat tool
@@ -167,26 +166,80 @@ class Calculator:
 
             self.logger.debug(f"Calling MCP tool {tool_name} with proper initialization")
 
-            # Execute the command with proper handling for async responses
-            # For consensus tool and other long-running tools, we need to ensure
-            # the subprocess doesn't close prematurely
-            result = subprocess.run(
-                server_cmd,
-                input=input_data,
-                text=True,
-                capture_output=True,
-                timeout=3600,  # 1 hour timeout
-                check=False,  # Don't raise on non-zero exit code
-            )
+            # mcp 2.x cancels in-flight requests when stdin reaches EOF (the
+            # 1.x SDK drained them first), so the tool response must be read
+            # BEFORE stdin closes — the old subprocess.run(input=...) shape
+            # closed stdin immediately and got a -32000 "Connection closed"
+            # error instead of the result. Pump stdout/stderr on threads,
+            # wait for the id=2 response, then close stdin.
+            import queue as queue_module
+            import threading
+            import time as time_module
 
-            if result.returncode != 0:
-                self.logger.error(f"Standalone server failed with return code {result.returncode}")
-                self.logger.error(f"Stderr: {result.stderr}")
+            proc = subprocess.Popen(
+                server_cmd,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            out_queue: queue_module.Queue = queue_module.Queue()
+            stderr_chunks: list[str] = []
+
+            def _pump_stdout():
+                for out_line in proc.stdout:
+                    out_queue.put(out_line)
+                out_queue.put(None)
+
+            def _pump_stderr():
+                for err_line in proc.stderr:
+                    stderr_chunks.append(err_line)
+
+            threading.Thread(target=_pump_stdout, daemon=True).start()
+            threading.Thread(target=_pump_stderr, daemon=True).start()
+
+            stdout_lines: list[str] = []
+            try:
+                proc.stdin.write(input_data)
+                proc.stdin.flush()
+                deadline = time_module.monotonic() + 3600  # 1 hour timeout
+                while True:
+                    remaining = deadline - time_module.monotonic()
+                    if remaining <= 0:
+                        raise subprocess.TimeoutExpired(server_cmd, 3600)
+                    try:
+                        line = out_queue.get(timeout=min(remaining, 5.0))
+                    except queue_module.Empty:
+                        continue
+                    if line is None:
+                        break  # server exited (EOF) before answering
+                    stdout_lines.append(line)
+                    try:
+                        message = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    if message.get("id") == 2:
+                        break
+            finally:
+                try:
+                    proc.stdin.close()
+                except Exception:
+                    pass
+                try:
+                    proc.wait(timeout=30)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+                    proc.wait()
+
+            stdout_text = "".join(stdout_lines)
+            if proc.returncode != 0:
+                self.logger.error(f"Standalone server failed with return code {proc.returncode}")
+                self.logger.error(f"Stderr: {''.join(stderr_chunks)[-2000:]}")
                 # Still try to parse stdout as the response might have been written before the error
-                self.logger.debug(f"Attempting to parse stdout despite error: {result.stdout[:500]}")
+                self.logger.debug(f"Attempting to parse stdout despite error: {stdout_text[:500]}")
 
             # Parse the response - look for the tool call response
-            response_data = self._parse_mcp_response(result.stdout, expected_id=2)
+            response_data = self._parse_mcp_response(stdout_text, expected_id=2)
             if not response_data:
                 return None, None
 
@@ -202,7 +255,7 @@ class Calculator:
             self.logger.error(f"MCP tool call failed: {e}")
             return None, None
 
-    def _parse_mcp_response(self, stdout: str, expected_id: int = 2) -> Optional[str]:
+    def _parse_mcp_response(self, stdout: str, expected_id: int = 2) -> str | None:
         """Parse MCP JSON-RPC response from stdout"""
         try:
             lines = stdout.strip().split("\n")
@@ -238,7 +291,7 @@ class Calculator:
             self.logger.debug(f"Stdout that failed to parse: {stdout}")
             return None
 
-    def _extract_continuation_id(self, response_text: str) -> Optional[str]:
+    def _extract_continuation_id(self, response_text: str) -> str | None:
         """Extract continuation_id from response metadata"""
         try:
             # Parse the response text as JSON to look for continuation metadata
@@ -302,7 +355,7 @@ class Calculator:
     # Log Utility Methods (delegate to LogUtils)
     # ============================================================================
 
-    def get_server_logs_since(self, since_time: Optional[str] = None) -> str:
+    def get_server_logs_since(self, since_time: str | None = None) -> str:
         """Get server logs from both main and activity log files."""
         return LogUtils.get_server_logs_since(since_time)
 
@@ -338,9 +391,7 @@ class Calculator:
         """Validate that logs show file deduplication behavior."""
         return LogUtils.validate_file_deduplication_in_logs(logs, tool_name, test_file)
 
-    def search_logs_for_pattern(
-        self, pattern: str, logs: Optional[str] = None, case_sensitive: bool = False
-    ) -> list[str]:
+    def search_logs_for_pattern(self, pattern: str, logs: str | None = None, case_sensitive: bool = False) -> list[str]:
         """Search logs for a specific pattern."""
         return LogUtils.search_logs_for_pattern(pattern, logs, case_sensitive)
 

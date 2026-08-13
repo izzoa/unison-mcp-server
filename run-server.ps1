@@ -75,8 +75,32 @@
     Version            : See config.py (__version__)
     References         : https://github.com/izzoa/unison-mcp-server
 
+    REQUIREMENTS
+    PowerShell 7.0 or later. The Windows PowerShell 5.1 that ships with
+    Windows 10/11 cannot parse this script. Install with:
+        winget install --id Microsoft.PowerShell --source winget
+
+    WSL is NOT required. This script is native PowerShell and invokes no
+    bash, no WSL, and no Unix utilities.
+
+    EXECUTION POLICY
+    Windows blocks unsigned scripts by default, so this script may fail
+    before its first line with "running scripts is disabled on this system".
+    Allow it for the current process only:
+        Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process
+
+    A process-scoped policy expires with the shell and needs no administrator
+    rights, but it CANNOT override a MachinePolicy or UserPolicy set by Group
+    Policy — those take precedence. On a managed machine, contact your
+    administrator.
+
 #>
-#Requires -Version 5.1
+# PowerShell 7.0+ is required: this script uses the ternary operator, which
+# Windows PowerShell 5.1 cannot parse. PowerShell parses a script in full
+# before executing any of it, so declaring 5.1 here produced an unexplained
+# parse error on the interpreter shipped with Windows rather than a version
+# message. Raise this deliberately if later syntax is adopted.
+#Requires -Version 7.0
 [CmdletBinding()]
 param(
     [switch]$Help,
@@ -101,6 +125,19 @@ param(
 
 # Set error action preference
 $ErrorActionPreference = "Stop"
+
+# uv validates TLS against bundled roots by default, which fails behind
+# corporate TLS-intercepting proxies whose CA lives in the OS store (pip
+# already trusts the OS store). Opt uv into the system trust store for every
+# uv invocation this script makes. UV_NATIVE_TLS is the deprecated alias,
+# kept for older uv versions.
+$env:UV_SYSTEM_CERTS = "true"
+$env:UV_NATIVE_TLS = "1"
+
+# uv installs by hardlinking from its cache, which OneDrive-synced folders
+# reject ("incompatible hardlinks", os error 396) — corporate checkouts often
+# live under OneDrive. Copying is slightly slower but always works.
+$env:UV_LINK_MODE = "copy"
 
 # ----------------------------------------------------------------------------
 # Constants and Configuration  
@@ -477,6 +514,15 @@ function Cleanup-Docker {
     New-Item -Path $DOCKER_CLEANED_FLAG -ItemType File -Force | Out-Null
 }
 
+# True when an .env value is present and is not the template placeholder for
+# the given variable name (placeholders look like your_<name-lowercase>_here)
+function Test-ApiKeyValueConfigured {
+    param([string]$Name, [string]$Value)
+    if ([string]::IsNullOrWhiteSpace($Value)) { return $false }
+    if ($Value -eq "your_$($Name.ToLower())_here") { return $false }
+    return $true
+}
+
 # Validate API keys
 function Test-ApiKeys {
     Write-Step "Validating API Keys"
@@ -489,23 +535,45 @@ function Test-ApiKeys {
     $envContent = Get-Content ".env"
     $hasValidKey = $false
     
-    $keyPatterns = @{
-        "GEMINI_API_KEY"     = "AIza[0-9A-Za-z-_]{35}"
-        "OPENAI_API_KEY"     = "sk-[a-zA-Z0-9]{20}T3BlbkFJ[a-zA-Z0-9]{20}"
-        "XAI_API_KEY"        = "xai-[a-zA-Z0-9-_]+"
-        "OPENROUTER_API_KEY" = "sk-or-[a-zA-Z0-9-_]+"
-    }
+    # Native API-key providers recognized in .env. A value equal to its
+    # template placeholder is unconfigured. Provider key-format regexes are
+    # deliberately NOT enforced here: formats change (e.g. current OpenAI
+    # sk-proj-... keys) and a stale pattern would reject real credentials.
+    $apiKeyNames = @(
+        "GEMINI_API_KEY"
+        "OPENAI_API_KEY"
+        "ANTHROPIC_API_KEY"
+        "XAI_API_KEY"
+        "OPENROUTER_API_KEY"
+        "DIAL_API_KEY"
+    )
     
+    $envValues = @{}
     foreach ($line in $envContent) {
         if ($line -match '^([^#][^=]*?)=(.*)$') {
-            $key = $matches[1].Trim()
-            $value = $matches[2].Trim() -replace '^["'']|["'']$', ''
-            
-            if ($keyPatterns.ContainsKey($key) -and $value -ne "your_${key.ToLower()}_here" -and $value.Length -gt 10) {
-                Write-Success "Found valid $key"
-                $hasValidKey = $true
-            }
+            $envValues[$matches[1].Trim()] = $matches[2].Trim() -replace '^["'']|["'']$', ''
         }
+    }
+
+    foreach ($name in $apiKeyNames) {
+        if ($envValues.ContainsKey($name) -and (Test-ApiKeyValueConfigured -Name $name -Value $envValues[$name])) {
+            Write-Success "Found valid $name"
+            $hasValidKey = $true
+        }
+    }
+
+    # Azure OpenAI is configured as a key + endpoint pair
+    if ((Test-ApiKeyValueConfigured -Name "AZURE_OPENAI_API_KEY" -Value $envValues["AZURE_OPENAI_API_KEY"]) -and
+        (Test-ApiKeyValueConfigured -Name "AZURE_OPENAI_ENDPOINT" -Value $envValues["AZURE_OPENAI_ENDPOINT"])) {
+        Write-Success "Found Azure OpenAI configuration"
+        $hasValidKey = $true
+    }
+
+    # Custom endpoints (Ollama, vLLM, ...) may be keyless: a real
+    # CUSTOM_API_URL alone is a configured provider
+    if (Test-ApiKeyValueConfigured -Name "CUSTOM_API_URL" -Value $envValues["CUSTOM_API_URL"]) {
+        Write-Success "Found custom API endpoint (CUSTOM_API_URL)"
+        $hasValidKey = $true
     }
     
     if (!$hasValidKey) {
@@ -546,11 +614,14 @@ function Initialize-Environment {
         
         try {
             Write-Info "Creating virtual environment with uv..."
-            uv venv $VENV_PATH --python 3.12
+            # --seed installs pip into the venv: uv-created venvs are pip-less
+            # by default, which would strand the pip fallback path
+            uv venv --seed $VENV_PATH --python 3.12
             if ($LASTEXITCODE -eq 0) {
                 Write-Success "Environment created with uv"
                 return Get-AbsolutePath "$VENV_PATH\Scripts\python.exe"
             }
+            Write-Warning "uv could not create the environment (exit code $LASTEXITCODE) - falling back to a system Python venv"
         }
         catch {
             Write-Warning "uv failed, falling back to venv"
@@ -700,14 +771,14 @@ function Install-Dependencies {
     Write-Step "Installing Dependencies"
 
     # Build requirements files list
-    $requirementsFiles = @("requirements.txt")
+    $requirementsFiles = @("requirements.lock.txt")
     if ($InstallDevDependencies) {
-        if (Test-Path "requirements-dev.txt") {
-            $requirementsFiles += "requirements-dev.txt"
-            Write-Info "Including development dependencies from requirements-dev.txt"
+        if (Test-Path "requirements-dev.lock.txt") {
+            $requirementsFiles += "requirements-dev.lock.txt"
+            Write-Info "Including development dependencies from requirements-dev.lock.txt"
         }
         else {
-            Write-Warning "Development dependencies requested but requirements-dev.txt not found"
+            Write-Warning "Development dependencies requested but requirements-dev.lock.txt not found"
         }
     }
 
@@ -719,13 +790,13 @@ function Install-Dependencies {
             foreach ($file in $requirementsFiles) {
                 Write-Info "Installing from $file with uv..."
                 $uv = (Get-Command uv -ErrorAction Stop).Source
-                $arguments = @('pip', 'install', '-r', $file, '--python', $PythonPath)
-                $proc = Start-Process -FilePath $uv -ArgumentList $arguments -NoNewWindow -Wait -PassThru
-
-                if ($proc.ExitCode -ne 0) { 
-                    throw "uv failed to install $file with exit code $($proc.ExitCode)" 
+                # Direct invocation passes each argument intact; Start-Process
+                # -ArgumentList joins elements unquoted, splitting paths that
+                # contain spaces (e.g. "OneDrive - Vendor") into fragments.
+                & $uv pip install -r $file --python $PythonPath
+                if ($LASTEXITCODE -ne 0) {
+                    throw "uv failed to install $file with exit code $LASTEXITCODE"
                 }
-
             }
             Write-Success "Dependencies installed successfully with uv"
             return
@@ -739,10 +810,24 @@ function Install-Dependencies {
     # Fallback to pip
     Write-Info "Installing dependencies with pip..."
     $pipCmd = Join-Path (Split-Path $PythonPath -Parent) "pip.exe"
+    if (!(Test-Path $pipCmd)) {
+        # A venv created by uv without --seed has no pip at all; bootstrap it
+        # so the fallback can proceed.
+        Write-Info "pip not present in venv - bootstrapping via ensurepip..."
+        & $PythonPath -m ensurepip --upgrade *> $null
+        if (!(Test-Path $pipCmd)) {
+            Write-Error "pip is unavailable in the virtual environment and ensurepip could not install it."
+            exit 1
+        }
+    }
     
     try {
-        # Upgrade pip first
-        & $pipCmd install --upgrade pip | Out-Null
+        # Upgrade pip via the interpreter; pip.exe cannot modify itself on
+        # Windows and always errors when asked to
+        & $PythonPath -m pip install --upgrade pip *> $null
+        if ($LASTEXITCODE -ne 0) {
+            Write-Warning "Could not upgrade pip, continuing..."
+        }
     }
     catch {
         Write-Warning "Could not upgrade pip, continuing..."
@@ -863,19 +948,28 @@ function Initialize-DockerEnvironment {
         Write-Warning "No .env file found. Creating default .env file..."
         
         $defaultEnv = @"
-# API Keys - Replace with your actual keys
+# API keys — the server enables one provider per REAL value below. ONLY these
+# variables activate providers; placeholder values count as unset.
 GEMINI_API_KEY=your_gemini_api_key_here
-GOOGLE_API_KEY=your_google_api_key_here
 OPENAI_API_KEY=your_openai_api_key_here
 ANTHROPIC_API_KEY=your_anthropic_api_key_here
 XAI_API_KEY=your_xai_api_key_here
-DIAL_API_KEY=your_dial_api_key_here
-DIAL_API_HOST=your_dial_api_host_here
-DIAL_API_VERSION=your_dial_api_version_here
 OPENROUTER_API_KEY=your_openrouter_api_key_here
-CUSTOM_API_URL=your_custom_api_url_here
-CUSTOM_API_KEY=your_custom_api_key_here
-CUSTOM_MODEL_NAME=your_custom_model_name_here
+DIAL_API_KEY=your_dial_api_key_here
+
+# Azure OpenAI (both required together)
+#AZURE_OPENAI_API_KEY=
+#AZURE_OPENAI_ENDPOINT=
+
+# Local/self-hosted OpenAI-compatible endpoint (Ollama, vLLM, LM Studio, ...).
+# A real URL alone is enough; leave CUSTOM_API_KEY empty for keyless servers.
+#CUSTOM_API_URL=http://localhost:11434/v1
+#CUSTOM_API_KEY=
+#CUSTOM_MODEL_NAME=llama3.2
+
+# DIAL extras (only meaningful alongside a real DIAL_API_KEY)
+#DIAL_API_HOST=
+#DIAL_API_VERSION=
 
 # Server Configuration
 DEFAULT_MODEL=auto
@@ -1037,22 +1131,51 @@ function Test-Docker {
 # MCP Client Configuration System
 # ----------------------------------------------------------------------------
 
+function Get-ClaudeDesktopConfigPath {
+    # MSIX/Store installs of Claude Desktop virtualize their app data, so the
+    # app reads its config from inside the package's LocalCache — a file
+    # written to the real %APPDATA%\Claude would be invisible to it. Classic
+    # installs read %APPDATA%\Claude directly.
+    $msix = Get-ChildItem -Path "$env:LOCALAPPDATA\Packages" -Directory -Filter "AnthropicPBC.Claude*" -ErrorAction SilentlyContinue |
+        Select-Object -First 1
+    if ($msix -and -not (Test-Path "$env:APPDATA\Claude")) {
+        return (Join-Path $msix.FullName "LocalCache\Roaming\Claude\claude_desktop_config.json")
+    }
+    return "$env:APPDATA\Claude\claude_desktop_config.json"
+}
+
 # Centralized MCP client definitions
 $script:McpClientDefinitions = @(
     @{
         Name           = "Claude Desktop"
-        DetectionPath  = "$env:APPDATA\Claude\claude_desktop_config.json"
+        # Claude Desktop install layouts vary: classic installs keep app data
+        # at %APPDATA%\Claude (updater under %LOCALAPPDATA%\AnthropicClaude,
+        # some builds use %LOCALAPPDATA%\Claude); MSIX/Store deployments live
+        # under %LOCALAPPDATA%\Packages\AnthropicPBC.Claude*. Detect any of
+        # them — never the MCP config file itself, which only exists once MCP
+        # has been configured. The writer creates the config file (and its
+        # directory) at the path the installed variant actually reads.
+        DetectionPaths = @(
+            "$env:APPDATA\Claude"
+            "$env:LOCALAPPDATA\Claude"
+            "$env:LOCALAPPDATA\AnthropicClaude"
+            "$env:LOCALAPPDATA\Packages\AnthropicPBC.Claude*"
+        )
         DetectionType  = "Path"
-        ConfigPath     = "$env:APPDATA\Claude\claude_desktop_config.json"
+        ConfigPath     = (Get-ClaudeDesktopConfigPath)
         ConfigJsonPath = "mcpServers.unison"
-        NeedsConfigDir = $true
     },
     @{
+        # VS Code reads MCP servers from a user-profile `mcp.json` with a
+        # top-level `servers` key. This entry previously wrote `settings.json`
+        # with an `mcp.servers` key, which is the older shape — VS Code Insiders
+        # below was already updated and stable was not.
+        # https://code.visualstudio.com/docs/agent-customization/mcp-servers
         Name             = "VSCode"
         DetectionCommand = "code"
         DetectionType    = "Command"
-        ConfigPath       = "$env:APPDATA\Code\User\settings.json"
-        ConfigJsonPath   = "mcp.servers.unison"
+        ConfigPath       = "$env:APPDATA\Code\User\mcp.json"
+        ConfigJsonPath   = "servers.unison"
         IsVSCode         = $true
     },
     @{
@@ -1083,6 +1206,35 @@ $script:McpClientDefinitions = @(
         DetectionType  = "Path"
         ConfigPath     = "$env:APPDATA\Trae\User\mcp.json"
         ConfigJsonPath = "mcpServers.unison"
+    },
+    # CLI hosts. These don't follow the JSON-config pattern above; each row
+    # names its Handler function, which Invoke-McpClientConfiguration
+    # dispatches instead of Configure-McpClient. They are listed here so this
+    # table enumerates EVERY supported host - comparing coverage with
+    # run-server.sh means comparing this table against its MCP_HOST_REGISTRY.
+    @{
+        Name             = "Claude CLI"
+        DetectionCommand = "claude"
+        DetectionType    = "Command"
+        Handler          = "Test-ClaudeCliIntegration"
+    },
+    @{
+        Name             = "Gemini CLI"
+        DetectionPath    = "$env:USERPROFILE\.gemini\settings.json"
+        DetectionType    = "Path"
+        Handler          = "Test-GeminiCliIntegration"
+    },
+    @{
+        Name             = "Qwen CLI"
+        DetectionCommand = "qwen"
+        DetectionType    = "Command"
+        Handler          = "Test-QwenCliIntegration"
+    },
+    @{
+        Name             = "Codex CLI"
+        DetectionCommand = "codex"
+        DetectionType    = "Command"
+        Handler          = "Test-CodexCliIntegration"
     }
 )
 
@@ -1125,11 +1277,16 @@ function Test-McpJsonFormat {
     return $configFileName -eq "mcp.json"
 }
 
-# Check if client uses the new VS Code Insiders format (servers instead of mcpServers)
+# Check if a client uses the mcp.json format (top-level `servers` key) rather
+# than the older `mcpServers` / `mcp.servers` shapes.
+#
+# Keyed on the configured shape rather than on which client it is, so both
+# VS Code stable and Insiders are covered — they now use the same format, and
+# tying this to a client flag is what let stable drift onto the old shape.
 function Test-VSCodeInsidersFormat {
     param([hashtable]$Client)
-    
-    return $Client.IsVSCodeInsiders -eq $true -and $Client.ConfigJsonPath -eq "servers.unison"
+
+    return $Client.ConfigJsonPath -eq "servers.unison"
 }
 
 # Analyze existing MCP configuration to determine type (Python or Docker)
@@ -1275,8 +1432,16 @@ function Configure-McpClient {
     if ($Client.DetectionType -eq "Command" -and (Test-Command $Client.DetectionCommand)) {
         $detected = $true
     }
-    elseif ($Client.DetectionType -eq "Path" -and (Test-Path ($Client.DetectionPath -as [string]))) {
-        $detected = $true
+    elseif ($Client.DetectionType -eq "Path") {
+        $candidatePaths = @()
+        if ($Client.DetectionPaths) { $candidatePaths += $Client.DetectionPaths }
+        elseif ($Client.DetectionPath) { $candidatePaths += $Client.DetectionPath }
+        foreach ($candidate in $candidatePaths) {
+            if ($candidate -and (Test-Path ($candidate -as [string]))) {
+                $detected = $true
+                break
+            }
+        }
     }
 
     if (!$detected) {
@@ -1496,17 +1661,20 @@ function Invoke-McpClientConfiguration {
     )
     
     Write-Step "Checking Client Integrations"
-    
-    # Configure GUI clients
+
+    # One pass over the full host table. JSON-config hosts go through
+    # Configure-McpClient; rows that declare a Handler are CLI hosts and
+    # dispatch to their handler function (all handlers share the signature
+    # PythonPath, ServerPath). CLI handlers are skipped under Docker, matching
+    # the previous behavior.
     foreach ($client in $script:McpClientDefinitions) {
+        if ($client.Handler) {
+            if (!$UseDocker) {
+                & $client.Handler $PythonPath $ServerPath
+            }
+            continue
+        }
         Configure-McpClient -Client $client -UseDocker $UseDocker -PythonPath $PythonPath -ServerPath $ServerPath
-    }
-    
-    # Handle CLI tools separately (they don't follow JSON config pattern)
-    if (!$UseDocker) {
-        Test-ClaudeCliIntegration $PythonPath $ServerPath
-        Test-GeminiCliIntegration (Split-Path $ServerPath -Parent)
-        Test-QwenCliIntegration $PythonPath $ServerPath
     }
 }
 
@@ -1528,21 +1696,35 @@ function Test-ClaudeCliIntegration {
         $claudeConfig = claude mcp list 2>$null
         if ($claudeConfig -match "unison") {
             Write-Success "Claude CLI already configured for unison server"
+            return
+        }
+
+        # Perform the registration rather than printing it for the user to run.
+        # run-server.sh registers automatically, and setup that leaves an
+        # unexecuted command on screen is not equivalent to setup that works.
+        Write-Info "Registering unison server with Claude CLI..."
+        claude mcp add -s user unison $PythonPath $ServerPath 2>$null | Out-Null
+
+        if ($LASTEXITCODE -eq 0) {
+            Write-Success "Registered unison server with Claude CLI"
         }
         else {
-            Write-Info "To add unison server to Claude CLI, run:"
+            Write-Warning "Automatic registration failed. To configure manually, run:"
             Write-Host "  claude mcp add -s user unison $PythonPath $ServerPath" -ForegroundColor Cyan
         }
     }
     catch {
-        Write-Info "To configure Claude CLI manually, run:"
+        Write-Warning "Could not query or configure Claude CLI. To configure manually, run:"
         Write-Host "  claude mcp add -s user unison $PythonPath $ServerPath" -ForegroundColor Cyan
     }
 }
 
 function Test-GeminiCliIntegration {
-    param([string]$ScriptDir)
-    
+    # Uniform registry-handler signature (PythonPath, ServerPath); this handler
+    # only needs the script directory, derived from ServerPath.
+    param([string]$PythonPath, [string]$ServerPath)
+
+    $ScriptDir = Split-Path $ServerPath -Parent
     $palWrapper = Join-Path $ScriptDir "unison-mcp-server.cmd"
     
     # Check if Gemini settings file exists (Windows path)
@@ -1901,6 +2083,118 @@ function Test-QwenCliIntegration {
 # ----------------------------------------------------------------------------
 
 # Show script help
+function Test-CodexCliIntegration {
+    # Windows counterpart of run-server.sh's check_codex_cli_integration:
+    # cleans legacy [mcp_servers.<legacy>] sections from ~/.codex/config.toml,
+    # recognises an existing unison entry, and otherwise appends one. The
+    # server entry uses the resolved interpreter + server.py (the same shape
+    # Get-PythonMcpConfig registers everywhere else on Windows) rather than the
+    # bash/uvx launcher the Unix script writes, which has no Windows equivalent.
+    param([string]$PythonPath, [string]$ServerPath)
+
+    if (!(Test-Command "codex")) {
+        return
+    }
+
+    Write-Info "Codex CLI detected - checking configuration..."
+
+    $configPath = Join-Path (Join-Path $env:USERPROFILE ".codex") "config.toml"
+
+    # TOML basic strings treat backslash as an escape, so Windows paths must be
+    # escaped before being written.
+    $escapedCommand = $PythonPath -replace '\\', '\\' -replace '"', '\"'
+    $escapedArg = $ServerPath -replace '\\', '\\' -replace '"', '\"'
+
+    if (Test-Path $configPath) {
+        # Remove legacy [mcp_servers.<legacy>] sections (and their subsections),
+        # mirroring the line-filter the Unix script applies.
+        $lines = Get-Content $configPath
+        $output = New-Object System.Collections.Generic.List[string]
+        $skip = $false
+        $removed = $false
+
+        foreach ($line in $lines) {
+            if ($line -match '^\s*\[([^\]]+)\]') {
+                $header = $matches[1].Trim()
+                $parts = $header.Split('.')
+                $isLegacy = $false
+                if ($parts.Count -ge 2 -and $parts[0] -eq 'mcp_servers') {
+                    $sectionKey = ($parts | Select-Object -Skip 1) -join '.'
+                    foreach ($name in $script:LegacyServerNames) {
+                        if ($sectionKey -eq $name -or $sectionKey.StartsWith("$name.")) {
+                            $isLegacy = $true
+                            break
+                        }
+                    }
+                }
+                $skip = $isLegacy
+                if ($isLegacy) { $removed = $true; continue }
+            }
+            if (!$skip) { $output.Add($line) }
+        }
+
+        if ($removed) {
+            Set-Content -Path $configPath -Value ($output -join "`n").TrimEnd()
+            Write-Success "Removed legacy Codex MCP entries"
+        }
+
+        if (Select-String -Path $configPath -Pattern '\[mcp_servers\.unison\]' -Quiet) {
+            Write-Success "Codex CLI already configured for unison server"
+            return
+        }
+    }
+
+    $response = Read-Host "`nConfigure Unison for Codex CLI? (y/N)"
+    if ($response -notmatch '^[Yy]') {
+        Write-Info "Skipping Codex CLI integration"
+        return
+    }
+
+    $configDir = Split-Path $configPath -Parent
+    if (!(Test-Path $configDir)) {
+        New-Item -ItemType Directory -Path $configDir -Force | Out-Null
+    }
+    if (Test-Path $configPath) {
+        $timestamp = Get-Date -Format 'yyyyMMdd_HHmmss'
+        Copy-Item $configPath "$configPath.backup_$timestamp"
+    }
+
+    $block = @(
+        ""
+        "[mcp_servers.unison]"
+        "command = `"$escapedCommand`""
+        "args = [`"$escapedArg`"]"
+        "tool_timeout_sec = 1200"
+    )
+
+    # Mirror the Unix script's env section, populated from .env when present.
+    $envLines = @()
+    if (Test-Path ".env") {
+        foreach ($line in Get-Content ".env") {
+            $trimmed = $line.Trim()
+            if ([string]::IsNullOrWhiteSpace($trimmed) -or $trimmed.StartsWith('#')) { continue }
+            if ($trimmed -match '^([^=]+)=(.*)$') {
+                $key = $matches[1].Trim()
+                $value = $matches[2].Trim() -replace '^["'']|["'']$', ''
+                if ([string]::IsNullOrWhiteSpace($value) -or $value -match '^your_.*_here$') { continue }
+                $escapedValue = $value -replace '\\', '\\' -replace '"', '\"'
+                $envLines += "$key = `"$escapedValue`""
+            }
+        }
+    }
+    if ($envLines.Count -gt 0) {
+        $block += ""
+        $block += "[mcp_servers.unison.env]"
+        $block += $envLines
+    }
+
+    Add-Content -Path $configPath -Value ($block -join "`n")
+
+    Write-Success "Successfully configured Codex CLI"
+    Write-Host "  Config: $configPath"
+    Write-Host "  Restart Codex CLI to use Unison MCP Server"
+}
+
 function Show-Help {
     Write-Host @"
 Unison MCP Server - Setup and Launch Script
@@ -2064,19 +2358,28 @@ function Initialize-EnvFile {
     if (!(Test-Path ".env")) {
         Write-Info "Creating default .env file..."
         @"
-# API Keys - Replace with your actual keys
+# API keys — the server enables one provider per REAL value below. ONLY these
+# variables activate providers; placeholder values count as unset.
 GEMINI_API_KEY=your_gemini_api_key_here
-GOOGLE_API_KEY=your_google_api_key_here
 OPENAI_API_KEY=your_openai_api_key_here
 ANTHROPIC_API_KEY=your_anthropic_api_key_here
 XAI_API_KEY=your_xai_api_key_here
-DIAL_API_KEY=your_dial_api_key_here
-DIAL_API_HOST=your_dial_api_host_here
-DIAL_API_VERSION=your_dial_api_version_here
 OPENROUTER_API_KEY=your_openrouter_api_key_here
-CUSTOM_API_URL=your_custom_api_url_here
-CUSTOM_API_KEY=your_custom_api_key_here
-CUSTOM_MODEL_NAME=your_custom_model_name_here
+DIAL_API_KEY=your_dial_api_key_here
+
+# Azure OpenAI (both required together)
+#AZURE_OPENAI_API_KEY=
+#AZURE_OPENAI_ENDPOINT=
+
+# Local/self-hosted OpenAI-compatible endpoint (Ollama, vLLM, LM Studio, ...).
+# A real URL alone is enough; leave CUSTOM_API_KEY empty for keyless servers.
+#CUSTOM_API_URL=http://localhost:11434/v1
+#CUSTOM_API_KEY=
+#CUSTOM_MODEL_NAME=llama3.2
+
+# DIAL extras (only meaningful alongside a real DIAL_API_KEY)
+#DIAL_API_HOST=
+#DIAL_API_VERSION=
 
 # Server Configuration
 DEFAULT_MODEL=auto
@@ -2128,6 +2431,27 @@ function Import-EnvFile {
 # Workflow Functions
 # ----------------------------------------------------------------------------
 
+# Post-install smoke test: the server module must import with the venv
+# interpreter before any MCP client is configured or success is reported.
+# Handler registration happens at import time, so this catches broken
+# installs (missing or incompatible packages) at setup instead of at the
+# first client launch. No API key is needed: provider configuration only
+# happens in the server's main().
+function Test-ServerImport {
+    param([Parameter(Mandatory = $true)][string]$PythonPath)
+
+    Write-Step "Verifying Server Installation"
+    Write-Info "Checking that the server module imports..."
+    & $PythonPath -c "import server"
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "Server import check failed (exit code $LASTEXITCODE) - see the error above."
+        Write-Info "MCP clients were NOT configured. Fix the error and run .\run-server.ps1 again."
+        return $false
+    }
+    Write-Success "Server module imports cleanly"
+    return $true
+}
+
 # Docker deployment workflow
 function Invoke-DockerWorkflow {
     Write-Step "Starting Docker Workflow"
@@ -2144,7 +2468,7 @@ function Invoke-DockerWorkflow {
     if (!(Initialize-DockerEnvironment)) { exit 1 }
     
     Import-EnvFile
-    Test-ApiKeys
+    $null = Test-ApiKeys
     
     if (!(Build-DockerImage -Force:$Force)) { exit 1 }
     
@@ -2199,7 +2523,7 @@ function Invoke-PythonWorkflow {
     Clear-PythonCache
     Initialize-EnvFile
     Import-EnvFile
-    Test-ApiKeys
+    $null = Test-ApiKeys
     
     try {
         $pythonPath = Initialize-Environment
@@ -2216,7 +2540,11 @@ function Invoke-PythonWorkflow {
         Write-Error "Failed to install dependencies: $_"
         exit 1
     }
-    
+
+    if (!(Test-ServerImport -PythonPath $pythonPath)) {
+        exit 1
+    }
+
     $serverPath = Get-AbsolutePath "server.py"
     
     # Configure MCP clients for Python

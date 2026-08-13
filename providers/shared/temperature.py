@@ -1,7 +1,6 @@
 """Helper types for validating model temperature parameters."""
 
 from abc import ABC, abstractmethod
-from typing import Optional
 
 __all__ = [
     "TemperatureConstraint",
@@ -83,7 +82,7 @@ class TemperatureConstraint(ABC):
     @staticmethod
     def resolve_settings(
         model_name: str,
-        constraint_hint: Optional[str] = None,
+        constraint_hint: str | None = None,
     ) -> tuple[bool, "TemperatureConstraint", str]:
         """Derive temperature support and constraint for a model.
 
@@ -150,7 +149,7 @@ class FixedTemperatureConstraint(TemperatureConstraint):
 class RangeTemperatureConstraint(TemperatureConstraint):
     """Constraint for providers that expose a continuous min/max temperature range."""
 
-    def __init__(self, min_temp: float, max_temp: float, default: Optional[float] = None):
+    def __init__(self, min_temp: float, max_temp: float, default: float | None = None):
         self.min_temp = min_temp
         self.max_temp = max_temp
         self.default_temp = default or (min_temp + max_temp) / 2
@@ -171,7 +170,7 @@ class RangeTemperatureConstraint(TemperatureConstraint):
 class DiscreteTemperatureConstraint(TemperatureConstraint):
     """Constraint for models that permit a discrete list of temperature values."""
 
-    def __init__(self, allowed_values: list[float], default: Optional[float] = None):
+    def __init__(self, allowed_values: list[float], default: float | None = None):
         self.allowed_values = sorted(allowed_values)
         self.default_temp = default or allowed_values[len(allowed_values) // 2]
 

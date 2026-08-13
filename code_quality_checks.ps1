@@ -100,8 +100,9 @@ Write-Host ""
 Write-Emoji "🔍" "Checking development dependencies..." -Color Cyan
 $devDepsNeeded = $false
 
-# List of dev tools to check
-$devTools = @("ruff", "black", "isort", "pytest")
+# List of dev tools to check. mypy is included because Step 1b runs it; without
+# it here the type-check step would silently skip on a fresh venv.
+$devTools = @("ruff", "black", "isort", "mypy", "pytest")
 
 foreach ($tool in $devTools) {
     $toolFound = $false
@@ -136,7 +137,7 @@ foreach ($tool in $devTools) {
 if ($devDepsNeeded) {
     Write-Emoji "📦" "Installing development dependencies..." -Color Yellow
     try {
-        & $pipCmd install -q -r requirements-dev.txt
+        & $pipCmd install -q -r requirements-dev.lock.txt
         if ($LASTEXITCODE -ne 0) {
             throw "Failed to install dev dependencies"
         }
@@ -150,17 +151,49 @@ if ($devDepsNeeded) {
     Write-Emoji "✅" "Development dependencies already installed" -Color Green
 }
 
-# Set tool paths
-if ($IsWindows -or $env:OS -eq "Windows_NT") {
-    $ruffCmd = if (Test-Path ".unison_venv\Scripts\ruff.exe") { ".unison_venv\Scripts\ruff.exe" } else { "ruff" }
-    $blackCmd = if (Test-Path ".unison_venv\Scripts\black.exe") { ".unison_venv\Scripts\black.exe" } else { "black" }
-    $isortCmd = if (Test-Path ".unison_venv\Scripts\isort.exe") { ".unison_venv\Scripts\isort.exe" } else { "isort" }
-    $pytestCmd = if (Test-Path ".unison_venv\Scripts\pytest.exe") { ".unison_venv\Scripts\pytest.exe" } else { "pytest" }
+# Set tool paths.
+#
+# Each tool is resolved independently: the presence of one tool in the venv is
+# never used to infer another's. The bash gate had exactly that defect — four
+# paths gated on a single probe — so a partially-populated venv silently mixed
+# venv and system toolchains while still reporting success.
+function Resolve-Tool {
+    param([string]$Name)
+
+    $venvPath = if ($IsWindows -or $env:OS -eq "Windows_NT") {
+        ".unison_venv\Scripts\$Name.exe"
+    } else {
+        ".unison_venv/bin/$Name"
+    }
+
+    if (Test-Path $venvPath) {
+        return [pscustomobject]@{ Path = $venvPath; Source = "venv" }
+    }
+    return [pscustomobject]@{ Path = $Name; Source = "PATH" }
+}
+
+$tools = @{}
+foreach ($name in @("ruff", "black", "isort", "mypy", "pytest")) {
+    $tools[$name] = Resolve-Tool $name
+}
+$ruffCmd = $tools["ruff"].Path
+$blackCmd = $tools["black"].Path
+$isortCmd = $tools["isort"].Path
+$mypyCmd = $tools["mypy"].Path
+$pytestCmd = $tools["pytest"].Path
+
+# Report how each tool resolved, so a mixed toolchain is visible rather than
+# silent. A run using a system tool of a different major version can otherwise
+# reformat files CI expects in another style and still print success.
+$fellBack = @($tools.GetEnumerator() | Where-Object { $_.Value.Source -eq "PATH" })
+if ($fellBack.Count -gt 0) {
+    Write-Emoji "⚠️" "Some tools resolved outside the venv:" -Color Yellow
+    foreach ($entry in ($tools.GetEnumerator() | Sort-Object Key)) {
+        $marker = if ($entry.Value.Source -eq "venv") { "venv" } else { "PATH" }
+        Write-ColorText "     $($entry.Key.PadRight(8)) -> $marker" -Color Yellow
+    }
 } else {
-    $ruffCmd = if (Test-Path ".unison_venv/bin/ruff") { ".unison_venv/bin/ruff" } else { "ruff" }
-    $blackCmd = if (Test-Path ".unison_venv/bin/black") { ".unison_venv/bin/black" } else { "black" }
-    $isortCmd = if (Test-Path ".unison_venv/bin/isort") { ".unison_venv/bin/isort" } else { "isort" }
-    $pytestCmd = if (Test-Path ".unison_venv/bin/pytest") { ".unison_venv/bin/pytest" } else { "pytest" }
+    Write-Emoji "✅" "All tools resolved from the venv" -Color Green
 }
 
 Write-Host ""
@@ -207,25 +240,126 @@ if (!$SkipLinting) {
 
 Write-Host ""
 
+# Step 1b: Type Checking (strict allowlist)
+#
+# The file list mirrors code_quality_checks.sh and the mypy step in
+# .github/workflows/test.yml. Keep all three in sync when adding a module to
+# the strict allowlist in pyproject.toml.
+if (!$SkipLinting) {
+    Write-Emoji "🔎" "Step 1b: Running mypy Type Checking" -Color Cyan
+    Write-ColorText "---------------------------------------" -Color Cyan
+
+    $mypyAvailable = (Test-Path $mypyCmd) -or (Get-Command $mypyCmd -ErrorAction SilentlyContinue)
+    if (!$mypyAvailable) {
+        Write-Emoji "⚠️" "mypy not found - skipping type checks (install via: pip install -r requirements-dev.lock.txt)" -Color Yellow
+    } else {
+        $mypyFiles = @(
+            "utils/circuit_breaker.py", "utils/fs_snapshot.py", "utils/tool_execution_context.py", "utils/token_utils.py",
+            "providers/shared/provider_type.py", "providers/shared/model_response.py",
+            "utils/file_types.py", "utils/security_config.py", "utils/conversation_memory.py",
+            "utils/env.py", "utils/model_resolution.py", "utils/request_helpers.py",
+            "utils/image_utils.py", "utils/context_reconstructor.py", "utils/file_utils.py",
+            "tools/registry.py",
+            "scripts/smoke_test_wheel.py", "scripts/build_mockups.py",
+            "clink/agents/opencode.py", "clink/parsers/opencode.py",
+            "clink/agents/aider.py", "clink/parsers/aider.py",
+            "clink/agents/crush.py", "clink/parsers/crush.py",
+            "clink/agents/amp.py", "clink/parsers/amp.py",
+            "clink/agents/copilot.py", "clink/parsers/copilot.py",
+            "utils/observability.py", "utils/json_log_formatter.py"
+        )
+
+        Write-Emoji "🔍" "Running mypy on strict allowlist files..." -Color Yellow
+        & $mypyCmd @mypyFiles
+        if ($LASTEXITCODE -ne 0) {
+            Write-Emoji "❌" "Step 1b Failed: Type checking failed" -Color Red
+            exit 1
+        }
+        Write-Emoji "✅" "Step 1b Complete: Type checking passed!" -Color Green
+    }
+} else {
+    Write-Emoji "⏭️" "Skipping type checks" -Color Yellow
+}
+
+Write-Host ""
+
+# Step 1c: Mockup drift check
+#
+# Regenerates the README mockups into a temp dir and compares against the
+# checked-in SVGs, catching a scene YAML edit that was never regenerated.
+if (!$SkipLinting) {
+    Write-Emoji "🔍" "Step 1c: Checking mockup drift" -Color Cyan
+    Write-ColorText "----------------------------------" -Color Cyan
+
+    $mockupTmp = Join-Path ([System.IO.Path]::GetTempPath()) ("unison-mockups-" + [System.Guid]::NewGuid().ToString("N"))
+    New-Item -ItemType Directory -Path $mockupTmp -Force | Out-Null
+    try {
+        & $pythonCmd scripts/build_mockups.py --output-dir $mockupTmp | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            throw "Mockup generation failed"
+        }
+
+        $generated = Get-ChildItem -Path $mockupTmp -File | Sort-Object Name
+        $committed = Get-ChildItem -Path "docs/assets/mockups" -File | Sort-Object Name
+        $differences = @()
+
+        $generatedNames = $generated | ForEach-Object { $_.Name }
+        $committedNames = $committed | ForEach-Object { $_.Name }
+        $differences += (Compare-Object $generatedNames $committedNames | ForEach-Object { "missing or extra: $($_.InputObject)" })
+
+        foreach ($file in $generated) {
+            $counterpart = Join-Path "docs/assets/mockups" $file.Name
+            if (Test-Path $counterpart) {
+                $a = (Get-FileHash $file.FullName -Algorithm SHA256).Hash
+                $b = (Get-FileHash $counterpart -Algorithm SHA256).Hash
+                if ($a -ne $b) { $differences += "differs: $($file.Name)" }
+            }
+        }
+
+        if ($differences.Count -gt 0) {
+            Write-Emoji "❌" "Generated SVGs are out of sync with scene YAML." -Color Red
+            Write-ColorText "   Run: python scripts/build_mockups.py" -Color Yellow
+            $differences | Select-Object -First 20 | ForEach-Object { Write-ColorText "   $_" -Color Yellow }
+            exit 1
+        }
+
+        Write-Emoji "✅" "Step 1c Complete: Mockups in sync!" -Color Green
+    } catch {
+        Write-Emoji "❌" "Step 1c Failed: $_" -Color Red
+        exit 1
+    } finally {
+        Remove-Item -Recurse -Force $mockupTmp -ErrorAction SilentlyContinue
+    }
+} else {
+    Write-Emoji "⏭️" "Skipping mockup drift check" -Color Yellow
+}
+
+Write-Host ""
+
 # Step 2: Unit Tests
 if (!$SkipTests) {
     Write-Emoji "🧪" "Step 2: Running Complete Unit Test Suite" -Color Cyan
     Write-ColorText "---------------------------------------------" -Color Cyan
 
     try {
-        Write-Emoji "🏃" "Running unit tests (excluding integration tests)..." -Color Yellow
-        
-        $pytestArgs = @("tests/", "-v", "-x", "-m", "not integration")
+        Write-Emoji "🏃" "Running unit tests with coverage (excluding integration tests)..." -Color Yellow
+
+        # Coverage threshold matches code_quality_checks.sh (--cov-fail-under=44).
+        # Without it the PowerShell gate could pass a tree the bash gate rejects.
+        $pytestArgs = @(
+            "tests/", "-v", "-x", "-m", "not integration",
+            "--cov=.", "--cov-report=term-missing", "--cov-fail-under=44"
+        )
         if ($VerboseOutput) {
             $pytestArgs += "--verbose"
         }
-        
+
         & $pythonCmd -m pytest @pytestArgs
         if ($LASTEXITCODE -ne 0) {
-            throw "Unit tests failed"
+            throw "Unit tests failed or coverage below threshold"
         }
 
-        Write-Emoji "✅" "Step 2 Complete: All unit tests passed!" -Color Green
+        Write-Emoji "✅" "Step 2 Complete: All unit tests passed with coverage above threshold!" -Color Green
     } catch {
         Write-Emoji "❌" "Step 2 Failed: Unit tests failed" -Color Red
         Write-ColorText "Error: $_" -Color Red

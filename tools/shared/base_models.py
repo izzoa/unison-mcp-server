@@ -11,7 +11,6 @@ Key Models:
 """
 
 import logging
-from typing import Optional
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -67,15 +66,15 @@ class ToolRequest(BaseModel):
     """
 
     # Model configuration
-    model: Optional[str] = Field(None, description=COMMON_FIELD_DESCRIPTIONS["model"])
-    temperature: Optional[float] = Field(None, ge=0.0, le=1.0, description=COMMON_FIELD_DESCRIPTIONS["temperature"])
-    thinking_mode: Optional[str] = Field(None, description=COMMON_FIELD_DESCRIPTIONS["thinking_mode"])
+    model: str | None = Field(None, description=COMMON_FIELD_DESCRIPTIONS["model"])
+    temperature: float | None = Field(None, ge=0.0, le=1.0, description=COMMON_FIELD_DESCRIPTIONS["temperature"])
+    thinking_mode: str | None = Field(None, description=COMMON_FIELD_DESCRIPTIONS["thinking_mode"])
 
     # Conversation support
-    continuation_id: Optional[str] = Field(None, description=COMMON_FIELD_DESCRIPTIONS["continuation_id"])
+    continuation_id: str | None = Field(None, description=COMMON_FIELD_DESCRIPTIONS["continuation_id"])
 
     # Visual context
-    images: Optional[list[str]] = Field(None, description=COMMON_FIELD_DESCRIPTIONS["images"])
+    images: list[str] | None = Field(None, description=COMMON_FIELD_DESCRIPTIONS["images"])
 
 
 class BaseWorkflowRequest(ToolRequest):
@@ -120,8 +119,8 @@ class WorkflowRequest(BaseWorkflowRequest):
     confidence: str = Field("low", description=WORKFLOW_FIELD_DESCRIPTIONS["confidence"])
 
     # Optional workflow fields
-    hypothesis: Optional[str] = Field(None, description=WORKFLOW_FIELD_DESCRIPTIONS["hypothesis"])
-    use_assistant_model: Optional[bool] = Field(True, description=WORKFLOW_FIELD_DESCRIPTIONS["use_assistant_model"])
+    hypothesis: str | None = Field(None, description=WORKFLOW_FIELD_DESCRIPTIONS["hypothesis"])
+    use_assistant_model: bool | None = Field(True, description=WORKFLOW_FIELD_DESCRIPTIONS["use_assistant_model"])
 
     @field_validator("files_checked", "relevant_files", "relevant_context", mode="before")
     @classmethod

@@ -17,7 +17,7 @@ Key features:
 """
 
 import logging
-from typing import TYPE_CHECKING, Any, Literal, Optional
+from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import Field, model_validator
 
@@ -108,25 +108,25 @@ class RefactorRequest(WorkflowRequest):
         default_factory=list, description=REFACTOR_FIELD_DESCRIPTIONS["relevant_context"]
     )
     issues_found: list[dict] = Field(default_factory=list, description=REFACTOR_FIELD_DESCRIPTIONS["issues_found"])
-    confidence: Optional[Literal["exploring", "incomplete", "partial", "complete"]] = Field(
+    confidence: Literal["exploring", "incomplete", "partial", "complete"] | None = Field(
         "incomplete", description=REFACTOR_FIELD_DESCRIPTIONS["confidence"]
     )
 
     # Optional images for visual context
-    images: Optional[list[str]] = Field(default=None, description=REFACTOR_FIELD_DESCRIPTIONS["images"])
+    images: list[str] | None = Field(default=None, description=REFACTOR_FIELD_DESCRIPTIONS["images"])
 
     # Refactor-specific fields (only used in step 1 to initialize)
-    refactor_type: Optional[Literal["codesmells", "decompose", "modernize", "organization"]] = Field(
+    refactor_type: Literal["codesmells", "decompose", "modernize", "organization"] | None = Field(
         "codesmells", description=REFACTOR_FIELD_DESCRIPTIONS["refactor_type"]
     )
-    focus_areas: Optional[list[str]] = Field(None, description=REFACTOR_FIELD_DESCRIPTIONS["focus_areas"])
-    style_guide_examples: Optional[list[str]] = Field(
+    focus_areas: list[str] | None = Field(None, description=REFACTOR_FIELD_DESCRIPTIONS["focus_areas"])
+    style_guide_examples: list[str] | None = Field(
         None, description=REFACTOR_FIELD_DESCRIPTIONS["style_guide_examples"]
     )
 
     # Override inherited fields to exclude them from schema (except model which needs to be available)
-    temperature: Optional[float] = Field(default=None, exclude=True)
-    thinking_mode: Optional[str] = Field(default=None, exclude=True)
+    temperature: float | None = Field(default=None, exclude=True)
+    thinking_mode: str | None = Field(default=None, exclude=True)
 
     @model_validator(mode="after")
     def validate_step_one_requirements(self):

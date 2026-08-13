@@ -8,7 +8,6 @@ rate limiting to avoid flooding the client with excessive notifications.
 
 import logging
 import time
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -34,8 +33,10 @@ class StreamProgressNotifier:
     completes normally.
 
     Args:
-        server: The MCP ``Server`` instance (used to access
-            ``request_context.session``).
+        server: Optional MCP ``Server`` instance. The session is resolved from
+            the ContextVar-bound request context first; a legacy
+            ``server.request_context`` attribute is a fallback for test
+            doubles.
         progress_token: Opaque token from the client's request metadata.
             ``None`` means no progress reporting was requested.
         min_interval: Minimum seconds between notifications (default 0.1).
@@ -46,7 +47,7 @@ class StreamProgressNotifier:
     def __init__(
         self,
         server: object,
-        progress_token: Optional[object] = None,
+        progress_token: object | None = None,
         min_interval: float = _MIN_NOTIFY_INTERVAL_SECONDS,
         min_chunk_size: int = _MIN_CHUNK_SIZE,
     ) -> None:
@@ -142,13 +143,19 @@ class StreamProgressNotifier:
             logger.debug("Failed to send progress notification", exc_info=True)
 
     def _get_session(self):
-        """Retrieve the current MCP session from the server's request context.
+        """Retrieve the current MCP session.
 
-        Returns ``None`` if unavailable (e.g. called outside a request
-        handler).
+        Prefers the request context bound by the mcp 2.x handler adapters,
+        falling back to the legacy ``server.request_context`` attribute (kept
+        for 1.x-shaped test doubles). Returns ``None`` if unavailable (e.g.
+        called outside a request handler).
         """
         try:
-            ctx = self._server.request_context
-            return ctx.session
+            from utils.mcp_context import get_current_request_context
+
+            ctx = get_current_request_context()
+            if ctx is None and self._server is not None:
+                ctx = self._server.request_context
+            return ctx.session if ctx is not None else None
         except (LookupError, AttributeError):
             return None

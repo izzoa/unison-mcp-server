@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
+import pytest
+
 from clink.agents.base import BaseCLIAgent
 from clink.agents.claude import ClaudeAgent
 from clink.agents.codex import CodexAgent
@@ -138,18 +140,44 @@ class TestCLinkRequestReadOnly:
 
 
 class TestCLinkPromptInjection:
-    def test_read_only_instruction_injected(self):
-        """When read_only=true, request carries the flag for prompt injection."""
-        from tools.clink import CLinkRequest
+    """Assertions on the assembled prompt itself.
 
-        request = CLinkRequest(prompt="Analyze this code", read_only=True)
-        assert request.read_only is True
+    These previously only checked ``request.read_only``, duplicating
+    TestCLinkRequestReadOnly and providing no coverage of the injected text.
+    """
 
-    def test_read_only_instruction_not_injected_when_false(self):
-        from tools.clink import CLinkRequest
+    @staticmethod
+    async def _assemble(read_only: bool) -> str:
+        from tools.clink import CLinkRequest, CLinkTool
 
-        request = CLinkRequest(prompt="Edit this code", read_only=False)
-        assert request.read_only is False
+        tool = CLinkTool()
+        client = tool._resolve_client("gemini")
+        role = client.get_role("default")
+        request = CLinkRequest(prompt="Analyze this code", cli_name="gemini", read_only=read_only)
+        return await tool._prepare_prompt_for_role(
+            request,
+            role,
+            client=client,
+            system_prompt=role.prompt_path.read_text(encoding="utf-8"),
+            include_system_prompt=True,
+        )
+
+    @pytest.mark.asyncio
+    async def test_read_only_instruction_injected(self):
+        prompt = await self._assemble(read_only=True)
+        assert "=== READ-ONLY MODE ===" in prompt
+        assert "MUST NOT create, modify, delete, or rename any file" in prompt
+
+    @pytest.mark.asyncio
+    async def test_read_only_instruction_not_injected_when_false(self):
+        prompt = await self._assemble(read_only=False)
+        assert "READ-ONLY MODE" not in prompt
+
+    @pytest.mark.asyncio
+    async def test_read_only_instruction_names_no_cli_specific_tools(self):
+        prompt = await self._assemble(read_only=True)
+        for name in ("EditFile", "WriteFile", "CreateFile", "DeleteFile", "ReplaceInFile"):
+            assert name not in prompt
 
 
 class TestCLinkInputSchema:

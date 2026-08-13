@@ -35,8 +35,8 @@ jobs:
 
       - name: Verify tests pass
         run: |
-          pip install -r requirements.txt
-          pip install -r requirements-dev.txt
+          pip install -r requirements.lock.txt
+          pip install -r requirements-dev.lock.txt
           python -m pytest tests/ -v --ignore=simulator_tests/ -m "not integration"
 
       - name: Run semantic release

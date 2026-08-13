@@ -222,6 +222,37 @@ configurable delays.
 Fixes #45
 ```
 
+## Dependency Locking
+
+Installs are reproducible: the setup scripts, CI, and Docker install the exact
+versions recorded in the committed lockfiles rather than resolving open ranges
+at install time.
+
+- `uv.lock` — the source of truth (universal: all platforms, Python ≥3.10)
+- `requirements.lock.txt` — pip-consumable export of the runtime dependencies
+- `requirements-dev.lock.txt` — pip-consumable export of the dev tooling group
+
+Dependency *ranges* live in `pyproject.toml` (`[project] dependencies` and
+`[dependency-groups] dev`). To add or upgrade a dependency, edit the range
+there, then regenerate all three artifacts:
+
+```bash
+uv lock
+uv export --format requirements.txt --no-emit-project --no-hashes --no-default-groups -o requirements.lock.txt
+uv export --format requirements.txt --no-emit-project --no-hashes --only-group dev -o requirements-dev.lock.txt
+```
+
+Commit the resulting diffs — dependency upgrades are reviewed changes, never
+resolution-time surprises. CI runs a lockfile drift check that fails when the
+exports don't match `uv.lock` or `uv.lock` doesn't match `pyproject.toml`.
+
+Use uv **0.8.x** to regenerate (CI pins 0.8.12) so the lockfile schema stays
+stable across contributors. The exports are deliberately hash-free so the pip
+fallback keeps working behind corporate TLS-intercepting proxies and
+artifact-rebuilding mirrors. One deliberate exception: the CI wheel smoke test
+still resolves open `pyproject.toml` ranges — it is the canary that catches
+upstream releases breaking pip/uvx users.
+
 ## Common Issues and Solutions
 
 ### Linting Failures
@@ -239,7 +270,7 @@ isort .
 
 ### Import Errors
 - Verify virtual environment is activated
-- Check all dependencies are installed: `pip install -r requirements.txt`
+- Check all dependencies are installed: `pip install -r requirements.lock.txt`
 
 ## Getting Help
 

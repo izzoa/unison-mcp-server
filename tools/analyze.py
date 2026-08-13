@@ -17,7 +17,7 @@ Key features:
 """
 
 import logging
-from typing import TYPE_CHECKING, Any, Literal, Optional
+from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import Field, model_validator
 
@@ -108,14 +108,14 @@ class AnalyzeWorkflowRequest(WorkflowRequest):
     )
 
     # Optional images for visual context
-    images: Optional[list[str]] = Field(default=None, description=ANALYZE_WORKFLOW_FIELD_DESCRIPTIONS["images"])
+    images: list[str] | None = Field(default=None, description=ANALYZE_WORKFLOW_FIELD_DESCRIPTIONS["images"])
 
     # Analyze-specific fields (only used in step 1 to initialize)
     # Note: Use relevant_files field instead of files for consistency across workflow tools
-    analysis_type: Optional[Literal["architecture", "performance", "security", "quality", "general"]] = Field(
+    analysis_type: Literal["architecture", "performance", "security", "quality", "general"] | None = Field(
         "general", description=ANALYZE_WORKFLOW_FIELD_DESCRIPTIONS["analysis_type"]
     )
-    output_format: Optional[Literal["summary", "detailed", "actionable"]] = Field(
+    output_format: Literal["summary", "detailed", "actionable"] | None = Field(
         "detailed", description=ANALYZE_WORKFLOW_FIELD_DESCRIPTIONS["output_format"]
     )
 

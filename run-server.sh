@@ -587,7 +587,7 @@ setup_environment() {
 
         # Try Python 3.12 first (preferred)
         local uv_output
-        if uv_output=$(uv venv --python 3.12 "$VENV_PATH" 2>&1); then
+        if uv_output=$(uv venv --seed --python 3.12 "$VENV_PATH" 2>&1); then
             # Use helper function for cross-platform path detection
             if venv_python=$(get_venv_python_path "$VENV_PATH"); then
                 touch "$VENV_PATH/uv_created"  # Mark as uv-created
@@ -607,7 +607,7 @@ setup_environment() {
                 print_warning "uv succeeded but Python executable not found in venv"
             fi
         # Fall back to any available Python through uv
-        elif uv_output=$(uv venv "$VENV_PATH" 2>&1); then
+        elif uv_output=$(uv venv --seed "$VENV_PATH" 2>&1); then
             # Use helper function for cross-platform path detection
             if venv_python=$(get_venv_python_path "$VENV_PATH"); then
                 touch "$VENV_PATH/uv_created"  # Mark as uv-created
@@ -946,19 +946,9 @@ install_dependencies() {
         return 1
     fi
 
-    # Check required packages
-    local packages=("mcp" "google.genai" "openai" "pydantic" "dotenv")
-    for package in "${packages[@]}"; do
-        if ! check_package "$python_cmd" "$package"; then
-            deps_needed=true
-            break
-        fi
-    done
-
-    if [[ "$deps_needed" == false ]]; then
-        print_success "Dependencies already installed"
-        return 0
-    fi
+    # Always install from the committed lock: an import-existence check cannot
+    # see version drift, so existing environments must converge to the locked
+    # versions on every setup run (fast no-op when already satisfied).
 
     echo ""
     print_info "Setting up Unison MCP Server..."
@@ -977,11 +967,11 @@ install_dependencies() {
 
     if command -v uv &> /dev/null && [[ -f "$VENV_PATH/uv_created" ]]; then
         print_info "Using uv for faster package installation..."
-        install_output=$(uv pip install -q -r requirements.txt --python "$python_cmd" 2>&1) || exit_code=$?
+        install_output=$(uv pip install -q -r requirements.lock.txt --python "$python_cmd" 2>&1) || exit_code=$?
     elif [[ -n "${VIRTUAL_ENV:-}" ]] || [[ "$python_cmd" == *"$VENV_PATH"* ]]; then
-        install_output=$("$python_cmd" -m pip install -q -r requirements.txt 2>&1) || exit_code=$?
+        install_output=$("$python_cmd" -m pip install -q -r requirements.lock.txt 2>&1) || exit_code=$?
     else
-        install_output=$("$python_cmd" -m pip install -q --user -r requirements.txt 2>&1) || exit_code=$?
+        install_output=$("$python_cmd" -m pip install -q --user -r requirements.lock.txt 2>&1) || exit_code=$?
     fi
 
     if [[ $exit_code -ne 0 ]]; then
@@ -1015,17 +1005,17 @@ install_dependencies() {
             print_error "Permission denied during installation"
             echo ""
             echo "Try using a virtual environment or install with --user flag:"
-            echo "  $python_cmd -m pip install --user -r requirements.txt"
+            echo "  $python_cmd -m pip install --user -r requirements.lock.txt"
         else
             echo "Try running manually:"
             if [[ "$use_uv" == true ]]; then
-                echo "  uv pip install -r requirements.txt --python $python_cmd"
+                echo "  uv pip install -r requirements.lock.txt --python $python_cmd"
                 echo "Or fallback to pip:"
             fi
-            echo "  $python_cmd -m pip install -r requirements.txt"
+            echo "  $python_cmd -m pip install -r requirements.lock.txt"
             echo ""
             echo "Or install individual packages:"
-            echo "  $python_cmd -m pip install mcp google-genai openai pydantic python-dotenv"
+            echo "  $python_cmd -m pip install \"mcp>=1.0.0,<2\" google-genai openai pydantic python-dotenv"
         fi
         return 1
     else
@@ -1634,7 +1624,10 @@ EOF
 
 # Check and update Gemini CLI configuration
 check_gemini_cli_integration() {
-    local script_dir="$1"
+    # Uniform registry-handler signature is (python_cmd, server_path, script_dir);
+    # this handler only needs script_dir. The $1 fallback keeps any direct
+    # legacy call working.
+    local script_dir="${3:-$1}"
     local unison_wrapper="$script_dir/unison-mcp-server"
 
     # Check if Gemini settings file exists
@@ -2636,6 +2629,201 @@ follow_logs() {
 }
 
 # ----------------------------------------------------------------------------
+# MCP host registry
+#
+# One row per supported host: "Name|detect_type|detect_target|handler".
+#   detect_type   : command | path | always
+#   detect_target : executable name (command) or filesystem path (path)
+#   handler       : function invoked as  handler python_cmd server_path script_dir
+#
+# This is the single place host coverage is enumerated. Comparing coverage with
+# run-server.ps1 means comparing these rows against its
+# $script:McpClientDefinitions table - not reading either script's control flow.
+# Host-specific behaviour stays in the per-host handlers referenced here.
+# ----------------------------------------------------------------------------
+
+# Editor config locations differ per platform. VS Code, VS Code Insiders and
+# Trae share the "<base>/<Product>/User/mcp.json" layout.
+get_editor_user_config() {
+    local product="$1"
+    if [[ "$(uname -s)" == "Darwin" ]]; then
+        echo "$HOME/Library/Application Support/$product/User/mcp.json"
+    else
+        echo "${XDG_CONFIG_HOME:-$HOME/.config}/$product/User/mcp.json"
+    fi
+}
+
+# Trae detection keys on the application directory (.../Trae), two levels above
+# the config file (.../Trae/User/mcp.json) - matching run-server.ps1, which
+# detects on %APPDATA%\Trae and configures %APPDATA%\Trae\User\mcp.json.
+TRAE_USER_CONFIG="$(get_editor_user_config Trae)"
+TRAE_APP_DIR="$(dirname "$(dirname "$TRAE_USER_CONFIG")")"
+
+MCP_HOST_REGISTRY=(
+    "Claude CLI|command|claude|check_claude_cli_integration"
+    "Claude Desktop|always||check_claude_desktop_integration"
+    "Gemini CLI|path|$HOME/.gemini/settings.json|check_gemini_cli_integration"
+    "Codex CLI|command|codex|check_codex_cli_integration"
+    "Qwen CLI|command|qwen|check_qwen_cli_integration"
+    "VSCode|command|code|check_vscode_integration"
+    "VSCode Insiders|command|code-insiders|check_vscode_insiders_integration"
+    "Cursor|command|cursor|check_cursor_integration"
+    "Windsurf|path|$HOME/.codeium/windsurf|check_windsurf_integration"
+    "Trae|path|$TRAE_APP_DIR|check_trae_integration"
+)
+
+# Register Unison with a JSON-config MCP host (the editor hosts).
+#
+# The server entry shape mirrors run-server.ps1's Get-PythonMcpConfig
+# (command / args / type=stdio) so registration is behaviourally identical
+# across platforms. json_root is "servers" (current VS Code mcp.json) or
+# "mcpServers" (Cursor, Windsurf, Trae, Claude Desktop convention).
+configure_json_mcp_host() {
+    local host_name="$1" config_path="$2" json_root="$3" python_cmd="$4" server_path="$5"
+
+    local legacy_names_csv
+    legacy_names_csv=$(IFS=,; echo "${LEGACY_MCP_NAMES[*]}")
+
+    local status="ABSENT"
+    if [[ -f "$config_path" ]]; then
+        status=$(
+            UNISON_HOST_CONFIG="$config_path" UNISON_HOST_ROOT="$json_root" \
+            UNISON_LEGACY_NAMES="$legacy_names_csv" \
+            UNISON_MCP_COMMAND="$python_cmd" UNISON_MCP_ARG="$server_path" \
+            python3 - <<'PY' 2>/dev/null
+import json, os, pathlib, sys
+
+path = pathlib.Path(os.environ["UNISON_HOST_CONFIG"])
+root = os.environ["UNISON_HOST_ROOT"]
+legacy = [n for n in os.environ.get("UNISON_LEGACY_NAMES", "").split(",") if n]
+
+try:
+    data = json.loads(path.read_text(encoding="utf-8"))
+except Exception:
+    sys.stdout.write("INVALID")
+    sys.exit(0)
+if not isinstance(data, dict):
+    sys.stdout.write("INVALID")
+    sys.exit(0)
+
+# Legacy entries are cleaned from both container shapes, matching the
+# Claude Desktop handler and run-server.ps1's Remove-LegacyServerKeys.
+changed = False
+for container in ("mcpServers", "servers"):
+    servers = data.get(container)
+    if isinstance(servers, dict):
+        for key in legacy:
+            if servers.pop(key, None) is not None:
+                changed = True
+if changed:
+    path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+
+servers = data.get(root)
+entry = servers.get("unison") if isinstance(servers, dict) else None
+if isinstance(entry, dict) and entry.get("command") == os.environ["UNISON_MCP_COMMAND"] \
+        and entry.get("args") == [os.environ["UNISON_MCP_ARG"]]:
+    sys.stdout.write("MATCH")
+else:
+    sys.stdout.write("ABSENT" if entry is None else "MISMATCH")
+PY
+        ) || status="INVALID"
+    fi
+
+    if [[ "$status" == "MATCH" ]]; then
+        print_success "$host_name already configured for unison server"
+        return 0
+    fi
+
+    echo ""
+    local REPLY=""
+    read -p "Configure Unison for $host_name? (Y/n): " -n 1 -r || REPLY=""
+    echo ""
+    if [[ $REPLY =~ ^[Nn]$ ]]; then
+        print_info "Skipping $host_name integration"
+        return 0
+    fi
+
+    if [[ -f "$config_path" ]]; then
+        cp "$config_path" "${config_path}.backup_$(date +%Y%m%d_%H%M%S)" 2>/dev/null || true
+    fi
+
+    UNISON_HOST_CONFIG="$config_path" UNISON_HOST_ROOT="$json_root" \
+    UNISON_MCP_COMMAND="$python_cmd" UNISON_MCP_ARG="$server_path" \
+    python3 - <<'PY'
+import json, os, pathlib
+
+path = pathlib.Path(os.environ["UNISON_HOST_CONFIG"])
+root = os.environ["UNISON_HOST_ROOT"]
+
+try:
+    data = json.loads(path.read_text(encoding="utf-8"))
+except Exception:
+    data = {}
+if not isinstance(data, dict):
+    data = {}
+
+servers = data.get(root)
+if not isinstance(servers, dict):
+    servers = {}
+    data[root] = servers
+
+servers["unison"] = {
+    "command": os.environ["UNISON_MCP_COMMAND"],
+    "args": [os.environ["UNISON_MCP_ARG"]],
+    "type": "stdio",
+}
+
+path.parent.mkdir(parents=True, exist_ok=True)
+path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+PY
+
+    if [[ $? -eq 0 ]]; then
+        print_success "Configured $host_name"
+        echo "  Config: $config_path"
+    else
+        print_error "Failed to update $host_name config at $config_path"
+    fi
+}
+
+check_vscode_integration() {
+    configure_json_mcp_host "VSCode" "$(get_editor_user_config Code)" "servers" "$1" "$2"
+}
+
+check_vscode_insiders_integration() {
+    configure_json_mcp_host "VSCode Insiders" "$(get_editor_user_config "Code - Insiders")" "servers" "$1" "$2"
+}
+
+check_cursor_integration() {
+    configure_json_mcp_host "Cursor" "$HOME/.cursor/mcp.json" "mcpServers" "$1" "$2"
+}
+
+check_windsurf_integration() {
+    configure_json_mcp_host "Windsurf" "$HOME/.codeium/windsurf/mcp_config.json" "mcpServers" "$1" "$2"
+}
+
+check_trae_integration() {
+    configure_json_mcp_host "Trae" "$TRAE_USER_CONFIG" "mcpServers" "$1" "$2"
+}
+
+# Walk the registry: detect each host, dispatch to its handler, silently skip
+# hosts that are not installed (no config is created for them).
+run_mcp_host_integrations() {
+    local python_cmd="$1" server_path="$2" script_dir="$3"
+    local row name dtype dtarget handler
+
+    for row in "${MCP_HOST_REGISTRY[@]}"; do
+        IFS='|' read -r name dtype dtarget handler <<< "$row"
+        case "$dtype" in
+            command) command -v "$dtarget" &>/dev/null || continue ;;
+            path)    [[ -e "$dtarget" ]] || continue ;;
+            always)  : ;;
+            *)       print_warning "Unknown detection type '$dtype' for host '$name'"; continue ;;
+        esac
+        "$handler" "$python_cmd" "$server_path" "$script_dir"
+    done
+}
+
+# ----------------------------------------------------------------------------
 # Main Function
 # ----------------------------------------------------------------------------
 
@@ -2733,18 +2921,11 @@ main() {
     # Step 8: Display setup instructions
     display_setup_instructions "$python_cmd" "$server_path"
 
-    # Step 9: Check Claude integrations
-    check_claude_cli_integration "$python_cmd" "$server_path"
-    check_claude_desktop_integration "$python_cmd" "$server_path"
-
-    # Step 10: Check Gemini CLI integration
-    check_gemini_cli_integration "$script_dir"
-
-    # Step 11: Check Codex CLI integration
-    check_codex_cli_integration
-
-    # Step 12: Check Qwen CLI integration
-    check_qwen_cli_integration "$python_cmd" "$server_path"
+    # Step 9: Register Unison with every detected MCP host. Coverage is
+    # enumerated in MCP_HOST_REGISTRY (one row per host) so it can be compared
+    # against run-server.ps1's $script:McpClientDefinitions without reading
+    # either script's control flow.
+    run_mcp_host_integrations "$python_cmd" "$server_path" "$script_dir"
 
     # Step 13: Display log information
     echo ""

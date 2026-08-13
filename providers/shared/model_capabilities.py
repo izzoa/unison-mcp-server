@@ -2,7 +2,6 @@
 
 import math
 from dataclasses import dataclass, field
-from typing import Optional
 
 from .provider_type import ProviderType
 from .temperature import RangeTemperatureConstraint, TemperatureConstraint
@@ -53,7 +52,7 @@ class ModelCapabilities:
     supports_json_mode: bool = False
     supports_temperature: bool = True
     use_openai_response_api: bool = False
-    default_reasoning_effort: Optional[str] = None
+    default_reasoning_effort: str | None = None
     allow_code_generation: bool = (
         False  # Enables structured code generation in chat tool for substantial implementations
     )
@@ -65,7 +64,7 @@ class ModelCapabilities:
     )
     auto_discovered: bool = False  # True when model was discovered via LiteLLM without a JSON override
 
-    def get_effective_temperature(self, requested_temperature: float) -> Optional[float]:
+    def get_effective_temperature(self, requested_temperature: float) -> float | None:
         """Return the temperature that should be sent to the provider.
 
         Models that do not support temperature return ``None`` so that callers

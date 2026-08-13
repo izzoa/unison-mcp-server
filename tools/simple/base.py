@@ -14,12 +14,13 @@ capabilities from BaseTool.
 
 import asyncio
 from abc import abstractmethod
-from typing import Any, Optional
+from typing import Any
 
 from tools.shared.base_models import ToolRequest
 from tools.shared.base_tool import BaseTool
 from tools.shared.exceptions import ToolExecutionError
 from tools.shared.schema_builders import SchemaBuilder
+from utils.observability import instrument_generate as _instrument_generate
 
 
 class SimpleTool(BaseTool):
@@ -102,7 +103,7 @@ class SimpleTool(BaseTool):
         """
         return []
 
-    def get_annotations(self) -> Optional[dict[str, Any]]:
+    def get_annotations(self) -> dict[str, Any] | None:
         """
         Return tool annotations. Simple tools are read-only by default.
 
@@ -117,7 +118,7 @@ class SimpleTool(BaseTool):
         """
         return {"readOnlyHint": True}
 
-    def format_response(self, response: str, request, model_info: Optional[dict] = None) -> str:
+    def format_response(self, response: str, request, model_info: dict | None = None) -> str:
         """
         Format the AI response before returning to the client.
 
@@ -169,7 +170,7 @@ class SimpleTool(BaseTool):
 
     # Hook methods for safe attribute access without hasattr/getattr
 
-    def get_request_model_name(self, request) -> Optional[str]:
+    def get_request_model_name(self, request) -> str | None:
         """Get model name from request. Override for custom model name handling."""
         try:
             return request.model
@@ -183,7 +184,7 @@ class SimpleTool(BaseTool):
         except AttributeError:
             return []
 
-    def get_request_continuation_id(self, request) -> Optional[str]:
+    def get_request_continuation_id(self, request) -> str | None:
         """Get continuation_id from request. Override for custom continuation handling."""
         try:
             return request.continuation_id
@@ -197,7 +198,7 @@ class SimpleTool(BaseTool):
         except AttributeError:
             return ""
 
-    def get_request_temperature(self, request) -> Optional[float]:
+    def get_request_temperature(self, request) -> float | None:
         """Get temperature from request. Override for custom temperature handling."""
         try:
             return request.temperature
@@ -223,7 +224,7 @@ class SimpleTool(BaseTool):
             temperature = self.get_default_temperature()
         return self.validate_and_correct_temperature(temperature, model_context)
 
-    def get_request_thinking_mode(self, request) -> Optional[str]:
+    def get_request_thinking_mode(self, request) -> str | None:
         """Get thinking_mode from request. Override for custom thinking mode handling."""
         try:
             return request.thinking_mode
@@ -468,7 +469,7 @@ class SimpleTool(BaseTool):
             # than async_generate_content so callers/tests that stub the sync
             # method continue to work.
             model_response = await asyncio.to_thread(
-                provider.generate_content,
+                _instrument_generate(provider),
                 prompt=prompt,
                 model_name=self._current_model_name,
                 system_prompt=system_prompt,
@@ -526,7 +527,7 @@ class SimpleTool(BaseTool):
 
                         try:
                             retry_response = await asyncio.to_thread(
-                                provider.generate_content,
+                                _instrument_generate(provider),
                                 prompt=retry_prompt,
                                 model_name=self._current_model_name,
                                 system_prompt=system_prompt,
@@ -615,7 +616,7 @@ class SimpleTool(BaseTool):
             )
             raise ToolExecutionError(error_output.model_dump_json()) from e
 
-    def _parse_response(self, raw_text: str, request, model_info: Optional[dict] = None):
+    def _parse_response(self, raw_text: str, request, model_info: dict | None = None):
         """
         Parse the raw response and format it using the hook method.
 
@@ -662,7 +663,7 @@ class SimpleTool(BaseTool):
                 metadata=metadata if metadata else None,
             )
 
-    def _create_continuation_offer(self, request, model_info: Optional[dict] = None):
+    def _create_continuation_offer(self, request, model_info: dict | None = None):
         """Create continuation offer following old base.py pattern"""
         continuation_id = self.get_request_continuation_id(request)
 
@@ -713,7 +714,7 @@ class SimpleTool(BaseTool):
             return None
 
     def _create_continuation_offer_response(
-        self, content: str, continuation_data: dict, request, model_info: Optional[dict] = None
+        self, content: str, continuation_data: dict, request, model_info: dict | None = None
     ):
         """Create response with continuation offer following old base.py pattern"""
         from tools.models import ContinuationOffer, ToolOutput
@@ -763,7 +764,7 @@ class SimpleTool(BaseTool):
             return ToolOutput(status="success", content=content, content_type="text")
 
     def _record_assistant_turn(
-        self, continuation_id: str, response_text: str, request, model_info: Optional[dict]
+        self, continuation_id: str, response_text: str, request, model_info: dict | None
     ) -> None:
         """Persist an assistant response in conversation memory."""
 
@@ -884,7 +885,7 @@ Please provide a thoughtful, comprehensive response:"""
         # Fallback to default behavior (validate full user content)
         return user_content
 
-    def get_websearch_guidance(self) -> Optional[str]:
+    def get_websearch_guidance(self) -> str | None:
         """
         Return tool-specific web search guidance.
 
@@ -966,7 +967,7 @@ Please provide a thoughtful, comprehensive response:"""
         """
         return self.get_request_model() != ToolRequest
 
-    def _validate_file_paths(self, request) -> Optional[str]:
+    def _validate_file_paths(self, request) -> str | None:
         """
         Validate that all file paths in the request are absolute paths.
 

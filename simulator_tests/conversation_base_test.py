@@ -36,7 +36,6 @@ EXAMPLE:
 
 import asyncio
 import json
-from typing import Optional
 
 from tools.shared.exceptions import ToolExecutionError
 
@@ -110,7 +109,7 @@ class ConversationBaseTest(BaseSimulatorTest):
                 asyncio.set_event_loop(self._loop)
         return self._loop
 
-    def call_mcp_tool_direct(self, tool_name: str, params: dict) -> tuple[Optional[str], Optional[str]]:
+    def call_mcp_tool_direct(self, tool_name: str, params: dict) -> tuple[str | None, str | None]:
         """
         Call an MCP tool directly in-process without subprocess isolation.
 
@@ -203,7 +202,7 @@ class ConversationBaseTest(BaseSimulatorTest):
             self.logger.error(f"Direct tool call failed for '{tool_name}': {e}")
             return None, None
 
-    def _extract_continuation_id_from_response(self, response_text: str) -> Optional[str]:
+    def _extract_continuation_id_from_response(self, response_text: str) -> str | None:
         """Extract continuation_id from tool response"""
         try:
             # Parse the response as JSON to look for continuation metadata

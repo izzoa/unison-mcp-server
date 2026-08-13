@@ -8,7 +8,7 @@ hooks for size validation content.
 """
 
 import logging
-from typing import Any, Optional
+from typing import Any
 
 from config import MCP_PROMPT_SIZE_LIMIT
 from utils.conversation_memory import ConversationTurn
@@ -83,7 +83,7 @@ class ConversationHandler:
         # Default implementation: validate the full user content
         return user_content
 
-    def check_prompt_size(self, text: str) -> Optional[dict[str, Any]]:
+    def check_prompt_size(self, text: str) -> dict[str, Any] | None:
         """
         Check if USER INPUT text is too large for MCP transport boundary.
 

@@ -10,7 +10,6 @@ Tests the debug tool's 'certain' confidence feature in a realistic simulation:
 """
 
 import json
-from typing import Optional
 
 from tools.shared.exceptions import ToolExecutionError
 
@@ -470,7 +469,7 @@ This happens every time a user tries to log in. The error occurs in the password
             self.logger.error(f"Multi-step investigation certain test failed: {e}")
             return False
 
-    def call_mcp_tool_direct(self, tool_name: str, params: dict) -> tuple[Optional[str], Optional[str]]:
+    def call_mcp_tool_direct(self, tool_name: str, params: dict) -> tuple[str | None, str | None]:
         """Call an MCP tool directly in-process to maintain conversation memory"""
         try:
             # Get the tool instance
@@ -507,7 +506,7 @@ This happens every time a user tries to log in. The error occurs in the password
             self.logger.error(f"Failed to call tool '{tool_name}' directly: {e}")
             return None, None
 
-    def _extract_debug_continuation_id(self, response_text: str) -> Optional[str]:
+    def _extract_debug_continuation_id(self, response_text: str) -> str | None:
         """Extract continuation_id from debug response"""
         try:
             response_data = json.loads(response_text)

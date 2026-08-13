@@ -16,7 +16,7 @@ Key features:
 """
 
 import logging
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any
 
 from pydantic import Field
 
@@ -89,15 +89,15 @@ class DebugInvestigationRequest(WorkflowRequest):
     relevant_context: list[str] = Field(
         default_factory=list, description=DEBUG_INVESTIGATION_FIELD_DESCRIPTIONS["relevant_context"]
     )
-    hypothesis: Optional[str] = Field(None, description=DEBUG_INVESTIGATION_FIELD_DESCRIPTIONS["hypothesis"])
-    confidence: Optional[str] = Field("low", description=DEBUG_INVESTIGATION_FIELD_DESCRIPTIONS["confidence"])
+    hypothesis: str | None = Field(None, description=DEBUG_INVESTIGATION_FIELD_DESCRIPTIONS["hypothesis"])
+    confidence: str | None = Field("low", description=DEBUG_INVESTIGATION_FIELD_DESCRIPTIONS["confidence"])
 
     # Optional images for visual debugging
-    images: Optional[list[str]] = Field(default=None, description=DEBUG_INVESTIGATION_FIELD_DESCRIPTIONS["images"])
+    images: list[str] | None = Field(default=None, description=DEBUG_INVESTIGATION_FIELD_DESCRIPTIONS["images"])
 
     # Override inherited fields to exclude them from schema (except model which needs to be available)
-    temperature: Optional[float] = Field(default=None, exclude=True)
-    thinking_mode: Optional[str] = Field(default=None, exclude=True)
+    temperature: float | None = Field(default=None, exclude=True)
+    thinking_mode: str | None = Field(default=None, exclude=True)
 
 
 class DebugIssueTool(WorkflowTool):
@@ -341,7 +341,7 @@ class DebugIssueTool(WorkflowTool):
 
         return "\n".join(summary_parts)
 
-    def _extract_error_context(self, consolidated_findings) -> Optional[str]:
+    def _extract_error_context(self, consolidated_findings) -> str | None:
         """Extract error context from investigation findings."""
         error_patterns = ["error", "exception", "stack trace", "traceback", "failure"]
         error_context_parts = []

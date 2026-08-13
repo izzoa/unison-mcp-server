@@ -30,10 +30,11 @@ Gemini · OpenAI · Anthropic · Grok · Azure · Ollama · OpenRouter · DIAL �
 
 Unison forks [BeehiveInnovations/pal-mcp-server](https://github.com/BeehiveInnovations/pal-mcp-server) and preserves every PAL tool, provider, and workflow. On top of that, it changes what's possible in four ways:
 
-- 🔗 **CLI-to-CLI orchestration.** The new [`clink`](docs/tools/clink.md) tool spawns **seven** subagents — Claude Code, Codex, Gemini CLI, opencode, Aider, Crush, and Amp — in isolated contexts with role presets, read-only enforcement (native CLI flags + post-call filesystem-snapshot diff), and a cross-cutting recursion guard for MCP-aware CLIs. **PAL has no equivalent.**
+- 🔗 **CLI-to-CLI orchestration.** The new [`clink`](docs/tools/clink.md) tool spawns **eight** subagents — Claude Code, Codex, Gemini CLI, opencode, Aider, Crush, Amp, and GitHub Copilot CLI — in isolated contexts with role presets, read-only enforcement (native CLI flags + post-call filesystem-snapshot diff), and a cross-cutting recursion guard for MCP-aware CLIs. **PAL has no equivalent.**
 - 🌐 **75+ providers through one integration.** clink + opencode routes a single call to OpenAI, Anthropic, Google, Ollama, OpenRouter, xAI, Mistral, Groq, DeepSeek, and ~70 more via `provider/model` syntax. No per-provider implementation work.
 - 🧠 **2000+ models, auto-discovered.** Every model from every authenticated provider appears at startup via [LiteLLM](https://github.com/BerriAI/litellm); a **weekly CI workflow** opens a PR with the latest catalog. Auto-mode picks the smartest available model using `intelligence_score`, not hardcoded preference lists that go stale.
 - 🛡️ **Production reliability.** Optional **SQLite conversation backend** survives restarts; a **per-provider circuit breaker** fails fast on outages so consensus doesn't hang on a dead provider.
+- 🔌 **Pip-installable tool plugins.** Third-party packages add tools via `[project.entry-points."unison.tools"]` — validated, quarantined on failure, never able to crash the server ([guide](docs/plugins.md)). Opt-in **structured observability**: JSON activity logs (`UNISON_JSON_LOGS`) and OpenTelemetry spans/metrics per tool call (`UNISON_OTEL_ENABLED`), credential-redacted end to end.
 
 **Migration is lossless** — every PAL tool, provider, and workflow is preserved. The [full PAL vs Unison comparison](#pal-vs-unison-full-comparison) below breaks down each capability.
 
@@ -52,7 +53,7 @@ Unison forks [BeehiveInnovations/pal-mcp-server](https://github.com/BeehiveInnov
 
 The new **[`clink`](docs/tools/clink.md)** (CLI + Link) tool connects external AI CLIs directly into your workflow:
 
-- **Connect external CLIs** like [Gemini CLI](https://github.com/google-gemini/gemini-cli), [Codex CLI](https://github.com/openai/codex), [Claude Code](https://www.anthropic.com/claude-code), [opencode](https://opencode.ai), [Aider](https://aider.chat), [Crush](https://github.com/charmbracelet/crush), and [Amp](https://ampcode.com) directly into your workflow
+- **Connect external CLIs** like [Gemini CLI](https://github.com/google-gemini/gemini-cli), [Codex CLI](https://github.com/openai/codex), [Claude Code](https://www.anthropic.com/claude-code), [opencode](https://opencode.ai), [Aider](https://aider.chat), [Crush](https://github.com/charmbracelet/crush), [Amp](https://ampcode.com), and [GitHub Copilot CLI](https://docs.github.com/copilot/how-tos/copilot-cli) directly into your workflow
 - **CLI Subagents** - Launch isolated CLI instances from _within_ your current CLI! Claude Code can spawn Codex subagents, Codex can spawn Gemini CLI subagents, etc. Offload heavy tasks (code reviews, bug hunting) to fresh contexts while your main session's context window remains unpolluted. Each subagent returns only final results.
 - **Context Isolation** - Run separate investigations without polluting your primary workspace
 - **Role Specialization** - Spawn `planner`, `codereviewer`, or custom role agents with specialized system prompts
@@ -111,6 +112,9 @@ clink with claude codereviewer in read-only mode to review PR #482
 | `aider` | Largest AI-CLI userbase, git-integrated diff-edit workflow, multi-provider via standard env keys | `--dry-run` (native) |
 | `crush` | Charm-built multi-provider TUI / CLI, `provider/model` syntax for routing | _(none — prompt + snapshot)_ |
 | `amp` | Sourcegraph-backed, code-search-aware tools, structured JSONL output, image input via `--stream-json-input` | _(none — prompt + snapshot)_ |
+| `copilot` | GitHub-backed, available on every Copilot plan; native image/PDF attachments; BYOK support for routing to your own provider | `--available-tools view,grep,glob` (fail-closed) |
+
+> **Note on copilot read-only mode:** Copilot is the only target that restricts the model's *tool schema* rather than gating tool use. `--available-tools` is an allowlist, so a tool added by a future Copilot release is excluded by default instead of silently permitted — measured on CLI 1.0.78, it cuts the schema from 23 tools to exactly 3, including removal of MCP server tools. This is application-level enforcement, not an OS sandbox like Codex's `--sandbox read-only`, and it trades away shell access: `git diff` is unavailable under `read_only=true`, though the native `view`/`grep`/`glob` tools cover most read needs.
 
 > **Note on opencode/crush/amp read-only mode:** these three CLIs have no native flag for read-only-while-still-executing semantics. Read-only enforcement falls back to prompt-level instruction + post-execution filesystem snapshot diff — both CLI-agnostic. CLI bookkeeping that each CLI creates on first-run (`.opencode/...`, `.crush/...`) is classified separately under `read_only_violations.by_cli_bookkeeping` so it doesn't drown out genuine model-write detection. Aider is the exception — its documented `--dry-run` flag provides native read-only enforcement, supplemented by snapshot verification.
 
@@ -136,6 +140,7 @@ opencode providers list                   # check which providers are authentica
 | `aider` | `aider --help` · [Aider docs](https://aider.chat/docs) | provider-prefixed names (e.g. `gpt-4o-mini`, `claude-sonnet-4-5`) per Aider's `--model` flag |
 | `crush` | `crush models` (local) | `provider/model` (e.g. `anthropic/claude-sonnet-4-5`, `openai/gpt-4o`) — same shape as opencode |
 | `amp` | `amp --help` · [Amp owner's manual](https://ampcode.com/manual) | **Named modes only**: `deep`, `large`, `rush`, `smart` (mapped to `--mode`, not arbitrary model strings) |
+| `copilot` | `copilot help` · [Copilot CLI reference](https://docs.github.com/copilot/reference/copilot-cli-reference/cli-programmatic-reference) | model IDs (e.g. `gpt-5.3-codex`, `claude-sonnet-4.6`, `claude-haiku-4.5`) via `--model` |
 
 **Validation behavior:** the `model` field is free-text — invalid values come back as a CLI-level error in response metadata, not a schema rejection. Authentication for opencode providers is opencode's own concern (`opencode auth`); Unison doesn't manage credentials.
 
@@ -263,7 +268,7 @@ Unison inherits the entire PAL feature set. Every row below is an addition or ha
 
 | Capability | PAL MCP | Unison MCP |
 |---|---|---|
-| **CLI-to-CLI orchestration** | — | **`clink`** spawns **7 CLIs** as subagents — Claude, Codex, Gemini, opencode, Aider, Crush, Amp — with role presets (`planner`, `codereviewer`), optional `supported_models` allowlist per CLI, and a cross-cutting recursion guard for MCP-aware targets |
+| **CLI-to-CLI orchestration** | — | **`clink`** spawns **8 CLIs** as subagents — Claude, Codex, Gemini, opencode, Aider, Crush, Amp, GitHub Copilot — with role presets (`planner`, `codereviewer`), optional `supported_models` allowlist per CLI, and a cross-cutting recursion guard for MCP-aware targets |
 | **Read-only mode for sub-CLIs** | — | Native CLI flags (`--sandbox read-only`, `--approval-mode plan`, `--permission-mode plan`, `--dry-run`) + prompt instruction + full-tree post-call filesystem-snapshot diff; `read_only_enforced` metadata reflects whether a real sandbox flag was applied; CLI bookkeeping (e.g. `.opencode/`) classified separately so it doesn't drown out genuine model writes |
 | **Provider reach via one integration** | One provider per implementation | **75+ providers** through opencode via `provider/model` syntax (OpenAI, Anthropic, Google, Ollama, OpenRouter, xAI, Mistral, Groq, DeepSeek, …) |
 | **Model catalog** | Static JSON files, manually curated — go stale the day a provider ships a new model | **2000+ models auto-discovered** via [LiteLLM](https://github.com/BerriAI/litellm) at startup, with curated overrides for tuned metadata |
@@ -272,6 +277,7 @@ Unison inherits the entire PAL feature set. Every row below is an addition or ha
 | **Catalog freshness** | Manual JSON updates only | **Weekly CI workflow** fetches the latest LiteLLM catalog and opens a PR for human review |
 | **Conversation persistence** | In-memory only — lost on restart | Optional **SQLite backend** (`STORAGE_BACKEND=sqlite`), zero-config |
 | **Provider failure handling** | Wait through the full retry cycle on every call | **Per-provider circuit breaker** — fails fast after N consecutive failures, auto-probes recovery; consensus skips dead providers and synthesizes from the rest |
+| **Install reproducibility & SDK currency** | Open version ranges resolved at install time | **Locked installs** — `uv.lock` plus committed pip exports consumed by the setup scripts, CI, and Docker, with a CI drift check (the wheel smoke test deliberately still canaries open ranges); runs on the **mcp 2.x SDK** with wire-level equivalence to the 1.x behavior verified against captured fixtures |
 
 > All core tools, providers, workflows, and conversation continuity features from PAL are fully preserved. See [docs/name-change.md](docs/name-change.md) for migration notes.
 >
@@ -286,6 +292,7 @@ Unison inherits the entire PAL feature set. Every row below is an addition or ha
 - **[Gemini](https://makersuite.google.com/app/apikey)** - Google's latest models
 - **[OpenAI](https://platform.openai.com/api-keys)** - O3, GPT-5 series
 - **[Azure OpenAI](https://learn.microsoft.com/azure/ai-services/openai/)** - Enterprise deployments of GPT-4o, GPT-4.1, GPT-5 family
+- **[Anthropic](https://console.anthropic.com/)** - Claude models (Fable, Opus, Sonnet, Haiku) with native extended thinking
 - **[X.AI](https://console.x.ai/)** - Grok models
 - **[DIAL](https://dialx.ai/)** - Vendor-agnostic model access
 - **[Ollama](https://ollama.ai/)** - Local models (free)
@@ -298,10 +305,28 @@ git clone https://github.com/izzoa/unison-mcp-server.git
 cd unison-mcp-server
 
 # Handles everything: setup, config, API keys from system environment. 
-# Auto-configures Claude Desktop, Claude Code, Gemini CLI, Codex CLI, Qwen Code CLI
+# Auto-configures Claude Desktop, Claude Code, Gemini CLI, Codex CLI, Qwen Code CLI,
+# VS Code, VS Code Insiders, Cursor, Windsurf, and Trae (same host set on Windows)
 # Enable / disable additional settings in .env
 ./run-server.sh  
 ```
+
+**On Windows, use `run-server.ps1` instead — WSL is not required.** It is native PowerShell and invokes no bash.
+
+> **Requires PowerShell 7.0+.** The Windows PowerShell 5.1 that ships with Windows 10/11 cannot parse this script. Install it with `winget install --id Microsoft.PowerShell --source winget`, then run `pwsh` rather than `powershell`.
+
+```powershell
+git clone https://github.com/izzoa/unison-mcp-server.git
+cd unison-mcp-server
+
+# Windows blocks unsigned scripts by default; allow it for this shell only
+Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process
+
+.\run-server.ps1
+```
+
+>
+> `Set-ExecutionPolicy -Scope Process` applies to the current shell only and needs no administrator rights, but it **cannot** override a `MachinePolicy` or `UserPolicy` set by Group Policy — those take precedence. On a managed machine, contact your administrator.
 
 **Option B: Instant Setup with [uvx](https://docs.astral.sh/uv/getting-started/installation/)**
 ```json
@@ -603,7 +628,7 @@ DISABLED_TOOLS=
 - [Model Ranking Guide](docs/model_ranking.md) - How intelligence scores drive auto-mode suggestions
 
 **🔧 Setup & Support**
-- [WSL Setup](docs/wsl-setup.md) - Windows users
+- [WSL Setup](docs/wsl-setup.md) - Optional for Windows; `run-server.ps1` is native and needs no WSL
 - [Troubleshooting](docs/troubleshooting.md) - Common issues
 - [Contributing](docs/contributions.md) - Code standards, PR process
 

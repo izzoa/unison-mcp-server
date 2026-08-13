@@ -1,7 +1,7 @@
 """OpenAI model provider implementation."""
 
 import logging
-from typing import TYPE_CHECKING, ClassVar, Optional
+from typing import TYPE_CHECKING, ClassVar
 
 if TYPE_CHECKING:
     from tools.models import ToolModelCategory
@@ -40,8 +40,8 @@ class OpenAIModelProvider(RegistryBackedProviderMixin, OpenAICompatibleProvider)
     def _lookup_capabilities(
         self,
         canonical_name: str,
-        requested_name: Optional[str] = None,
-    ) -> Optional[ModelCapabilities]:
+        requested_name: str | None = None,
+    ) -> ModelCapabilities | None:
         """Look up OpenAI capabilities from built-ins or the custom registry."""
 
         self._ensure_registry()
@@ -90,7 +90,7 @@ class OpenAIModelProvider(RegistryBackedProviderMixin, OpenAICompatibleProvider)
     # Provider preferences
     # ------------------------------------------------------------------
 
-    def get_preferred_model(self, category: "ToolModelCategory", allowed_models: list[str]) -> Optional[str]:
+    def get_preferred_model(self, category: "ToolModelCategory", allowed_models: list[str]) -> str | None:
         """Select the best OpenAI model for *category* using capability metadata."""
         return self.select_preferred_model(category, allowed_models)
 

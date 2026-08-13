@@ -17,7 +17,7 @@ Key features:
 """
 
 import logging
-from typing import TYPE_CHECKING, Any, Literal, Optional
+from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import Field, model_validator
 
@@ -85,27 +85,27 @@ class CodeReviewRequest(WorkflowRequest):
         default_factory=list, description=CODEREVIEW_WORKFLOW_FIELD_DESCRIPTIONS["issues_found"]
     )
     # Deprecated confidence field kept for backward compatibility only
-    confidence: Optional[str] = Field("low", exclude=True)
-    review_validation_type: Optional[Literal["external", "internal"]] = Field(
+    confidence: str | None = Field("low", exclude=True)
+    review_validation_type: Literal["external", "internal"] | None = Field(
         "external", description=CODEREVIEW_WORKFLOW_FIELD_DESCRIPTIONS.get("review_validation_type", "")
     )
 
     # Optional images for visual context
-    images: Optional[list[str]] = Field(default=None, description=CODEREVIEW_WORKFLOW_FIELD_DESCRIPTIONS["images"])
+    images: list[str] | None = Field(default=None, description=CODEREVIEW_WORKFLOW_FIELD_DESCRIPTIONS["images"])
 
     # Code review-specific fields (only used in step 1 to initialize)
-    review_type: Optional[Literal["full", "security", "performance", "quick"]] = Field(
+    review_type: Literal["full", "security", "performance", "quick"] | None = Field(
         "full", description=CODEREVIEW_WORKFLOW_FIELD_DESCRIPTIONS["review_type"]
     )
-    focus_on: Optional[str] = Field(None, description=CODEREVIEW_WORKFLOW_FIELD_DESCRIPTIONS["focus_on"])
-    standards: Optional[str] = Field(None, description=CODEREVIEW_WORKFLOW_FIELD_DESCRIPTIONS["standards"])
-    severity_filter: Optional[Literal["critical", "high", "medium", "low", "all"]] = Field(
+    focus_on: str | None = Field(None, description=CODEREVIEW_WORKFLOW_FIELD_DESCRIPTIONS["focus_on"])
+    standards: str | None = Field(None, description=CODEREVIEW_WORKFLOW_FIELD_DESCRIPTIONS["standards"])
+    severity_filter: Literal["critical", "high", "medium", "low", "all"] | None = Field(
         "all", description=CODEREVIEW_WORKFLOW_FIELD_DESCRIPTIONS["severity_filter"]
     )
 
     # Override inherited fields to exclude them from schema (except model which needs to be available)
-    temperature: Optional[float] = Field(default=None, exclude=True)
-    thinking_mode: Optional[str] = Field(default=None, exclude=True)
+    temperature: float | None = Field(default=None, exclude=True)
+    thinking_mode: str | None = Field(default=None, exclude=True)
 
     @model_validator(mode="after")
     def validate_step_one_requirements(self):

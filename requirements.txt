@@ -1,13 +1,14 @@
-mcp>=1.0.0
+mcp>=2,<3
+jsonschema>=4.20.0  # Input-schema validation in the call_tool adapter
+anthropic>=0.121,<1  # Native Anthropic provider (Messages API, extended thinking)
 google-genai>=1.19.0
 openai>=1.55.2  # Minimum version for httpx 0.28.0 compatibility
 pydantic>=2.0.0
 python-dotenv>=1.0.0
 litellm>=1.50.0  # Model metadata discovery (model_cost, get_model_info)
 tiktoken>=0.7.0  # OpenAI-compatible token counting (also available via openai SDK)
-importlib-resources>=5.0.0; python_version<"3.9"
 
-# Development dependencies (install with pip install -r requirements-dev.txt)
-# pytest>=7.4.0
-# pytest-asyncio>=0.21.0
-# pytest-mock>=3.11.0
+# Development dependencies live in pyproject.toml [dependency-groups] dev.
+# Installs consume the committed lock exports instead of these ranges:
+#   runtime: pip install -r requirements.lock.txt
+#   dev:     pip install -r requirements-dev.lock.txt

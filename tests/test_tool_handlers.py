@@ -32,68 +32,39 @@ def mock_registry(mock_tool):
     return registry
 
 
-@pytest.fixture
-def mock_server():
-    """Create a mock MCP server that captures registered handlers."""
-    server = MagicMock()
-    handlers = {}
-
-    def list_tools_decorator():
-        def decorator(fn):
-            handlers["list_tools"] = fn
-            return fn
-
-        return decorator
-
-    def call_tool_decorator():
-        def decorator(fn):
-            handlers["call_tool"] = fn
-            return fn
-
-        return decorator
-
-    server.list_tools = list_tools_decorator
-    server.call_tool = call_tool_decorator
-    server._handlers = handlers
-    return server
-
-
 class TestListToolsHandler:
-    """Tests for the list_tools handler."""
+    """Tests for the list_tools handler (legacy-shaped impl)."""
 
     @pytest.mark.asyncio
-    async def test_returns_correct_tool_count(self, mock_server, mock_registry, mock_tool):
+    async def test_returns_correct_tool_count(self, mock_registry, mock_tool):
         """list_tools returns one Tool per available tool."""
-        tool_handlers.register(mock_server, mock_registry)
-        handler = mock_server._handlers["list_tools"]
+        handlers = tool_handlers.build_handlers(mock_registry)
 
-        tools = await handler()
+        tools = await handlers.handle_list_tools()
         assert len(tools) == 1
         assert tools[0].name == "chat"
 
     @pytest.mark.asyncio
-    async def test_schema_format(self, mock_server, mock_registry, mock_tool):
+    async def test_schema_format(self, mock_registry, mock_tool):
         """list_tools returns tools with correct schema format."""
-        tool_handlers.register(mock_server, mock_registry)
-        handler = mock_server._handlers["list_tools"]
+        handlers = tool_handlers.build_handlers(mock_registry)
 
-        tools = await handler()
+        tools = await handlers.handle_list_tools()
         assert tools[0].name == "chat"
         assert tools[0].description == "Chat tool"
 
     @pytest.mark.asyncio
-    async def test_filters_by_availability(self, mock_server, mock_registry):
+    async def test_filters_by_availability(self, mock_registry):
         """list_tools only returns tools from get_available_tools."""
         mock_registry.get_available_tools.return_value = {}
-        tool_handlers.register(mock_server, mock_registry)
-        handler = mock_server._handlers["list_tools"]
+        handlers = tool_handlers.build_handlers(mock_registry)
 
-        tools = await handler()
+        tools = await handlers.handle_list_tools()
         assert len(tools) == 0
 
 
 class TestCallToolHandler:
-    """Tests for the call_tool handler."""
+    """Tests for the call_tool handler (legacy-shaped impl)."""
 
     @pytest.mark.asyncio
     @patch("utils.tool_execution_context.ToolExecutionContext")
@@ -104,7 +75,6 @@ class TestCallToolHandler:
         mock_get_registry,
         mock_model_ctx_cls,
         mock_exec_ctx_cls,
-        mock_server,
         mock_registry,
         mock_tool,
     ):
@@ -115,22 +85,20 @@ class TestCallToolHandler:
         mock_model_ctx.capabilities.context_window = 100000
         mock_model_ctx_cls.return_value = mock_model_ctx
 
-        tool_handlers.register(mock_server, mock_registry)
-        handler = mock_server._handlers["call_tool"]
+        handlers = tool_handlers.build_handlers(mock_registry)
 
-        result = await handler("chat", {"prompt": "hello", "model": "gemini-2.0-flash"})
+        result = await handlers.handle_call_tool("chat", {"prompt": "hello", "model": "gemini-2.0-flash"})
 
         mock_tool.execute.assert_awaited_once()
         assert len(result) == 1
 
     @pytest.mark.asyncio
-    async def test_unknown_tool_returns_error(self, mock_server, mock_registry):
+    async def test_unknown_tool_returns_error(self, mock_registry):
         """call_tool returns error for unknown tool names."""
         mock_registry.is_available.return_value = False
-        tool_handlers.register(mock_server, mock_registry)
-        handler = mock_server._handlers["call_tool"]
+        handlers = tool_handlers.build_handlers(mock_registry)
 
-        result = await handler("nonexistent", {"prompt": "test"})
+        result = await handlers.handle_call_tool("nonexistent", {"prompt": "test"})
 
         assert len(result) == 1
         assert "Unknown tool" in result[0].text

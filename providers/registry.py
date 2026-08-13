@@ -66,6 +66,7 @@ class ModelProviderRegistry:
         ProviderType.GOOGLE,  # Direct Gemini access
         ProviderType.OPENAI,  # Direct OpenAI access
         ProviderType.AZURE,  # Azure-hosted OpenAI deployments
+        ProviderType.ANTHROPIC,  # Direct Anthropic (Claude) access
         ProviderType.XAI,  # Direct X.AI GROK access
         ProviderType.DIAL,  # DIAL unified API access
         ProviderType.CUSTOM,  # Local/self-hosted models
@@ -95,7 +96,7 @@ class ModelProviderRegistry:
         # Invalidate any cached instance so subsequent lookups use the new registration
         self._initialized_providers.pop(provider_type, None)
 
-    def get_provider(self, provider_type: ProviderType, force_new: bool = False) -> Optional[ModelProvider]:
+    def get_provider(self, provider_type: ProviderType, force_new: bool = False) -> ModelProvider | None:
         """Get an initialized provider instance.
 
         Args:
@@ -173,7 +174,7 @@ class ModelProviderRegistry:
 
         return provider
 
-    def get_provider_for_model(self, model_name: str) -> Optional[ModelProvider]:
+    def get_provider_for_model(self, model_name: str) -> ModelProvider | None:
         """Get provider instance for a specific model name.
 
         Provider priority order:
@@ -323,7 +324,7 @@ class ModelProviderRegistry:
 
         return display_names
 
-    def get_available_model_names(self, provider_type: Optional[ProviderType] = None) -> list[str]:
+    def get_available_model_names(self, provider_type: ProviderType | None = None) -> list[str]:
         """Get list of available model names, optionally filtered by provider.
 
         This respects model restrictions automatically.
@@ -343,7 +344,7 @@ class ModelProviderRegistry:
             # Return all available models
             return list(available_models.keys())
 
-    def _get_api_key_for_provider(self, provider_type: ProviderType) -> Optional[str]:
+    def _get_api_key_for_provider(self, provider_type: ProviderType) -> str | None:
         """Get API key for a provider from config dict or environment variables.
 
         Args:
@@ -355,6 +356,7 @@ class ModelProviderRegistry:
         key_mapping = {
             ProviderType.GOOGLE: "GEMINI_API_KEY",
             ProviderType.OPENAI: "OPENAI_API_KEY",
+            ProviderType.ANTHROPIC: "ANTHROPIC_API_KEY",
             ProviderType.AZURE: "AZURE_OPENAI_API_KEY",
             ProviderType.XAI: "XAI_API_KEY",
             ProviderType.OPENROUTER: "OPENROUTER_API_KEY",

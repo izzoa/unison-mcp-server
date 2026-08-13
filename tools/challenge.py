@@ -8,7 +8,7 @@ avoid reflexive agreement by prompting deeper analysis and genuine evaluation.
 This is a simple, self-contained tool that doesn't require AI model access.
 """
 
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any
 
 from pydantic import Field
 
@@ -180,7 +180,7 @@ class ChallengeTool(SimpleTool):
         """Not used since challenge doesn't call AI models"""
         return ""
 
-    def format_response(self, response: str, request: ChallengeRequest, model_info: Optional[dict] = None) -> str:
+    def format_response(self, response: str, request: ChallengeRequest, model_info: dict | None = None) -> str:
         """Not used since challenge doesn't call AI models"""
         return response
 

@@ -16,7 +16,8 @@ a tool_formatter_fn callback instead of importing server.TOOLS directly.
 
 import logging
 import os
-from typing import Any, Callable, Optional
+from collections.abc import Callable
+from typing import Any
 
 from utils.conversation_store import MAX_CONVERSATION_TURNS, ConversationTurn, ThreadContext, get_thread_chain
 
@@ -238,7 +239,7 @@ def _plan_file_inclusion_by_size(all_files: list[str], max_file_tokens: int) -> 
 
 def _get_tool_formatted_content(
     turn: ConversationTurn,
-    tool_formatter_fn: Optional[Callable[[str, ConversationTurn], Optional[list[str]]]] = None,
+    tool_formatter_fn: Callable[[str, ConversationTurn], list[str] | None] | None = None,
 ) -> list[str]:
     """
     Get tool-specific formatting for a conversation turn.
@@ -298,7 +299,7 @@ def build_conversation_history(
     context: ThreadContext,
     model_context: Any = None,
     read_files_func: Any = None,
-    tool_formatter_fn: Optional[Callable[[str, ConversationTurn], Optional[list[str]]]] = None,
+    tool_formatter_fn: Callable[[str, ConversationTurn], list[str] | None] | None = None,
 ) -> tuple[str, int]:
     """
     Build formatted conversation history for tool prompts with embedded file contents.

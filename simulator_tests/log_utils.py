@@ -8,7 +8,6 @@ used across multiple simulator test files to reduce code duplication.
 import logging
 import re
 import subprocess
-from typing import Optional, Union
 
 
 class LogUtils:
@@ -19,7 +18,7 @@ class LogUtils:
     ACTIVITY_LOG_FILE = "logs/mcp_activity.log"
 
     @classmethod
-    def get_server_logs_since(cls, since_time: Optional[str] = None) -> str:
+    def get_server_logs_since(cls, since_time: str | None = None) -> str:
         """
         Get server logs from both main and activity log files.
 
@@ -204,7 +203,7 @@ class LogUtils:
         return thread_data
 
     @classmethod
-    def extract_history_traversal_logs(cls, logs: str) -> list[dict[str, Union[str, int]]]:
+    def extract_history_traversal_logs(cls, logs: str) -> list[dict[str, str | int]]:
         """
         Extract conversation history traversal logs.
 
@@ -256,9 +255,7 @@ class LogUtils:
         return has_embedding and (has_filtering or has_skip) and has_tool_processing
 
     @classmethod
-    def search_logs_for_pattern(
-        cls, pattern: str, logs: Optional[str] = None, case_sensitive: bool = False
-    ) -> list[str]:
+    def search_logs_for_pattern(cls, pattern: str, logs: str | None = None, case_sensitive: bool = False) -> list[str]:
         """
         Search logs for a specific pattern.
 
@@ -283,7 +280,7 @@ class LogUtils:
         return matches
 
     @classmethod
-    def get_log_file_info(cls) -> dict[str, dict[str, Union[str, int, bool]]]:
+    def get_log_file_info(cls) -> dict[str, dict[str, str | int | bool]]:
         """
         Get information about log files.
 

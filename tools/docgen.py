@@ -19,7 +19,7 @@ Key features:
 """
 
 import logging
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any
 
 from pydantic import Field
 
@@ -74,10 +74,10 @@ class DocgenRequest(WorkflowRequest):
     total_files_to_document: int = Field(0, description=DOCGEN_FIELD_DESCRIPTIONS["total_files_to_document"])
 
     # Documentation generation configuration parameters
-    document_complexity: Optional[bool] = Field(True, description=DOCGEN_FIELD_DESCRIPTIONS["document_complexity"])
-    document_flow: Optional[bool] = Field(True, description=DOCGEN_FIELD_DESCRIPTIONS["document_flow"])
-    update_existing: Optional[bool] = Field(True, description=DOCGEN_FIELD_DESCRIPTIONS["update_existing"])
-    comments_on_complex_logic: Optional[bool] = Field(
+    document_complexity: bool | None = Field(True, description=DOCGEN_FIELD_DESCRIPTIONS["document_complexity"])
+    document_flow: bool | None = Field(True, description=DOCGEN_FIELD_DESCRIPTIONS["document_flow"])
+    update_existing: bool | None = Field(True, description=DOCGEN_FIELD_DESCRIPTIONS["update_existing"])
+    comments_on_complex_logic: bool | None = Field(
         True, description=DOCGEN_FIELD_DESCRIPTIONS["comments_on_complex_logic"]
     )
 

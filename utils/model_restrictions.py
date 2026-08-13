@@ -8,6 +8,7 @@ standardization purposes.
 
 Environment Variables:
 - OPENAI_ALLOWED_MODELS: Comma-separated list of allowed OpenAI models
+- ANTHROPIC_ALLOWED_MODELS: Comma-separated list of allowed Anthropic Claude models
 - GOOGLE_ALLOWED_MODELS: Comma-separated list of allowed Gemini models
 - XAI_ALLOWED_MODELS: Comma-separated list of allowed X.AI GROK models
 - OPENROUTER_ALLOWED_MODELS: Comma-separated list of allowed OpenRouter models
@@ -22,7 +23,6 @@ Example:
 
 import logging
 from collections import defaultdict
-from typing import Optional
 
 from providers.shared import ProviderType
 from utils.env import get_env
@@ -55,6 +55,7 @@ class ModelRestrictionService:
     # then hard-fails at the boundary.
     ENV_VARS = {
         ProviderType.OPENAI: "OPENAI_ALLOWED_MODELS",
+        ProviderType.ANTHROPIC: "ANTHROPIC_ALLOWED_MODELS",
         ProviderType.GOOGLE: "GOOGLE_ALLOWED_MODELS",
         ProviderType.XAI: "XAI_ALLOWED_MODELS",
         ProviderType.OPENROUTER: "OPENROUTER_ALLOWED_MODELS",
@@ -132,7 +133,7 @@ class ModelRestrictionService:
                         f"Please check for typos. Known models: {sorted(supported_models)}"
                     )
 
-    def is_allowed(self, provider_type: ProviderType, model_name: str, original_name: Optional[str] = None) -> bool:
+    def is_allowed(self, provider_type: ProviderType, model_name: str, original_name: str | None = None) -> bool:
         """
         Check if a model is allowed for a specific provider.
 
@@ -196,7 +197,7 @@ class ModelRestrictionService:
 
         return False
 
-    def get_allowed_models(self, provider_type: ProviderType) -> Optional[set[str]]:
+    def get_allowed_models(self, provider_type: ProviderType) -> set[str] | None:
         """
         Get the set of allowed models for a provider.
 
@@ -254,7 +255,7 @@ class ModelRestrictionService:
 
 
 # Global instance (singleton pattern)
-_restriction_service: Optional[ModelRestrictionService] = None
+_restriction_service: ModelRestrictionService | None = None
 
 
 def get_restriction_service() -> ModelRestrictionService:

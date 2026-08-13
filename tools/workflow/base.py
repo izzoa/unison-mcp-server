@@ -13,7 +13,7 @@ and use SchemaBuilder for consistent schema generation.
 """
 
 from abc import abstractmethod
-from typing import Any, Optional
+from typing import Any
 
 from tools.shared.base_models import WorkflowRequest
 from tools.shared.base_tool import BaseTool
@@ -110,7 +110,7 @@ class WorkflowTool(BaseTool, BaseWorkflowMixin):
         """
         return []
 
-    def get_annotations(self) -> Optional[dict[str, Any]]:
+    def get_annotations(self) -> dict[str, Any] | None:
         """
         Return tool annotations. Workflow tools are read-only by default.
 
@@ -363,7 +363,7 @@ class WorkflowTool(BaseTool, BaseWorkflowMixin):
         """Get the key name for completion data in the response."""
         return f"complete_{self.get_name()}"
 
-    def get_final_analysis_from_request(self, request) -> Optional[str]:
+    def get_final_analysis_from_request(self, request) -> str | None:
         """Extract final analysis from request. Override for tool-specific extraction."""
         try:
             return request.hypothesis

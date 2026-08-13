@@ -6,12 +6,12 @@ and resolve_fallback_model() for unified fallback model resolution.
 """
 
 import logging
-from typing import Any, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
-def parse_model_option(model_string: str) -> tuple[str, Optional[str]]:
+def parse_model_option(model_string: str) -> tuple[str, str | None]:
     """
     Parse model:option format into model name and option.
 

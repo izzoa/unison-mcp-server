@@ -32,6 +32,21 @@ _SECRET_PATTERNS: list[tuple[re.Pattern, str]] = [
 ]
 
 
+def redact_text(text: str) -> str:
+    """Apply the credential-redaction patterns to *text*.
+
+    The single public redaction surface shared by the logging filter, both
+    log formatters (text-mode exception output leaks without it — the
+    standard formatter appends ``exc_info`` after filters run), the JSON
+    formatter's per-field pass, and telemetry export. One helper, one
+    pattern set: pipelines cannot drift.
+    """
+    redacted = text
+    for pattern, replacement in _SECRET_PATTERNS:
+        redacted = pattern.sub(replacement, redacted)
+    return redacted
+
+
 class RedactingFilter(logging.Filter):
     """Redact credential-shaped substrings from log messages (CWE-532)."""
 
@@ -40,9 +55,7 @@ class RedactingFilter(logging.Filter):
             message = record.getMessage()
         except Exception:
             return True
-        redacted = message
-        for pattern, replacement in _SECRET_PATTERNS:
-            redacted = pattern.sub(replacement, redacted)
+        redacted = redact_text(message)
         if redacted != message:
             # Collapse args into the already-redacted message so re-formatting
             # cannot reintroduce the secret.
@@ -52,6 +65,13 @@ class RedactingFilter(logging.Filter):
 
 
 class LocalTimeFormatter(logging.Formatter):
+    def formatException(self, ei) -> str:
+        # The RedactingFilter mutates record.msg only; formatted exc_info is
+        # appended AFTER filters run, so credential-shaped text inside an
+        # exception would otherwise reach the log unredacted (in text mode
+        # today, and in any future formatter that inherits this).
+        return redact_text(super().formatException(ei))
+
     def formatTime(self, record, datefmt=None):
         """Override to use local timezone instead of UTC"""
         ct = self.converter(record.created)
@@ -127,7 +147,17 @@ def configure_logging(log_level: str = None) -> tuple[logging.Logger, logging.Lo
             encoding="utf-8",
         )
         mcp_file_handler.setLevel(logging.INFO)
-        mcp_file_handler.setFormatter(LocalTimeFormatter("%(asctime)s - %(message)s"))
+        # Dual-mode: UNISON_JSON_LOGS=true switches the ACTIVITY log to the
+        # JSON formatter; the server log always stays text. The RedactingFilter
+        # stays attached in both modes — swapping a formatter must never drop
+        # or reorder handler filters.
+        json_logs = os.getenv("UNISON_JSON_LOGS", "").strip().lower() == "true"
+        if json_logs:
+            from utils.json_log_formatter import JsonLogFormatter
+
+            mcp_file_handler.setFormatter(JsonLogFormatter())
+        else:
+            mcp_file_handler.setFormatter(LocalTimeFormatter("%(asctime)s - %(message)s"))
         mcp_file_handler.addFilter(redacting_filter)
         mcp_activity_logger.addHandler(mcp_file_handler)
         mcp_activity_logger.setLevel(logging.INFO)

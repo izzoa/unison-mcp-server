@@ -1,7 +1,7 @@
 """X.AI (GROK) model provider implementation."""
 
 import logging
-from typing import TYPE_CHECKING, ClassVar, Optional
+from typing import TYPE_CHECKING, ClassVar
 
 if TYPE_CHECKING:
     from tools.models import ToolModelCategory
@@ -38,7 +38,7 @@ class XAIModelProvider(RegistryBackedProviderMixin, OpenAICompatibleProvider):
         """Get the provider type."""
         return ProviderType.XAI
 
-    def get_preferred_model(self, category: "ToolModelCategory", allowed_models: list[str]) -> Optional[str]:
+    def get_preferred_model(self, category: "ToolModelCategory", allowed_models: list[str]) -> str | None:
         """Select the best X.AI model for *category* using capability metadata."""
         return self.select_preferred_model(category, allowed_models)
 

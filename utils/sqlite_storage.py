@@ -19,7 +19,6 @@ import sqlite3
 import threading
 import time
 from pathlib import Path
-from typing import Optional
 
 from utils.env import get_env
 
@@ -70,7 +69,7 @@ class SQLiteStorageBackend:
     # Lifecycle
     # ------------------------------------------------------------------
 
-    def __init__(self, db_path: Optional[str] = None) -> None:
+    def __init__(self, db_path: str | None = None) -> None:
         self._db_path = db_path or get_env("STORAGE_SQLITE_PATH") or _DEFAULT_DB_PATH
 
         # Ensure parent directory exists. The DB stores plaintext conversation
@@ -194,7 +193,7 @@ class SQLiteStorageBackend:
     # StorageBackend protocol methods
     # ------------------------------------------------------------------
 
-    def get(self, key: str) -> Optional[str]:
+    def get(self, key: str) -> str | None:
         """Retrieve value if it exists and has not expired.
 
         Expired rows are deleted on read (lazy expiry) and ``None`` is
@@ -258,7 +257,7 @@ class SQLiteStorageBackend:
                 self._connection.execute("BEGIN IMMEDIATE")
                 cursor = self._connection.execute("SELECT value, expires_at FROM kv_store WHERE key = ?", (key,))
                 row = cursor.fetchone()
-                current: Optional[str] = None
+                current: str | None = None
                 if row is not None:
                     value, expires_at = row
                     if expires_at is None or expires_at > now:

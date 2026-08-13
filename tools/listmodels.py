@@ -7,7 +7,7 @@ It shows which providers are configured and what models can be used.
 """
 
 import logging
-from typing import Any, Optional
+from typing import Any
 
 from mcp.types import TextContent
 
@@ -47,7 +47,7 @@ class ListModelsTool(BaseTool):
             "additionalProperties": False,
         }
 
-    def get_annotations(self) -> Optional[dict[str, Any]]:
+    def get_annotations(self) -> dict[str, Any] | None:
         """Return tool annotations indicating this is a read-only tool"""
         return {"readOnlyHint": True}
 
@@ -66,7 +66,7 @@ class ListModelsTool(BaseTool):
         """Not used for this utility tool"""
         return ""
 
-    def format_response(self, response: str, request: ToolRequest, model_info: Optional[dict] = None) -> str:
+    def format_response(self, response: str, request: ToolRequest, model_info: dict | None = None) -> str:
         """Not used for this utility tool"""
         return response
 
@@ -281,7 +281,7 @@ class ListModelsTool(BaseTool):
                             output_lines.append("- *No models allowed by current restriction policy.*")
                     else:
                         available_models = provider.list_models(respect_restrictions=True)
-                        providers_models: dict[str, list[tuple[int, str, Optional[Any]]]] = {}
+                        providers_models: dict[str, list[tuple[int, str, Any | None]]] = {}
 
                         for model_name in available_models:
                             config = registry.resolve(model_name)

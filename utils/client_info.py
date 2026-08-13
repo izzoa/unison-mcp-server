@@ -9,12 +9,12 @@ identification across the application.
 """
 
 import logging
-from typing import Any, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 # Global cache for client information
-_client_info_cache: Optional[dict[str, Any]] = None
+_client_info_cache: dict[str, Any] | None = None
 
 # Mapping of known client names to friendly names
 # This is case-insensitive and checks if the key is contained in the client name
@@ -69,7 +69,7 @@ def get_friendly_name(client_name: str) -> str:
     return DEFAULT_FRIENDLY_NAME
 
 
-def get_cached_client_info() -> Optional[dict[str, Any]]:
+def get_cached_client_info() -> dict[str, Any] | None:
     """
     Get cached client information if available.
 
@@ -80,7 +80,7 @@ def get_cached_client_info() -> Optional[dict[str, Any]]:
     return _client_info_cache
 
 
-def get_client_info_from_context(server: Any) -> Optional[dict[str, Any]]:
+def get_client_info_from_context(server: Any = None) -> dict[str, Any] | None:
     """
     Extract client information from the MCP server's request context.
 
@@ -108,57 +108,39 @@ def get_client_info_from_context(server: Any) -> Optional[dict[str, Any]]:
         return _client_info_cache
 
     try:
-        # Try to access the request context and session
-        if not server:
-            return None
+        # mcp 2.x injects the request context into handlers; the handler
+        # adapters bind it to a ContextVar. Fall back to the legacy
+        # ``server.request_context`` attribute so 1.x-shaped test doubles
+        # keep working.
+        from utils.mcp_context import get_current_request_context
 
-        # Check if server has request_context property
-        request_context = None
-        try:
-            request_context = server.request_context
-        except AttributeError:
-            logger.debug("Server does not have request_context property")
-            return None
+        request_context = get_current_request_context()
+        if request_context is None and server is not None:
+            request_context = getattr(server, "request_context", None)
 
         if not request_context:
-            logger.debug("Request context is None")
+            logger.debug("No active MCP request context")
             return None
 
-        # Try to access session from request context
-        session = None
-        try:
-            session = request_context.session
-        except AttributeError:
-            logger.debug("Request context does not have session property")
-            return None
-
+        session = getattr(request_context, "session", None)
         if not session:
-            logger.debug("Session is None")
+            logger.debug("Request context has no session")
             return None
 
-        # Try to access client params from session
-        client_params = None
-        try:
-            # The clientInfo is stored in _client_params.clientInfo
-            client_params = session._client_params
-        except AttributeError:
-            logger.debug("Session does not have _client_params property")
-            return None
-
+        # 2.x exposes client params publicly; 1.x kept them private
+        client_params = getattr(session, "client_params", None)
+        if client_params is None:
+            client_params = getattr(session, "_client_params", None)
         if not client_params:
-            logger.debug("Client params is None")
+            logger.debug("Session has no client params")
             return None
 
-        # Try to extract clientInfo
-        client_info = None
-        try:
-            client_info = client_params.clientInfo
-        except AttributeError:
-            logger.debug("Client params does not have clientInfo property")
-            return None
-
+        # 2.x models are snake_case; 1.x used camelCase attributes
+        client_info = getattr(client_params, "client_info", None)
+        if client_info is None:
+            client_info = getattr(client_params, "clientInfo", None)
         if not client_info:
-            logger.debug("Client info is None")
+            logger.debug("Client params have no clientInfo")
             return None
 
         # Extract name and version
@@ -192,7 +174,7 @@ def get_client_info_from_context(server: Any) -> Optional[dict[str, Any]]:
         return None
 
 
-def format_client_info(client_info: Optional[dict[str, Any]], use_friendly_name: bool = True) -> str:
+def format_client_info(client_info: dict[str, Any] | None, use_friendly_name: bool = True) -> str:
     """
     Format client information for display.
 
@@ -236,7 +218,7 @@ def get_client_friendly_name() -> str:
     return DEFAULT_FRIENDLY_NAME
 
 
-def log_client_info(server: Any, logger_instance: Optional[logging.Logger] = None) -> None:
+def log_client_info(server: Any, logger_instance: logging.Logger | None = None) -> None:
     """
     Log client information extracted from the server.
 

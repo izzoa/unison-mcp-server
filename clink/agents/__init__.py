@@ -9,6 +9,7 @@ from .amp import AmpAgent
 from .base import AgentOutput, BaseCLIAgent, CLIAgentError
 from .claude import ClaudeAgent
 from .codex import CodexAgent
+from .copilot import CopilotAgent
 from .crush import CrushAgent
 from .gemini import GeminiAgent
 from .opencode import OpencodeAgent
@@ -21,6 +22,7 @@ _AGENTS: dict[str, type[BaseCLIAgent]] = {
     "aider": AiderAgent,
     "crush": CrushAgent,
     "amp": AmpAgent,
+    "copilot": CopilotAgent,
 }
 
 

@@ -18,7 +18,7 @@ Key features:
 """
 
 import logging
-from typing import TYPE_CHECKING, Any, Literal, Optional
+from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import Field, model_validator
 
@@ -79,23 +79,23 @@ class SecauditRequest(WorkflowRequest):
     issues_found: list[dict] = Field(
         default_factory=list, description=SECAUDIT_WORKFLOW_FIELD_DESCRIPTIONS["issues_found"]
     )
-    confidence: Optional[str] = Field("low", description=SECAUDIT_WORKFLOW_FIELD_DESCRIPTIONS["confidence"])
+    confidence: str | None = Field("low", description=SECAUDIT_WORKFLOW_FIELD_DESCRIPTIONS["confidence"])
 
     # Optional images for visual context
-    images: Optional[list[str]] = Field(default=None, description=SECAUDIT_WORKFLOW_FIELD_DESCRIPTIONS["images"])
+    images: list[str] | None = Field(default=None, description=SECAUDIT_WORKFLOW_FIELD_DESCRIPTIONS["images"])
 
     # Security audit-specific fields
-    security_scope: Optional[str] = Field(None, description=SECAUDIT_WORKFLOW_FIELD_DESCRIPTIONS["security_scope"])
-    threat_level: Optional[Literal["low", "medium", "high", "critical"]] = Field(
+    security_scope: str | None = Field(None, description=SECAUDIT_WORKFLOW_FIELD_DESCRIPTIONS["security_scope"])
+    threat_level: Literal["low", "medium", "high", "critical"] | None = Field(
         "medium", description=SECAUDIT_WORKFLOW_FIELD_DESCRIPTIONS["threat_level"]
     )
-    compliance_requirements: Optional[list[str]] = Field(
+    compliance_requirements: list[str] | None = Field(
         default_factory=list, description=SECAUDIT_WORKFLOW_FIELD_DESCRIPTIONS["compliance_requirements"]
     )
-    audit_focus: Optional[Literal["owasp", "compliance", "infrastructure", "dependencies", "comprehensive"]] = Field(
+    audit_focus: Literal["owasp", "compliance", "infrastructure", "dependencies", "comprehensive"] | None = Field(
         "comprehensive", description=SECAUDIT_WORKFLOW_FIELD_DESCRIPTIONS["audit_focus"]
     )
-    severity_filter: Optional[Literal["critical", "high", "medium", "low", "all"]] = Field(
+    severity_filter: Literal["critical", "high", "medium", "low", "all"] | None = Field(
         "all", description=SECAUDIT_WORKFLOW_FIELD_DESCRIPTIONS["severity_filter"]
     )
 

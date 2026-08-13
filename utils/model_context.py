@@ -28,7 +28,7 @@ optimal token allocation for multi-turn conversations:
 
 import logging
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any
 
 from config import DEFAULT_MODEL
 from providers import ModelCapabilities
@@ -60,7 +60,7 @@ class ModelContext:
     token calculations, ensuring consistency across the system.
     """
 
-    def __init__(self, model_name: str, model_option: Optional[str] = None):
+    def __init__(self, model_name: str, model_option: str | None = None):
         self.model_name = model_name
         self.model_option = model_option  # Store optional model option (e.g., "for", "against", etc.)
         self._provider = None
@@ -96,7 +96,7 @@ class ModelContext:
             self._capabilities = self.provider.get_capabilities(self.model_name)
         return self._capabilities
 
-    def calculate_token_allocation(self, reserved_for_response: Optional[int] = None) -> TokenAllocation:
+    def calculate_token_allocation(self, reserved_for_response: int | None = None) -> TokenAllocation:
         """
         Calculate token allocation based on model capacity and conversation requirements.
 

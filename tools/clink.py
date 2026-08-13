@@ -7,7 +7,7 @@ import os
 import re
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, NoReturn
 
 from mcp.types import TextContent
 from pydantic import BaseModel, Field
@@ -72,7 +72,11 @@ class CLinkRequest(BaseModel):
     prompt: str = Field(..., description="Prompt forwarded to the target CLI.")
     cli_name: str | None = Field(
         default=None,
-        description="Configured CLI client name to invoke. Defaults to the first configured CLI if omitted.",
+        description=(
+            "Configured CLI client name to invoke. Required when more than one CLI is "
+            "configured; may be omitted only when a single CLI is configured, in which case "
+            "that one is used."
+        ),
     )
     role: str | None = Field(
         default=None,
@@ -126,20 +130,51 @@ class CLinkTool(SimpleTool):
         self._cli_names = self._registry.list_clients()
         self._role_map: dict[str, list[str]] = {name: self._registry.list_roles(name) for name in self._cli_names}
         self._all_roles: list[str] = sorted({role for roles in self._role_map.values() for role in roles})
-        if "gemini" in self._cli_names:
-            self._default_cli_name = "gemini"
-        else:
-            self._default_cli_name = self._cli_names[0] if self._cli_names else None
+        # No vendor preference: a single configured client is the only implicit
+        # default. With more than one, `cli_name` is required — see
+        # _resolve_client() and the matching rule in get_input_schema().
+        self._default_cli_name = self._cli_names[0] if len(self._cli_names) == 1 else None
         self._active_system_prompt: str = ""
         super().__init__()
+
+    def _resolve_client(self, cli_name: str | None) -> ResolvedCLIClient:
+        """Resolve the effective CLI client for a request.
+
+        The single resolution path shared by every entry point that assembles a
+        prompt or dispatches to a CLI, so no caller passes an unresolved value
+        into the registry (where ``None`` would surface as an ``AttributeError``
+        rather than an actionable message).
+
+        ``cli_name`` is required whenever more than one client is configured —
+        matching what :meth:`get_input_schema` already advertises. Selecting an
+        arbitrary client instead would silently send the request somewhere the
+        caller did not ask for.
+        """
+        if not self._cli_names:
+            self._raise_tool_error("No CLI clients are configured for clink.")
+
+        selected = (cli_name or "").strip() or self._default_cli_name
+        if not selected:
+            available = ", ".join(self._cli_names)
+            self._raise_tool_error(
+                f"'cli_name' is required when multiple CLI clients are configured. " f"Available clients: {available}."
+            )
+
+        try:
+            return self._registry.get_client(selected)
+        except KeyError as exc:
+            self._raise_tool_error(str(exc))
 
     def get_name(self) -> str:
         return "clink"
 
     def get_description(self) -> str:
+        # Deliberately names no CLI: the generated `cli_name` enum is the
+        # authoritative list of configured targets, and a hardcoded example
+        # list goes stale (this previously advertised Qwen, never a target).
         return (
-            "Link a request to an external AI CLI (Gemini CLI, Qwen CLI, etc.) through Unison MCP to reuse "
-            "their capabilities inside existing workflows."
+            "Link a request to an external AI CLI through Unison MCP to reuse their capabilities "
+            "inside existing workflows. See the 'cli_name' enum for the configured targets."
         )
 
     def get_annotations(self) -> dict[str, Any]:
@@ -254,14 +289,7 @@ class CLinkTool(SimpleTool):
         if path_error:
             self._raise_tool_error(path_error)
 
-        selected_cli = request.cli_name or self._default_cli_name
-        if not selected_cli:
-            self._raise_tool_error("No CLI clients are configured for clink.")
-
-        try:
-            client_config = self._registry.get_client(selected_cli)
-        except KeyError as exc:
-            self._raise_tool_error(str(exc))
+        client_config = self._resolve_client(request.cli_name)
 
         try:
             role_config = client_config.get_role(request.role)
@@ -299,6 +327,7 @@ class CLinkTool(SimpleTool):
             prompt_text = await self._prepare_prompt_for_role(
                 request,
                 role_config,
+                client=client_config,
                 system_prompt=system_prompt_text,
                 include_system_prompt=include_system_prompt,
             )
@@ -405,13 +434,14 @@ class CLinkTool(SimpleTool):
         return [TextContent(type="text", text=tool_output.model_dump_json())]
 
     async def prepare_prompt(self, request) -> str:
-        client_config = self._registry.get_client(request.cli_name)
+        client_config = self._resolve_client(getattr(request, "cli_name", None))
         role_config = client_config.get_role(request.role)
         system_prompt_text = role_config.prompt_path.read_text(encoding="utf-8")
         include_system_prompt = not self._use_external_system_prompt(client_config)
         return await self._prepare_prompt_for_role(
             request,
             role_config,
+            client=client_config,
             system_prompt=system_prompt_text,
             include_system_prompt=include_system_prompt,
         )
@@ -421,6 +451,7 @@ class CLinkTool(SimpleTool):
         request: CLinkRequest,
         role: ResolvedCLIRole,
         *,
+        client: ResolvedCLIClient,
         system_prompt: str,
         include_system_prompt: bool,
     ) -> str:
@@ -428,7 +459,7 @@ class CLinkTool(SimpleTool):
         self._active_system_prompt = system_prompt
         try:
             user_content = self.handle_prompt_file_with_fallback(request).strip()
-            guidance = self._agent_capabilities_guidance()
+            guidance = self._agent_capabilities_guidance(client)
             file_section = self._format_file_references(self.get_request_files(request))
 
             sections: list[str] = []
@@ -438,12 +469,18 @@ class CLinkTool(SimpleTool):
 
             # Read-only enforcement: prompt-level instruction
             if getattr(request, "read_only", False):
+                # Stated behaviorally rather than by tool name. Enumerated names go
+                # stale — the five previously listed here match no current target,
+                # including Gemini — and naming a handful implicitly narrows a
+                # prohibition meant to cover every write path, including shell
+                # redirection and tools that did not exist when this was written.
                 sections.append(
                     "=== READ-ONLY MODE ===\n"
                     "CRITICAL CONSTRAINT: You are operating in READ-ONLY mode. "
-                    "You MUST NOT create, modify, delete, or rename any files. "
-                    "Do not use any file-writing tools (EditFile, WriteFile, CreateFile, "
-                    "DeleteFile, ReplaceInFile, or equivalent). "
+                    "You MUST NOT create, modify, delete, or rename any file. "
+                    "Do not use any tool that writes to the filesystem, whatever it is called, "
+                    "and do not achieve the same effect by other means such as shell commands "
+                    "or output redirection. "
                     "Only read files and provide analysis. Any file modification is a violation."
                 )
 
@@ -603,16 +640,25 @@ class CLinkTool(SimpleTool):
             metadata["stderr"] = exc.stderr.strip()
         return metadata
 
-    def _raise_tool_error(self, message: str, metadata: dict[str, Any] | None = None) -> None:
+    def _raise_tool_error(self, message: str, metadata: dict[str, Any] | None = None) -> NoReturn:
         error_output = ToolOutput(status="error", content=message, content_type="text", metadata=metadata)
         raise ToolExecutionError(error_output.model_dump_json())
 
-    def _agent_capabilities_guidance(self) -> str:
+    def _agent_capabilities_guidance(self, client: ResolvedCLIClient) -> str:
+        """Build the capabilities guidance for the CLI actually being invoked.
+
+        Interpolates the resolved client's name rather than consulting a lookup
+        table, so a newly registered target is named correctly with no change
+        here. Deliberately asserts no specific capability: ``ResolvedCLIClient``
+        models none, targets differ in what they can do (aider has no web
+        search, for instance), and promising a facility the target lacks
+        misinforms the model about the tools available to it.
+        """
         return (
-            "You are operating through the Gemini CLI agent. You have access to your full suite of "
-            "CLI capabilities—including launching web searches, reading files, and using any other "
-            "available tools. Gather current information yourself and deliver the final answer without "
-            "asking the Unison MCP host to perform searches or file reads."
+            f"You are operating through the {client.name} CLI agent. Use whatever tools are "
+            "available to you to gather the information you need. Deliver the final answer "
+            "yourself without asking the Unison MCP host to perform searches or file reads "
+            "on your behalf."
         )
 
     def _format_file_references(self, files: list[str]) -> str:

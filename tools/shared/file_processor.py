@@ -15,7 +15,7 @@ tool instance, making it suitable for use in any context that needs file process
 
 import logging
 import os
-from typing import Any, Optional
+from typing import Any
 
 from config import MCP_PROMPT_SIZE_LIMIT
 from utils import estimate_tokens
@@ -43,7 +43,7 @@ class FileProcessor:
         self.tool_name = tool_name
         self.include_line_numbers = include_line_numbers
 
-    def handle_prompt_file(self, files: Optional[list[str]]) -> tuple[Optional[str], Optional[list[str]]]:
+    def handle_prompt_file(self, files: list[str] | None) -> tuple[str | None, list[str] | None]:
         """
         Check for and handle prompt.txt in the absolute file paths list.
 
@@ -105,7 +105,7 @@ class FileProcessor:
 
         return prompt_content, updated_files if updated_files else None
 
-    def filter_new_files(self, requested_files: list[str], continuation_id: Optional[str]) -> list[str]:
+    def filter_new_files(self, requested_files: list[str], continuation_id: str | None) -> list[str]:
         """
         Filter out files that are already embedded in conversation history.
 
@@ -170,7 +170,7 @@ class FileProcessor:
             )
             return requested_files
 
-    def get_conversation_embedded_files(self, continuation_id: Optional[str]) -> list[str]:
+    def get_conversation_embedded_files(self, continuation_id: str | None) -> list[str]:
         """
         Get list of files already embedded in conversation history.
 
@@ -201,13 +201,13 @@ class FileProcessor:
     def _prepare_file_content_for_prompt(
         self,
         request_files: list[str],
-        continuation_id: Optional[str],
+        continuation_id: str | None,
         context_description: str = "New files",
-        max_tokens: Optional[int] = None,
+        max_tokens: int | None = None,
         reserve_tokens: int = 1_000,
-        remaining_budget: Optional[int] = None,
-        arguments: Optional[dict] = None,
-        model_context: Optional[Any] = None,
+        remaining_budget: int | None = None,
+        arguments: dict | None = None,
+        model_context: Any | None = None,
     ) -> tuple[str, list[str]]:
         """
         Centralized file processing implementing dual prioritization strategy.
@@ -404,8 +404,8 @@ class FileProcessor:
         )
 
     def _validate_image_limits(
-        self, images: Optional[list[str]], model_context: Optional[Any] = None, continuation_id: Optional[str] = None
-    ) -> Optional[dict]:
+        self, images: list[str] | None, model_context: Any | None = None, continuation_id: str | None = None
+    ) -> dict | None:
         """
         Validate image size and count against model capabilities.
 

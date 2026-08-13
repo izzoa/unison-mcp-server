@@ -3,7 +3,7 @@
 import base64
 import logging
 from collections.abc import Generator
-from typing import TYPE_CHECKING, ClassVar, Optional
+from typing import TYPE_CHECKING, ClassVar
 
 if TYPE_CHECKING:
     from tools.models import ToolModelCategory
@@ -90,7 +90,7 @@ class GeminiModelProvider(RegistryBackedProviderMixin, ModelProvider):
                 self._client = genai.Client(api_key=self.api_key)
         return self._client
 
-    def _resolve_http_timeout(self) -> Optional[float]:
+    def _resolve_http_timeout(self) -> float | None:
         """Compute timeout override from shared custom timeout environment variables."""
 
         timeouts: list[float] = []
@@ -123,11 +123,11 @@ class GeminiModelProvider(RegistryBackedProviderMixin, ModelProvider):
         self,
         prompt: str,
         model_name: str,
-        system_prompt: Optional[str] = None,
+        system_prompt: str | None = None,
         temperature: float = 1.0,
-        max_output_tokens: Optional[int] = None,
+        max_output_tokens: int | None = None,
         thinking_mode: str = "medium",
-        images: Optional[list[str]] = None,
+        images: list[str] | None = None,
         **kwargs,
     ) -> ModelResponse:
         """
@@ -322,11 +322,11 @@ class GeminiModelProvider(RegistryBackedProviderMixin, ModelProvider):
         self,
         prompt: str,
         model_name: str,
-        system_prompt: Optional[str] = None,
+        system_prompt: str | None = None,
         temperature: float = 1.0,
-        max_output_tokens: Optional[int] = None,
+        max_output_tokens: int | None = None,
         thinking_mode: str = "medium",
-        images: Optional[list[str]] = None,
+        images: list[str] | None = None,
         **kwargs,
     ) -> Generator[StreamChunk, None, None]:
         """Stream content from Gemini using the native ``stream=True`` API.
@@ -556,7 +556,7 @@ class GeminiModelProvider(RegistryBackedProviderMixin, ModelProvider):
         # Delegate to base class three-tier classification
         return super()._is_error_retryable(error)
 
-    def _process_image(self, image_path: str) -> Optional[dict]:
+    def _process_image(self, image_path: str) -> dict | None:
         """Process an image for Gemini API."""
         try:
             # Use base class validation
@@ -579,7 +579,7 @@ class GeminiModelProvider(RegistryBackedProviderMixin, ModelProvider):
             logger.error(f"Error processing image {image_path}: {e}")
             return None
 
-    def get_preferred_model(self, category: "ToolModelCategory", allowed_models: list[str]) -> Optional[str]:
+    def get_preferred_model(self, category: "ToolModelCategory", allowed_models: list[str]) -> str | None:
         """Select the best Gemini model for *category* using capability metadata."""
         return self.select_preferred_model(category, allowed_models)
 

@@ -7,8 +7,6 @@ subclasses can override methods to add custom formatting, validation, or
 additional context.
 """
 
-from typing import Optional
-
 
 class ResponseFormatter:
     """
@@ -44,7 +42,7 @@ class ResponseFormatter:
         """
         return response
 
-    def _parse_response(self, raw_text: str, request, model_info: Optional[dict] = None):
+    def _parse_response(self, raw_text: str, request, model_info: dict | None = None):
         """Parse response - will be inherited for now.
 
         Subclasses must override this method to provide tool-specific
