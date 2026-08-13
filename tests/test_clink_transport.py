@@ -347,3 +347,41 @@ class TestWorkingDirOverride:
 
         await agent.run(role=role, prompt="hello", files=[], images=[])
         assert captured["cwd"] is None
+
+
+# ---------------------------------------------------------------------------
+# Host cancellation must reap the CLI subprocess (no orphaned agents)
+# ---------------------------------------------------------------------------
+
+
+class TestHostCancellationReapsSubprocess:
+    @pytest.mark.asyncio
+    async def test_cancellation_kills_process_tree(self, monkeypatch) -> None:
+        agent, role = _make_agent()
+
+        class _HangingProcess:
+            def __init__(self) -> None:
+                self.returncode = None
+
+            async def communicate(self, *_args):
+                await asyncio.Event().wait()  # blocks until cancelled
+
+            def kill(self) -> None:
+                pass
+
+        process = _HangingProcess()
+        reaped: dict[str, Any] = {}
+        monkeypatch.setattr(agent, "_terminate_process_tree", lambda p: reaped.setdefault("proc", p))
+
+        async def fake_exec(*args, **kwargs):
+            return process
+
+        monkeypatch.setattr(asyncio, "create_subprocess_exec", fake_exec)
+        monkeypatch.setattr(shutil, "which", lambda name: f"/usr/bin/{name}")
+
+        task = asyncio.create_task(agent.run(role=role, prompt="x", files=[], images=[]))
+        await asyncio.sleep(0.05)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        assert reaped.get("proc") is process

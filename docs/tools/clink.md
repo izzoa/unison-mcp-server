@@ -160,6 +160,14 @@ Clink configurations live in `conf/cli_clients/`. We ship presets for the suppor
 
 Each preset points to role-specific prompts in `systemprompts/clink/`. Duplicate those files to add more roles or adjust CLI flags.
 
+### Timeouts
+
+Three layers can end a clink call — know which one fired:
+
+1. **Unison's subprocess timeout** — default **3600s (60 min)** per CLI, deliberately generous. Override per CLI with `timeout_seconds` in `conf/cli_clients/<cli>.json`, or globally at runtime with the `CLINK_TIMEOUT_SECONDS` env var (no file edits needed). When this fires, clink kills the whole CLI process tree and returns a clear `timed out after N seconds` error.
+2. **Your MCP host's tool-call timeout** — often much shorter than ours (for Claude Code, raise it with the `MCP_TOOL_TIMEOUT` env var, in milliseconds; Claude Desktop exposes no knob). When the host cancels, clink reaps the CLI subprocess so it never keeps running orphaned.
+3. **The CLI's own internal limits** — some CLIs abort long runs themselves and report it in their output; clink surfaces that as the CLI's error, not a clink timeout.
+
 > **Why `--yolo` for Gemini?** The Gemini CLI currently requires automatic approvals to execute its own tools (for example `run_shell_command`). Without the flag it errors with `Tool "run_shell_command" not found in registry`. See [issue #5382](https://github.com/google-gemini/gemini-cli/issues/5382) for more details.
 
 **Adding new CLIs**: Drop a JSON config into `conf/cli_clients/`, create role prompts in `systemprompts/clink/`, and register a parser/agent if the CLI outputs a new format.

@@ -5,7 +5,12 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
-DEFAULT_TIMEOUT_SECONDS = 1800
+# Deliberately generous ceiling: long agentic CLI runs are legitimate, and the
+# MCP host's own tool timeout usually fires first anyway (host cancellation
+# reaps the subprocess). This value is the safety net for hosts that wait.
+# Override per CLI via conf/cli_clients/*.json timeout_seconds, or globally at
+# runtime via CLINK_TIMEOUT_SECONDS.
+DEFAULT_TIMEOUT_SECONDS = 3600
 DEFAULT_STREAM_LIMIT = 10 * 1024 * 1024  # 10MB per stream
 
 # Recursion-guard environment variables (see clink-multi-cli-infrastructure).

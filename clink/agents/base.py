@@ -329,6 +329,16 @@ class BaseCLIAgent:
                 process.communicate(stdin_data),
                 timeout=self.client.timeout_seconds,
             )
+        except asyncio.CancelledError:
+            # The MCP host cancelled the request — its own tool timeout, a user
+            # abort, or a dropped connection. Without this, the CLI subprocess
+            # kept running orphaned after the caller stopped listening (an
+            # agentic CLI can burn minutes of paid usage that way). Kill the
+            # tree and re-raise immediately; no bounded drain here, because
+            # cancellation is latency-sensitive and the event loop reaps the
+            # dead child on its own.
+            self._terminate_process_tree(process)
+            raise
         except asyncio.TimeoutError as exc:
             # Kill the whole process group (not just the direct child) so no
             # descendants are orphaned, then bound the cleanup drain so a survivor

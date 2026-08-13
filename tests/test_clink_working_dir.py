@@ -97,3 +97,35 @@ async def test_omitted_working_dir_defaults_to_server_cwd(monkeypatch):
     payload = json.loads(result[0].text)
     assert captured["working_dir"] is None
     assert payload["metadata"]["working_dir"] == os.getcwd()
+
+
+# ---------------------------------------------------------------------------
+# CLINK_TIMEOUT_SECONDS runtime override
+# ---------------------------------------------------------------------------
+
+
+def _fresh_registry(monkeypatch):
+    import clink.registry as registry_module
+    from clink import get_registry
+
+    monkeypatch.setattr(registry_module, "_REGISTRY", None)
+    return get_registry()
+
+
+def test_clink_timeout_env_overrides_all_clis(monkeypatch):
+    monkeypatch.setenv("CLINK_TIMEOUT_SECONDS", "120")
+    registry = _fresh_registry(monkeypatch)
+    assert registry.get_client("gemini").timeout_seconds == 120
+    assert registry.get_client("copilot").timeout_seconds == 120
+
+
+def test_invalid_clink_timeout_env_is_ignored(monkeypatch):
+    from clink.constants import DEFAULT_TIMEOUT_SECONDS
+
+    monkeypatch.setenv("CLINK_TIMEOUT_SECONDS", "soon")
+    registry = _fresh_registry(monkeypatch)
+    assert registry.get_client("gemini").timeout_seconds == DEFAULT_TIMEOUT_SECONDS
+
+    monkeypatch.setenv("CLINK_TIMEOUT_SECONDS", "-5")
+    registry = _fresh_registry(monkeypatch)
+    assert registry.get_client("gemini").timeout_seconds == DEFAULT_TIMEOUT_SECONDS

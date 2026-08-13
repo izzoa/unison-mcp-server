@@ -144,6 +144,21 @@ class ClinkRegistry:
             internal_defaults.timeout_seconds if internal_defaults else DEFAULT_TIMEOUT_SECONDS
         )
 
+        # Operator runtime knob: CLINK_TIMEOUT_SECONDS overrides every CLI's
+        # timeout without editing manifests. Invalid or non-positive values are
+        # ignored with a warning so a typo cannot silently disable the timeout.
+        env_timeout = (get_env("CLINK_TIMEOUT_SECONDS") or "").strip()
+        if env_timeout:
+            try:
+                parsed_timeout = int(env_timeout)
+            except ValueError:
+                logger.warning("Ignoring invalid CLINK_TIMEOUT_SECONDS=%r (not an integer)", env_timeout)
+            else:
+                if parsed_timeout > 0:
+                    timeout_seconds = parsed_timeout
+                else:
+                    logger.warning("Ignoring invalid CLINK_TIMEOUT_SECONDS=%r (must be positive)", env_timeout)
+
         parser_name = internal_defaults.parser
         if not parser_name:
             raise RegistryLoadError(
