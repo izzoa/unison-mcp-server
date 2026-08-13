@@ -25,6 +25,28 @@ except ImportError:
     _OpenAIConnectionError = None
 
 
+class EmptyContentError(RuntimeError):
+    """A 200 OK response that carries no assistant content.
+
+    Raised rather than returned so the condition reaches the retry classifier
+    as a typed error. Carries ``finish_reason`` so retryability can be decided
+    from a field instead of from the message text — see
+    :meth:`OpenAICompatibleProvider._is_error_retryable`, which matches on this
+    class before any string inspection happens.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        finish_reason: str | None = None,
+        reasoning_tokens: int | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.finish_reason = finish_reason
+        self.reasoning_tokens = reasoning_tokens
+
+
 class OpenAICompatibleProvider(ModelProvider):
     """Shared implementation for OpenAI API lookalikes.
 
@@ -700,6 +722,28 @@ class OpenAICompatibleProvider(ModelProvider):
             content = response.choices[0].message.content
             usage = self._extract_usage(response)
 
+            # A reasoning model can answer 200 OK with content="" and
+            # finish_reason="length" when reasoning consumes the entire output
+            # budget. Returning that as a success is worse than failing: callers
+            # test `if model_response.content:`, so an empty string is falsy and
+            # the tool completes having produced nothing, with no error anywhere
+            # to explain it. Raising surfaces the cause instead.
+            if not (content or "").strip():
+                finish_reason = response.choices[0].finish_reason
+                reasoning_tokens = None
+                try:
+                    reasoning_tokens = response.usage.completion_tokens_details.reasoning_tokens
+                except AttributeError:
+                    pass
+                raise EmptyContentError(
+                    f"{self.FRIENDLY_NAME} returned empty content for {resolved_model} "
+                    f"(finish_reason={finish_reason}, reasoning_tokens={reasoning_tokens}). "
+                    f"For reasoning models this usually means the output budget was spent "
+                    f"on reasoning; reduce the input size or raise max_tokens.",
+                    finish_reason=finish_reason,
+                    reasoning_tokens=reasoning_tokens,
+                )
+
             return ModelResponse(
                 content=content,
                 usage=usage,
@@ -968,6 +1012,21 @@ class OpenAICompatibleProvider(ModelProvider):
             True if error should be retried, False otherwise
         """
         error_str = str(error).lower()
+
+        # Empty-content decisions read the finish_reason field, never the
+        # message. This has to come first: the message embeds a token count,
+        # and every classifier below inspects the string, so a reasoning_tokens
+        # value of 1500 or 8503 would otherwise match the "500"/"503" retry
+        # indicators and turn retry behaviour into a function of arbitrary
+        # digits — the same failure the structured-status-code comment below
+        # was added to fix.
+        if isinstance(error, EmptyContentError):
+            # finish_reason="length" means the output budget was exhausted.
+            # That is a function of input size and model configuration, both
+            # unchanged on a retry, so retrying spends an expensive reasoning
+            # call to reproduce the result. Any other finish_reason with empty
+            # content is unexplained and plausibly transient, so allow it.
+            return error.finish_reason != "length"
 
         # Timeouts / connection errors are always retryable regardless of code.
         if _OpenAITimeoutError is not None and isinstance(error, _OpenAITimeoutError):
