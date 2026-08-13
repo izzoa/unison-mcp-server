@@ -10,6 +10,7 @@ class ProviderType(Enum):
 
     GOOGLE = "google"
     OPENAI = "openai"
+    ANTHROPIC = "anthropic"
     AZURE = "azure"
     XAI = "xai"
     OPENROUTER = "openrouter"

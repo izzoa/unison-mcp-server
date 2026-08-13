@@ -8,6 +8,7 @@ standardization purposes.
 
 Environment Variables:
 - OPENAI_ALLOWED_MODELS: Comma-separated list of allowed OpenAI models
+- ANTHROPIC_ALLOWED_MODELS: Comma-separated list of allowed Anthropic Claude models
 - GOOGLE_ALLOWED_MODELS: Comma-separated list of allowed Gemini models
 - XAI_ALLOWED_MODELS: Comma-separated list of allowed X.AI GROK models
 - OPENROUTER_ALLOWED_MODELS: Comma-separated list of allowed OpenRouter models
@@ -54,6 +55,7 @@ class ModelRestrictionService:
     # then hard-fails at the boundary.
     ENV_VARS = {
         ProviderType.OPENAI: "OPENAI_ALLOWED_MODELS",
+        ProviderType.ANTHROPIC: "ANTHROPIC_ALLOWED_MODELS",
         ProviderType.GOOGLE: "GOOGLE_ALLOWED_MODELS",
         ProviderType.XAI: "XAI_ALLOWED_MODELS",
         ProviderType.OPENROUTER: "OPENROUTER_ALLOWED_MODELS",

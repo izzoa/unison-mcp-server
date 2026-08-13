@@ -292,6 +292,7 @@ Unison inherits the entire PAL feature set. Every row below is an addition or ha
 - **[Gemini](https://makersuite.google.com/app/apikey)** - Google's latest models
 - **[OpenAI](https://platform.openai.com/api-keys)** - O3, GPT-5 series
 - **[Azure OpenAI](https://learn.microsoft.com/azure/ai-services/openai/)** - Enterprise deployments of GPT-4o, GPT-4.1, GPT-5 family
+- **[Anthropic](https://console.anthropic.com/)** - Claude models (Fable, Opus, Sonnet, Haiku) with native extended thinking
 - **[X.AI](https://console.x.ai/)** - Grok models
 - **[DIAL](https://dialx.ai/)** - Vendor-agnostic model access
 - **[Ollama](https://ollama.ai/)** - Local models (free)

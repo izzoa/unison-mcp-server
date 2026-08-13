@@ -45,6 +45,7 @@ def configure_providers(registry=None):
 
     if registry is None:
         registry = get_default_registry()
+    from providers.anthropic import AnthropicModelProvider
     from providers.azure_openai import AzureOpenAIProvider
     from providers.custom import CustomProvider
     from providers.dial import DIALModelProvider
@@ -67,6 +68,7 @@ def configure_providers(registry=None):
         ProviderSpec("GEMINI_API_KEY", "Gemini", ProviderType.GOOGLE, GeminiModelProvider),
         ProviderSpec("OPENAI_API_KEY", "OpenAI", ProviderType.OPENAI, OpenAIModelProvider),
         ProviderSpec("XAI_API_KEY", "X.AI (GROK)", ProviderType.XAI, XAIModelProvider),
+        ProviderSpec("ANTHROPIC_API_KEY", "Anthropic", ProviderType.ANTHROPIC, AnthropicModelProvider),
         ProviderSpec("DIAL_API_KEY", "DIAL", ProviderType.DIAL, DIALModelProvider),
     ]
 
@@ -178,6 +180,7 @@ def configure_providers(registry=None):
             "At least one API configuration is required. Please set either:\n"
             "- GEMINI_API_KEY for Gemini models\n"
             "- OPENAI_API_KEY for OpenAI models\n"
+            "- ANTHROPIC_API_KEY for Anthropic Claude models\n"
             "- XAI_API_KEY for X.AI GROK models\n"
             "- DIAL_API_KEY for DIAL models\n"
             "- OPENROUTER_API_KEY for OpenRouter (multiple models)\n"

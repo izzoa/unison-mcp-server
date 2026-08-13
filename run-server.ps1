@@ -542,6 +542,7 @@ function Test-ApiKeys {
     $apiKeyNames = @(
         "GEMINI_API_KEY"
         "OPENAI_API_KEY"
+        "ANTHROPIC_API_KEY"
         "XAI_API_KEY"
         "OPENROUTER_API_KEY"
         "DIAL_API_KEY"
@@ -948,10 +949,10 @@ function Initialize-DockerEnvironment {
         
         $defaultEnv = @"
 # API keys — the server enables one provider per REAL value below. ONLY these
-# variables activate providers; placeholder values count as unset. (There is no
-# native Anthropic provider — Anthropic models are reachable via OpenRouter.)
+# variables activate providers; placeholder values count as unset.
 GEMINI_API_KEY=your_gemini_api_key_here
 OPENAI_API_KEY=your_openai_api_key_here
+ANTHROPIC_API_KEY=your_anthropic_api_key_here
 XAI_API_KEY=your_xai_api_key_here
 OPENROUTER_API_KEY=your_openrouter_api_key_here
 DIAL_API_KEY=your_dial_api_key_here
@@ -2358,10 +2359,10 @@ function Initialize-EnvFile {
         Write-Info "Creating default .env file..."
         @"
 # API keys — the server enables one provider per REAL value below. ONLY these
-# variables activate providers; placeholder values count as unset. (There is no
-# native Anthropic provider — Anthropic models are reachable via OpenRouter.)
+# variables activate providers; placeholder values count as unset.
 GEMINI_API_KEY=your_gemini_api_key_here
 OPENAI_API_KEY=your_openai_api_key_here
+ANTHROPIC_API_KEY=your_anthropic_api_key_here
 XAI_API_KEY=your_xai_api_key_here
 OPENROUTER_API_KEY=your_openrouter_api_key_here
 DIAL_API_KEY=your_dial_api_key_here

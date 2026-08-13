@@ -1,5 +1,6 @@
 mcp>=2,<3
 jsonschema>=4.20.0  # Input-schema validation in the call_tool adapter
+anthropic>=0.121,<1  # Native Anthropic provider (Messages API, extended thinking)
 google-genai>=1.19.0
 openai>=1.55.2  # Minimum version for httpx 0.28.0 compatibility
 pydantic>=2.0.0

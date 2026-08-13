@@ -7,6 +7,7 @@ requires-python = ">=3.10"
 dependencies = [
     "mcp>=2,<3",
     "jsonschema>=4.20.0",  # Input-schema validation in the call_tool adapter (was the 1.x SDK's job)
+    "anthropic>=0.121,<1",  # Native Anthropic provider (Messages API, extended thinking)  # Input-schema validation in the call_tool adapter (was the 1.x SDK's job)
     "google-genai>=1.19.0",
     "openai>=1.55.2",
     "pydantic>=2.0.0",
@@ -30,6 +31,7 @@ py-modules = ["server", "config"]
 
 [tool.setuptools.data-files]
 "conf" = [
+    "conf/anthropic_models.json",
     "conf/custom_models.json",
     "conf/openrouter_models.json",
     "conf/azure_models.json",
