@@ -947,19 +947,28 @@ function Initialize-DockerEnvironment {
         Write-Warning "No .env file found. Creating default .env file..."
         
         $defaultEnv = @"
-# API Keys - Replace with your actual keys
+# API keys — the server enables one provider per REAL value below. ONLY these
+# variables activate providers; placeholder values count as unset. (There is no
+# native Anthropic provider — Anthropic models are reachable via OpenRouter.)
 GEMINI_API_KEY=your_gemini_api_key_here
-GOOGLE_API_KEY=your_google_api_key_here
 OPENAI_API_KEY=your_openai_api_key_here
-ANTHROPIC_API_KEY=your_anthropic_api_key_here
 XAI_API_KEY=your_xai_api_key_here
-DIAL_API_KEY=your_dial_api_key_here
-DIAL_API_HOST=your_dial_api_host_here
-DIAL_API_VERSION=your_dial_api_version_here
 OPENROUTER_API_KEY=your_openrouter_api_key_here
-CUSTOM_API_URL=your_custom_api_url_here
-CUSTOM_API_KEY=your_custom_api_key_here
-CUSTOM_MODEL_NAME=your_custom_model_name_here
+DIAL_API_KEY=your_dial_api_key_here
+
+# Azure OpenAI (both required together)
+#AZURE_OPENAI_API_KEY=
+#AZURE_OPENAI_ENDPOINT=
+
+# Local/self-hosted OpenAI-compatible endpoint (Ollama, vLLM, LM Studio, ...).
+# A real URL alone is enough; leave CUSTOM_API_KEY empty for keyless servers.
+#CUSTOM_API_URL=http://localhost:11434/v1
+#CUSTOM_API_KEY=
+#CUSTOM_MODEL_NAME=llama3.2
+
+# DIAL extras (only meaningful alongside a real DIAL_API_KEY)
+#DIAL_API_HOST=
+#DIAL_API_VERSION=
 
 # Server Configuration
 DEFAULT_MODEL=auto
@@ -2316,19 +2325,28 @@ function Initialize-EnvFile {
     if (!(Test-Path ".env")) {
         Write-Info "Creating default .env file..."
         @"
-# API Keys - Replace with your actual keys
+# API keys — the server enables one provider per REAL value below. ONLY these
+# variables activate providers; placeholder values count as unset. (There is no
+# native Anthropic provider — Anthropic models are reachable via OpenRouter.)
 GEMINI_API_KEY=your_gemini_api_key_here
-GOOGLE_API_KEY=your_google_api_key_here
 OPENAI_API_KEY=your_openai_api_key_here
-ANTHROPIC_API_KEY=your_anthropic_api_key_here
 XAI_API_KEY=your_xai_api_key_here
-DIAL_API_KEY=your_dial_api_key_here
-DIAL_API_HOST=your_dial_api_host_here
-DIAL_API_VERSION=your_dial_api_version_here
 OPENROUTER_API_KEY=your_openrouter_api_key_here
-CUSTOM_API_URL=your_custom_api_url_here
-CUSTOM_API_KEY=your_custom_api_key_here
-CUSTOM_MODEL_NAME=your_custom_model_name_here
+DIAL_API_KEY=your_dial_api_key_here
+
+# Azure OpenAI (both required together)
+#AZURE_OPENAI_API_KEY=
+#AZURE_OPENAI_ENDPOINT=
+
+# Local/self-hosted OpenAI-compatible endpoint (Ollama, vLLM, LM Studio, ...).
+# A real URL alone is enough; leave CUSTOM_API_KEY empty for keyless servers.
+#CUSTOM_API_URL=http://localhost:11434/v1
+#CUSTOM_API_KEY=
+#CUSTOM_MODEL_NAME=llama3.2
+
+# DIAL extras (only meaningful alongside a real DIAL_API_KEY)
+#DIAL_API_HOST=
+#DIAL_API_VERSION=
 
 # Server Configuration
 DEFAULT_MODEL=auto
