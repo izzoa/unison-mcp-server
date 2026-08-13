@@ -138,10 +138,13 @@ def init_observability() -> None:
     except Exception:
         logger.exception("Failed to configure OTel exporter '%s'; spans will not be exported", exporter)
 
-    otel_trace.set_tracer_provider(tracer_provider)
-    otel_metrics.set_meter_provider(meter_provider)
-    _tracer = otel_trace.get_tracer("unison")
-    _meter = otel_metrics.get_meter("unison")
+    # opentelemetry-api exports these lazily (module __getattr__), so they are
+    # real at runtime but invisible to mypy's static view of the typed package
+    # (which is now always installed — mcp 2.x depends on opentelemetry-api).
+    otel_trace.set_tracer_provider(tracer_provider)  # type: ignore[attr-defined]
+    otel_metrics.set_meter_provider(meter_provider)  # type: ignore[attr-defined]
+    _tracer = otel_trace.get_tracer("unison")  # type: ignore[attr-defined]
+    _meter = otel_metrics.get_meter("unison")  # type: ignore[attr-defined]
     logger.info("Observability initialized (exporter=%s, sample_rate=%s)", exporter, sample_rate)
 
 

@@ -251,7 +251,7 @@ if (!$SkipLinting) {
 
     $mypyAvailable = (Test-Path $mypyCmd) -or (Get-Command $mypyCmd -ErrorAction SilentlyContinue)
     if (!$mypyAvailable) {
-        Write-Emoji "⚠️" "mypy not found - skipping type checks (install via: pip install -r requirements-dev.txt)" -Color Yellow
+        Write-Emoji "⚠️" "mypy not found - skipping type checks (install via: pip install -r requirements-dev.lock.txt)" -Color Yellow
     } else {
         $mypyFiles = @(
             "utils/circuit_breaker.py", "utils/fs_snapshot.py", "utils/tool_execution_context.py", "utils/token_utils.py",

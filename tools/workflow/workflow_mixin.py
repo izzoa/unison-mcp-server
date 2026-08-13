@@ -1580,11 +1580,18 @@ class BaseWorkflowMixin(ABC):
     def _get_progress_token(self):
         """Return the progress token from the current MCP request, or ``None``."""
         try:
-            from server import server
+            from utils.mcp_context import get_current_request_context
 
-            ctx = server.request_context
-            if ctx.meta and ctx.meta.progressToken is not None:
-                return ctx.meta.progressToken
+            ctx = get_current_request_context()
+            if ctx is None:
+                return None
+            meta = getattr(ctx, "meta", None)
+            if not meta:
+                return None
+            # mcp 2.x carries request meta as a plain dict with snake_case keys
+            if isinstance(meta, dict):
+                return meta.get("progress_token", meta.get("progressToken"))
+            return getattr(meta, "progress_token", None)
         except Exception:
             pass
         return None

@@ -39,7 +39,6 @@ else:
 # ---------------------------------------------------------------------------
 # Server & registry setup
 # ---------------------------------------------------------------------------
-server: Server = Server("unison-server")
 tool_registry = ToolRegistry()
 # Load dynamic tool sources (entry-point plugins, opt-in local scan, pending
 # @register_tool decorations) before handlers are wired, then the registry is
@@ -53,9 +52,25 @@ from utils.observability import init_observability  # noqa: E402
 
 init_observability()
 
-# Wire handler modules onto the server and capture handler references
-handle_list_tools, handle_call_tool = tool_handlers.register(server, tool_registry)
-prompt_handlers.register(server, tool_registry)
+# Build handlers first, then construct the server from them: mcp 2.x replaces
+# decorator registration with constructor callbacks, so the handler modules
+# supply the callables the Server is created with (server.py stays wiring-only).
+_tool_handlers = tool_handlers.build_handlers(tool_registry)
+_on_list_prompts, _on_get_prompt = prompt_handlers.build_handlers(tool_registry)
+
+server: Server = Server(
+    "unison-server",
+    on_list_tools=_tool_handlers.on_list_tools,
+    on_call_tool=_tool_handlers.on_call_tool,
+    on_list_prompts=_on_list_prompts,
+    on_get_prompt=_on_get_prompt,
+)
+
+# Legacy-shaped handler references (1.x signatures) plus the call adapter,
+# re-exported for tests and callers.
+handle_list_tools = _tool_handlers.handle_list_tools
+handle_call_tool = _tool_handlers.handle_call_tool
+on_call_tool = _tool_handlers.on_call_tool
 
 
 # ---------------------------------------------------------------------------

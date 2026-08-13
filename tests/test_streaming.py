@@ -168,6 +168,36 @@ class TestStreamProgressNotifier:
         mock_session.send_progress_notification.assert_called()
 
     @pytest.mark.asyncio
+    async def test_notifier_uses_contextvar_bound_context(self):
+        """The 2.x path: no server needed — the adapters bind the request context."""
+        from utils.mcp_context import reset_current_request_context, set_current_request_context
+        from utils.streaming import StreamProgressNotifier
+
+        mock_session = AsyncMock()
+        ctx = MagicMock()
+        ctx.session = mock_session
+        token = set_current_request_context(ctx)
+        try:
+            notifier = StreamProgressNotifier(server=None, progress_token="tok-cv", min_chunk_size=1)
+            await notifier.notify_chunk(StreamChunk(text="Hello", is_final=False))
+        finally:
+            reset_current_request_context(token)
+        mock_session.send_progress_notification.assert_called()
+
+    def test_workflow_progress_token_from_context_meta_dict(self):
+        """_get_progress_token reads the 2.x snake_case meta dict via the ContextVar."""
+        from types import SimpleNamespace
+
+        from tools.workflow.workflow_mixin import BaseWorkflowMixin
+        from utils.mcp_context import reset_current_request_context, set_current_request_context
+
+        token = set_current_request_context(SimpleNamespace(meta={"progress_token": "tok-99"}))
+        try:
+            assert BaseWorkflowMixin._get_progress_token(None) == "tok-99"
+        finally:
+            reset_current_request_context(token)
+
+    @pytest.mark.asyncio
     async def test_final_chunk_sends_notification(self):
         from utils.streaming import StreamProgressNotifier
 

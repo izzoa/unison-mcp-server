@@ -5,7 +5,8 @@ description = "AI-powered MCP server with multiple model providers"
 license = "AGPL-3.0"
 requires-python = ">=3.10"
 dependencies = [
-    "mcp>=1.0.0,<2",
+    "mcp>=2,<3",
+    "jsonschema>=4.20.0",  # Input-schema validation in the call_tool adapter (was the 1.x SDK's job)
     "google-genai>=1.19.0",
     "openai>=1.55.2",
     "pydantic>=2.0.0",
@@ -239,6 +240,7 @@ module = [
     "clink.parsers.copilot",
     "utils.observability",
     "utils.json_log_formatter",
+    "utils.mcp_context",
     "build_mockups",
 ]
 follow_imports = "normal"

@@ -130,7 +130,11 @@ class TestNoopObservability:
         obs.init_observability()
         assert isinstance(obs.get_tracer(), obs._NoopTracer)
         assert isinstance(obs.get_meter(), obs._NoopMeter)
-        assert not any(m.startswith("opentelemetry") for m in sys.modules)
+        # mcp 2.x hard-depends on opentelemetry-api, so the api package may be
+        # imported by the SDK regardless of our flag. The invariant that
+        # remains ours: the optional OTel SDK (the [observability] extra) is
+        # never imported while observability is disabled.
+        assert not any(m.startswith("opentelemetry.sdk") for m in sys.modules)
 
     def test_enabled_without_packages_degrades_with_warning(self, monkeypatch, caplog):
         monkeypatch.setenv("UNISON_OTEL_ENABLED", "true")

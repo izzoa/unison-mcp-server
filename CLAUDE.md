@@ -10,7 +10,7 @@ Before making any changes or submitting PRs, always run the comprehensive qualit
 
 ```bash
 # Activate virtual environment first
-source venv/bin/activate
+source .unison_venv/bin/activate
 
 # Run all quality checks (linting, formatting, tests)
 ./code_quality_checks.sh
@@ -359,8 +359,8 @@ mypy utils/circuit_breaker.py
 
 ### Environment Requirements
 
-- Python 3.9+ with virtual environment
-- All dependencies from `requirements.txt` installed
+- Python 3.10+ with virtual environment
+- All dependencies from `requirements.lock.txt` installed (the committed lock; ranges live in `pyproject.toml`)
 - Proper API keys configured in `.env` file
 
 This guide provides everything needed to efficiently work with the Unison MCP Server codebase using Claude. Always run quality checks before and after making changes to ensure code integrity.

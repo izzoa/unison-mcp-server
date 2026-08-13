@@ -97,7 +97,7 @@ if [[ -f ".unison_venv/bin/mypy" ]]; then
 elif command -v mypy &> /dev/null; then
     MYPY="mypy"
 else
-    echo "⚠️  mypy not found — skipping type checks (install via: pip install -r requirements-dev.txt)"
+    echo "⚠️  mypy not found — skipping type checks (install via: pip install -r requirements-dev.lock.txt)"
     MYPY=""
 fi
 
@@ -116,7 +116,7 @@ if [[ -n "$MYPY" ]]; then
         clink/agents/crush.py clink/parsers/crush.py \
         clink/agents/amp.py clink/parsers/amp.py \
         clink/agents/copilot.py clink/parsers/copilot.py \
-        utils/observability.py utils/json_log_formatter.py
+        utils/observability.py utils/json_log_formatter.py utils/mcp_context.py
     echo "✅ Step 1b Complete: Type checking passed!"
 fi
 echo ""

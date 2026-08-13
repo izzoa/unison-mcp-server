@@ -1,19 +1,23 @@
 """
 MCP tool handler implementations for the Unison MCP Server.
 
-Contains the list_tools and call_tool handler logic, wired onto the
-MCP server instance via the register() function.
+Contains the list_tools and call_tool handler logic. build_handlers()
+assembles legacy-shaped impls (the 1.x handler signatures, re-exported by
+server.py for tests and callers) plus the on_* adapters that server.py
+passes to the mcp 2.x Server constructor.
 """
 
 import logging
-from typing import Any
+from typing import Any, NamedTuple
 
-from mcp.types import TextContent, Tool, ToolAnnotations
+import jsonschema
+from mcp.types import CallToolResult, ListToolsResult, TextContent, Tool, ToolAnnotations
 
 from config import DEFAULT_MODEL
 from tools.models import ToolOutput
 from tools.shared.exceptions import ToolExecutionError
 from utils.env import get_env
+from utils.mcp_context import reset_current_request_context, set_current_request_context
 from utils.model_resolution import parse_model_option
 from utils.observability import tool_span
 from utils.request_helpers import get_follow_up_instructions
@@ -35,19 +39,31 @@ def _sanitize_for_log(value: Any, max_len: int = 128) -> str:
     return text
 
 
-def register(server, tool_registry):
+class ToolHandlers(NamedTuple):
+    """Handler bundle: legacy-shaped impls plus mcp 2.x constructor adapters."""
+
+    handle_list_tools: Any  # () -> list[Tool]
+    handle_call_tool: Any  # (name, arguments) -> list[TextContent]
+    on_list_tools: Any  # 2.x adapter: (ctx, params) -> ListToolsResult
+    on_call_tool: Any  # 2.x adapter: (ctx, params) -> CallToolResult
+
+
+def build_handlers(tool_registry):
     """
-    Register list_tools and call_tool handlers on the MCP server.
+    Build list_tools and call_tool handlers for the mcp 2.x server.
+
+    The legacy-shaped impls keep the 1.x handler signatures; the on_* adapters
+    wrap them with the behavior the 1.x SDK decorators used to provide —
+    request-context binding, input-schema validation, result wrapping, and
+    exception→isError conversion — and are what the Server is constructed with.
 
     Args:
-        server: The MCP Server instance.
         tool_registry: A ToolRegistry providing tool lookup and schemas.
 
     Returns:
-        Tuple of (handle_list_tools, handle_call_tool) for backward compatibility.
+        ToolHandlers namedtuple.
     """
 
-    @server.list_tools()
     async def handle_list_tools() -> list[Tool]:
         """List all available tools with their descriptions and input schemas."""
         logger.debug("MCP client requested tool list")
@@ -56,7 +72,7 @@ def register(server, tool_registry):
         try:
             from utils.client_info import format_client_info, get_client_info_from_context
 
-            client_info = get_client_info_from_context(server)
+            client_info = get_client_info_from_context()
             if client_info:
                 formatted = format_client_info(client_info)
                 logger.info("MCP Client Connected: %s", formatted)
@@ -287,7 +303,6 @@ def register(server, tool_registry):
         else:
             return [TextContent(type="text", text=f"Unknown tool: {name}")]
 
-    @server.call_tool()
     async def handle_call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
         """MCP entry point: one parent observability span wraps the full tool lifecycle.
 
@@ -299,7 +314,77 @@ def register(server, tool_registry):
         with tool_span(name, arguments):
             return await _handle_call_tool_inner(name, arguments)
 
-    return handle_list_tools, handle_call_tool
+    # ------------------------------------------------------------------
+    # mcp 2.x adapters — replicate what the 1.x SDK decorators provided
+    # ------------------------------------------------------------------
+    _tool_cache: dict[str, Tool] = {}
+
+    def _error_result(message: str) -> CallToolResult:
+        return CallToolResult(content=[TextContent(type="text", text=message)], is_error=True)
+
+    async def _refresh_tool_cache() -> None:
+        tools = await handle_list_tools()
+        _tool_cache.clear()
+        for tool in tools:
+            _tool_cache[tool.name] = tool
+
+    async def _get_cached_tool_definition(tool_name: str) -> Tool | None:
+        # Mirrors the 1.x SDK: a cache miss triggers a list_tools refresh, and
+        # an unlisted tool skips validation (the impl produces its own
+        # "Unknown tool" response) rather than erroring here.
+        if tool_name not in _tool_cache:
+            await _refresh_tool_cache()
+        tool = _tool_cache.get(tool_name)
+        if tool is None:
+            logger.warning("Tool '%s' not listed, no validation will be performed", tool_name)
+        return tool
+
+    async def on_list_tools(ctx, params) -> ListToolsResult:
+        token = set_current_request_context(ctx)
+        try:
+            tools = await handle_list_tools()
+        finally:
+            reset_current_request_context(token)
+        _tool_cache.clear()
+        for tool in tools:
+            _tool_cache[tool.name] = tool
+        return ListToolsResult(tools=tools)
+
+    async def on_call_tool(ctx, params) -> CallToolResult:
+        token = set_current_request_context(ctx)
+        try:
+            name = params.name
+            arguments = params.arguments or {}
+
+            # Input-schema validation, exactly as the 1.x decorator did it
+            # (same jsonschema mechanism and error text).
+            tool = await _get_cached_tool_definition(name)
+            if tool is not None:
+                try:
+                    jsonschema.validate(instance=arguments, schema=tool.input_schema)
+                except jsonschema.ValidationError as e:
+                    return _error_result(f"Input validation error: {e.message}")
+
+            results = await handle_call_tool(name, arguments)
+
+            # Our tools return list[TextContent]; pass a full CallToolResult
+            # through untouched if one ever appears.
+            if isinstance(results, CallToolResult):
+                return results
+            return CallToolResult(content=list(results), is_error=False)
+        except Exception as e:
+            # 1.x converted handler exceptions to an error result of str(e);
+            # ToolExecutionError payloads round-trip through this unchanged.
+            return _error_result(str(e))
+        finally:
+            reset_current_request_context(token)
+
+    return ToolHandlers(
+        handle_list_tools=handle_list_tools,
+        handle_call_tool=handle_call_tool,
+        on_list_tools=on_list_tools,
+        on_call_tool=on_call_tool,
+    )
 
 
 async def reconstruct_thread_context(arguments: dict[str, Any], tool_registry: Any) -> dict[str, Any]:

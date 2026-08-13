@@ -130,4 +130,4 @@ jobs:
             clink/agents/crush.py clink/parsers/crush.py \
             clink/agents/amp.py clink/parsers/amp.py \
             clink/agents/copilot.py clink/parsers/copilot.py \
-            utils/observability.py utils/json_log_formatter.py
+            utils/observability.py utils/json_log_formatter.py utils/mcp_context.py

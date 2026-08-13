@@ -277,6 +277,7 @@ Unison inherits the entire PAL feature set. Every row below is an addition or ha
 | **Catalog freshness** | Manual JSON updates only | **Weekly CI workflow** fetches the latest LiteLLM catalog and opens a PR for human review |
 | **Conversation persistence** | In-memory only — lost on restart | Optional **SQLite backend** (`STORAGE_BACKEND=sqlite`), zero-config |
 | **Provider failure handling** | Wait through the full retry cycle on every call | **Per-provider circuit breaker** — fails fast after N consecutive failures, auto-probes recovery; consensus skips dead providers and synthesizes from the rest |
+| **Install reproducibility & SDK currency** | Open version ranges resolved at install time | **Locked installs** — `uv.lock` plus committed pip exports consumed by the setup scripts, CI, and Docker, with a CI drift check (the wheel smoke test deliberately still canaries open ranges); runs on the **mcp 2.x SDK** with wire-level equivalence to the 1.x behavior verified against captured fixtures |
 
 > All core tools, providers, workflows, and conversation continuity features from PAL are fully preserved. See [docs/name-change.md](docs/name-change.md) for migration notes.
 >
