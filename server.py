@@ -140,20 +140,27 @@ async def main():
             f"When no model is mentioned, default to '{DEFAULT_MODEL}'."
         )
 
-    async with stdio_server() as (read_stream, write_stream):
-        await server.run(
-            read_stream,
-            write_stream,
-            InitializationOptions(
-                server_name="Unison",
-                server_version=__version__,
-                instructions=handshake_instructions,
-                capabilities=ServerCapabilities(
-                    tools=ToolsCapability(),
-                    prompts=PromptsCapability(),
+    try:
+        async with stdio_server() as (read_stream, write_stream):
+            await server.run(
+                read_stream,
+                write_stream,
+                InitializationOptions(
+                    server_name="Unison",
+                    server_version=__version__,
+                    instructions=handshake_instructions,
+                    capabilities=ServerCapabilities(
+                        tools=ToolsCapability(),
+                        prompts=PromptsCapability(),
+                    ),
                 ),
-            ),
-        )
+            )
+    finally:
+        # Deterministically cancel background clink jobs so their CLI process
+        # trees are reaped before the loop tears down.
+        from tools.clink_jobs import shutdown_clink_jobs
+
+        await shutdown_clink_jobs()
 
 
 def _resolve_pathological_cwd(cwd: Path | None = None) -> Path | None:

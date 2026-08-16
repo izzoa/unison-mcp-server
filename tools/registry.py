@@ -68,6 +68,9 @@ def register_tool(name: str) -> Callable[[type[Any]], type[Any]]:
 TOOL_DEFINITIONS: dict[str, tuple[str, str, str]] = {
     "chat": ("tools.chat", "ChatTool", "Interactive development chat and brainstorming"),
     "clink": ("tools.clink", "CLinkTool", "Bridge requests to configured AI CLIs"),
+    "clink_start": ("tools.clink_jobs", "ClinkStartTool", "Start a clink CLI run as a background job"),
+    "clink_poll": ("tools.clink_jobs", "ClinkPollTool", "Poll a clink background job until it completes"),
+    "clink_cancel": ("tools.clink_jobs", "ClinkCancelTool", "Cancel a clink background job"),
     "thinkdeep": ("tools.thinkdeep", "ThinkDeepTool", "Step-by-step deep thinking workflow with expert analysis"),
     "planner": ("tools.planner", "PlannerTool", "Interactive sequential planner using workflow architecture"),
     "consensus": ("tools.consensus", "ConsensusTool", "Step-by-step consensus workflow with multi-model analysis"),

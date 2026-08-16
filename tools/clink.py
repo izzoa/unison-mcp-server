@@ -156,7 +156,16 @@ class CLinkTool(SimpleTool):
         # _resolve_client() and the matching rule in get_input_schema().
         self._default_cli_name = self._cli_names[0] if len(self._cli_names) == 1 else None
         self._active_system_prompt: str = ""
+        # Background jobs (tools/clink_jobs.py) run execute() on a private
+        # instance after the originating MCP request has already returned;
+        # sending progress against that completed request would violate the
+        # spec, so job runners disable the heartbeat per instance.
+        self._progress_heartbeat_enabled = True
         super().__init__()
+
+    def disable_progress_heartbeat(self) -> None:
+        """Suppress MCP progress notifications for this instance (job mode)."""
+        self._progress_heartbeat_enabled = False
 
     def _resolve_client(self, cli_name: str | None) -> ResolvedCLIClient:
         """Resolve the effective CLI client for a request.
@@ -389,7 +398,10 @@ class CLinkTool(SimpleTool):
             # Bulk dirs (.git, node_modules, ...) are pruned and the walk is
             # time-budgeted so verification can never starve the CLI call
             # itself of the host's tool-timeout budget.
-            pre_snapshot = capture_snapshot(
+            # Off the event loop: a budgeted walk can still take tens of
+            # seconds, and background jobs must not stall poll responses.
+            pre_snapshot = await asyncio.to_thread(
+                capture_snapshot,
                 snapshot_dir,
                 include_ignored=True,
                 time_budget_seconds=snapshot_budget,
@@ -431,7 +443,8 @@ class CLinkTool(SimpleTool):
         # Post-execution read-only verification
         if read_only and pre_snapshot is not None:
             post_stats = SnapshotStats()
-            post_snapshot = capture_snapshot(
+            post_snapshot = await asyncio.to_thread(
+                capture_snapshot,
                 snapshot_dir,
                 include_ignored=True,
                 time_budget_seconds=snapshot_budget,
@@ -713,6 +726,8 @@ class CLinkTool(SimpleTool):
         alive; the rest at least surface liveness to the user. A heartbeat
         failure must never break the CLI call itself.
         """
+        if not self._progress_heartbeat_enabled:
+            return
         ctx = get_current_request_context()
         session = getattr(ctx, "session", None)
         report = getattr(session, "report_progress", None)
