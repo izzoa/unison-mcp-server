@@ -84,7 +84,7 @@ Continue with clink gemini - implement the recommended feature
 
 The `clink` tool takes five parameters that matter day-to-day: `cli_name`, `role`, `model`, `read_only`, and `working_dir`. Everything else (file attachments, continuation IDs) works the same as any other Unison tool.
 
-For runs that may outlast your MCP host's tool timeout (Claude Desktop's local-agent mode cancels calls around a minute; a serious CLI review needs several), use the companion **job API**: `clink_start` takes the same arguments and returns a `job_id` in about a second, `clink_poll` long-polls until the full result is ready, and `clink_cancel` kills the CLI's process tree — no single MCP request ever outlives the host's patience. See [docs/tools/clink.md](docs/tools/clink.md) for the contract.
+Long runs can't be killed by your MCP host's tool timeout: every `clink` call waits a bounded ~45s, and a CLI that needs longer returns `status: "running"` with a `job_id` — call `clink` again with just that `job_id` to keep waiting (or `cancel: true` to abort), and the full result arrives the moment the CLI finishes. Fast runs are byte-identical to a normal blocking call. See [docs/tools/clink.md](docs/tools/clink.md) for the contract.
 
 ### Basic invocation
 

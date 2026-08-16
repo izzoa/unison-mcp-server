@@ -11,9 +11,9 @@ from tools.registry import ESSENTIAL_TOOLS, TOOL_DEFINITIONS, ToolRegistry
 class TestToolRegistryDefinitions:
     """Tests for registry tool definitions."""
 
-    def test_all_21_tools_defined(self):
-        """Registry contains definitions for all 21 tools (18 + the clink job API trio)."""
-        assert len(TOOL_DEFINITIONS) == 21
+    def test_all_18_tools_defined(self):
+        """Registry contains definitions for all 18 tools (job control lives on clink itself)."""
+        assert len(TOOL_DEFINITIONS) == 18
 
     def test_definition_format(self):
         """Each definition is a (module_path, class_name, description) tuple."""

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import json
 import logging
 import os
 import re
@@ -20,6 +21,7 @@ from clink.agents import AgentOutput, CLIAgentError, create_agent
 from clink.constants import CLINK_DEPTH_ENV_VAR, CLINK_MAX_DEPTH_ENV_VAR, DEFAULT_CLINK_MAX_DEPTH
 from clink.models import ResolvedCLIClient, ResolvedCLIRole
 from config import TEMPERATURE_BALANCED
+from tools.clink_jobs import ClinkJob, get_clink_job_manager
 from tools.models import ToolModelCategory, ToolOutput
 from tools.shared.base_models import COMMON_FIELD_DESCRIPTIONS
 from tools.shared.exceptions import ToolExecutionError
@@ -27,6 +29,10 @@ from tools.simple.base import SchemaBuilder, SimpleTool
 from utils.env import get_env
 from utils.fs_snapshot import SnapshotStats, capture_snapshot, classify_changes, diff_snapshots
 from utils.mcp_context import get_current_request_context
+
+#: clink arguments that steer job control rather than the CLI run itself;
+#: stripped before arguments reach the blocking execution path.
+_JOB_CONTROL_KEYS = frozenset({"job_id", "cancel", "wait_seconds", "idempotency_key"})
 
 # Wall-clock ceiling for each read-only verification snapshot. Observed live:
 # an unbounded walk of a large OneDrive-synced repo took 60-90s per snapshot
@@ -80,7 +86,33 @@ def _check_recursion_guard() -> None:
 class CLinkRequest(BaseModel):
     """Request model for clink tool."""
 
-    prompt: str = Field(..., description="Prompt forwarded to the target CLI.")
+    prompt: str | None = Field(
+        default=None,
+        description="Prompt forwarded to the target CLI. Required when starting a run; omit with job_id.",
+    )
+    job_id: str | None = Field(
+        default=None,
+        description=(
+            "Continue a previous clink call that returned status='running'. Pass ONLY the job_id "
+            "(optionally with wait_seconds or cancel); the call waits for the running CLI and "
+            "returns its full result when finished."
+        ),
+    )
+    cancel: bool = Field(
+        default=False,
+        description="With job_id: cancel the running job and kill the CLI's process tree.",
+    )
+    wait_seconds: int | None = Field(
+        default=None,
+        description="How long this call may wait before returning a still-running job payload (0-50, default 45).",
+    )
+    idempotency_key: str | None = Field(
+        default=None,
+        description=(
+            "Optional client-chosen key. Retrying a start call with the same key while the original "
+            "run is still going returns the existing job instead of launching duplicate paid CLI work."
+        ),
+    )
     cli_name: str | None = Field(
         default=None,
         description=(
@@ -204,7 +236,10 @@ class CLinkTool(SimpleTool):
         # list goes stale (this previously advertised Qwen, never a target).
         return (
             "Link a request to an external AI CLI through Unison MCP to reuse their capabilities "
-            "inside existing workflows. See the 'cli_name' enum for the configured targets."
+            "inside existing workflows. See the 'cli_name' enum for the configured targets. "
+            "Long runs never time out: each call waits a bounded time and returns status='running' "
+            "with a job_id when the CLI needs longer — call clink again with just that job_id to "
+            "keep waiting (cancel=true aborts). Never report the task done before a final result."
         )
 
     def get_annotations(self) -> dict[str, Any]:
@@ -253,7 +288,34 @@ class CLinkTool(SimpleTool):
         properties = {
             "prompt": {
                 "type": "string",
-                "description": "User request forwarded to the CLI (conversation context is pre-applied).",
+                "description": (
+                    "User request forwarded to the CLI (conversation context is pre-applied). "
+                    "Required when starting a run; omit when continuing with job_id."
+                ),
+            },
+            "job_id": {
+                "type": "string",
+                "description": (
+                    "Continue a previous clink call that returned status='running'. Pass ONLY the "
+                    "job_id (optionally wait_seconds or cancel); returns the full result when the "
+                    "CLI finishes, or another running payload to keep polling."
+                ),
+            },
+            "cancel": {
+                "type": "boolean",
+                "default": False,
+                "description": "With job_id: cancel the running job and kill the CLI's process tree.",
+            },
+            "wait_seconds": {
+                "type": "integer",
+                "description": "How long this call may wait before returning a still-running job payload (0-50, default 45).",
+            },
+            "idempotency_key": {
+                "type": "string",
+                "description": (
+                    "Optional client-chosen key: retrying a start with the same key while the original "
+                    "run is still going returns the existing job instead of duplicate paid CLI work."
+                ),
             },
             "cli_name": {
                 "type": "string",
@@ -297,15 +359,15 @@ class CLinkTool(SimpleTool):
             },
         }
 
+        # No schema-level required fields: a job continuation passes only
+        # job_id, while a start needs prompt (and cli_name when several CLIs
+        # are configured) — both enforced at runtime with actionable errors.
         schema = {
             "type": "object",
             "properties": properties,
-            "required": ["prompt"],
+            "required": [],
             "additionalProperties": False,
         }
-
-        if len(self._cli_names) > 1:
-            schema["required"].append("cli_name")
 
         return schema
 
@@ -313,7 +375,123 @@ class CLinkTool(SimpleTool):
         """Unused by clink because we override the schema end-to-end."""
         return {}
 
+    #: Bounds for how long a single clink call may wait before returning a
+    #: still-running job payload. Kept under every known MCP host tool
+    #: deadline (Claude Desktop's local-agent mode cancels around a minute).
+    _DEFAULT_JOB_WAIT_SECONDS = 45.0
+    _MAX_JOB_WAIT_SECONDS = 50.0
+
     async def execute(self, arguments: dict[str, Any]) -> list[TextContent]:
+        """Dispatcher: start a run (bounded wait) or continue/cancel a job.
+
+        Every call returns within the wait budget. Runs finishing inside it
+        return exactly what a blocking call would have returned; longer runs
+        return a job payload whose job_id continues the wait on the next call.
+        ``CLINK_EXECUTION_MODE=blocking`` restores the pure blocking behavior.
+        """
+        job_id = str(arguments.get("job_id") or "").strip()
+        if job_id:
+            return await self._continue_job(job_id, arguments)
+
+        if not str(arguments.get("prompt") or "").strip():
+            self._raise_tool_error(
+                "prompt is required to start a clink run (or pass job_id to continue a previous one)."
+            )
+
+        mode = (get_env("CLINK_EXECUTION_MODE") or "hybrid").strip().lower()
+        if mode == "blocking":
+            return await self._execute_blocking(arguments)
+
+        run_args = {k: v for k, v in arguments.items() if k not in _JOB_CONTROL_KEYS}
+        manager = get_clink_job_manager()
+        job = manager.start(run_args, idempotency_key=arguments.get("idempotency_key"))
+        await self._wait_for_job(job, self._wait_budget(arguments))
+        return self._job_response(job)
+
+    async def _continue_job(self, job_id: str, arguments: dict[str, Any]) -> list[TextContent]:
+        manager = get_clink_job_manager()
+        if arguments.get("cancel"):
+            job = manager.cancel(job_id)
+            if job is None:
+                self._raise_tool_error(
+                    f"Unknown clink job '{job_id}'. It may have expired or the MCP server restarted "
+                    "(jobs are in-memory)."
+                )
+            await self._wait_for_job(job, 2.0)
+            return self._job_response(job)
+
+        job = manager.get(job_id)
+        if job is None:
+            self._raise_tool_error(
+                f"Unknown clink job '{job_id}'. It may have expired (results are retained ~30 min) "
+                "or the MCP server restarted (jobs are in-memory). Start a new clink run."
+            )
+        await self._wait_for_job(job, self._wait_budget(arguments))
+        return self._job_response(job)
+
+    def _wait_budget(self, arguments: dict[str, Any]) -> float:
+        raw = arguments.get("wait_seconds")
+        if raw is None:
+            return self._DEFAULT_JOB_WAIT_SECONDS
+        try:
+            return max(0.0, min(float(raw), self._MAX_JOB_WAIT_SECONDS))
+        except (TypeError, ValueError):
+            return self._DEFAULT_JOB_WAIT_SECONDS
+
+    async def _wait_for_job(self, job: ClinkJob, budget_seconds: float) -> None:
+        """Wait on the job's done-event, emitting progress heartbeats.
+
+        Waiting is independent of the job task: cancelling this request never
+        cancels the job. Heartbeats come from THIS foreground request (whose
+        progress token is live), not from the background runner.
+        """
+        deadline = time.monotonic() + budget_seconds
+        sequence = 0
+        while not job.done_event.is_set():
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return
+            interval = min(self._PROGRESS_HEARTBEAT_INTERVAL_SECONDS, remaining)
+            try:
+                await asyncio.wait_for(job.done_event.wait(), timeout=interval)
+                return
+            except asyncio.TimeoutError:
+                sequence += 1
+                await self._emit_progress(
+                    float(sequence),
+                    f"clink: {job.cli_name} still running ({int(job.elapsed_seconds())}s elapsed)",
+                )
+
+    def _job_response(self, job: ClinkJob) -> list[TextContent]:
+        if job.state == "completed" and job.result_json:
+            # Transparent: exactly what the blocking call would have returned,
+            # continuation offer and metadata included.
+            return [TextContent(type="text", text=job.result_json)]
+        if job.state == "failed" and job.error_json:
+            raise ToolExecutionError(job.error_json)
+
+        payload: dict[str, Any] = {
+            "status": job.state,
+            "job_id": job.job_id,
+            "cli_name": job.cli_name,
+            "elapsed_seconds": round(job.elapsed_seconds(), 1),
+        }
+        if job.state == "running":
+            payload["instructions"] = (
+                "The CLI is still working. Call clink again with ONLY job_id="
+                f"'{job.job_id}' to continue waiting (each call waits up to "
+                f"{int(self._DEFAULT_JOB_WAIT_SECONDS)}s; pass cancel=true to abort). "
+                "Do not report the task as done before receiving the final result."
+            )
+        output = ToolOutput(
+            status="success",
+            content=json.dumps(payload, indent=2),
+            content_type="json",
+            metadata={"tool_name": self.get_name()},
+        )
+        return [TextContent(type="text", text=output.model_dump_json())]
+
+    async def _execute_blocking(self, arguments: dict[str, Any]) -> list[TextContent]:
         # Recursion guard: if we're already running inside a clink-spawned CLI
         # that itself wired Unison as an MCP server, refuse to spawn another
         # CLI rather than enter a context-window-exploding loop. See
@@ -728,24 +906,29 @@ class CLinkTool(SimpleTool):
         """
         if not self._progress_heartbeat_enabled:
             return
-        ctx = get_current_request_context()
-        session = getattr(ctx, "session", None)
-        report = getattr(session, "report_progress", None)
-        if report is None:
-            return
         started = time.monotonic()
         sequence = 0
         while True:
             await asyncio.sleep(self._PROGRESS_HEARTBEAT_INTERVAL_SECONDS)
             sequence += 1
             elapsed = int(time.monotonic() - started)
-            try:
-                await report(float(sequence), None, f"clink: {cli_name} still running ({elapsed}s elapsed)")
-            except asyncio.CancelledError:
-                raise
-            except Exception:
-                logger.debug("clink progress heartbeat failed; stopping", exc_info=True)
-                return
+            await self._emit_progress(float(sequence), f"clink: {cli_name} still running ({elapsed}s elapsed)")
+
+    async def _emit_progress(self, progress: float, message: str) -> None:
+        """Send one MCP progress notification; a failure never breaks the call."""
+        if not self._progress_heartbeat_enabled:
+            return
+        ctx = get_current_request_context()
+        session = getattr(ctx, "session", None)
+        report = getattr(session, "report_progress", None)
+        if report is None:
+            return
+        try:
+            await report(progress, None, message)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.debug("clink progress heartbeat failed", exc_info=True)
 
     def _snapshot_budget_seconds(self) -> float:
         """Wall-clock budget per read-only verification snapshot."""

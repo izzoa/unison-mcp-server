@@ -80,6 +80,9 @@ async def test_clink_tool_defaults_to_sole_cli_when_only_one_configured(monkeypa
     tool = CLinkTool()
 
     # Simulate a single-client registry without rebuilding the whole registry.
+    # Blocking mode keeps execution on THIS instance (hybrid mode runs jobs on
+    # a fresh private instance, which would not see these monkeypatches).
+    monkeypatch.setenv("CLINK_EXECUTION_MODE", "blocking")
     monkeypatch.setattr(tool, "_cli_names", ["gemini"])
     monkeypatch.setattr(tool, "_default_cli_name", "gemini")
 
