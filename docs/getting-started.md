@@ -325,7 +325,7 @@ Claude reads MCP-related environment variables either from your shell or from `~
 }
 ```
 
-You can scope this block at the top level of `settings.json` (applies to every session) or under a specific `mcpServers.<name>.env` entry if you only want it for Unison (the server name may still be `unison` while configurations catch up). The values are in milliseconds. Note: Claude’s SSE transport still enforces an internal ceiling of roughly five minutes; long-running HTTP/SSE servers may need retries until Anthropic ships their fix.
+Scope this block at the **top level** of `settings.json` — it configures the Claude client itself. Do **not** put these under `mcpServers.<name>.env`: that environment is passed to the spawned MCP *server* process, not to the client enforcing the timeout, so it has no effect on the deadline. The values are in milliseconds. Claude Desktop's local (embedded Claude Code) sessions honor the same top-level `env` block — or set it via Desktop's local environment editor — then start a new session or fully restart Desktop from the tray. Note: Claude's SSE transport still enforces an internal ceiling of roughly five minutes; long-running HTTP/SSE servers may need retries until Anthropic ships their fix.
 
 ### Codex CLI
 

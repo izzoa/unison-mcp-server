@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import logging
 import os
 import re
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, NoReturn
@@ -23,6 +26,7 @@ from tools.shared.exceptions import ToolExecutionError
 from tools.simple.base import SchemaBuilder, SimpleTool
 from utils.env import get_env
 from utils.fs_snapshot import SnapshotStats, capture_snapshot, classify_changes, diff_snapshots
+from utils.mcp_context import get_current_request_context
 
 # Wall-clock ceiling for each read-only verification snapshot. Observed live:
 # an unbounded walk of a large OneDrive-synced repo took 60-90s per snapshot
@@ -393,6 +397,7 @@ class CLinkTool(SimpleTool):
             )
 
         agent = create_agent(client_config)
+        heartbeat = asyncio.create_task(self._progress_heartbeat(client_config.name))
         try:
             result = await agent.run(
                 role=role_config,
@@ -410,6 +415,12 @@ class CLinkTool(SimpleTool):
                 f"CLI '{client_config.name}' execution failed: {exc}",
                 metadata=metadata,
             )
+        finally:
+            # Stop the heartbeat before any response (success or error) is
+            # built: the spec forbids progress after request completion.
+            heartbeat.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await heartbeat
 
         metadata = self._build_success_metadata(client_config, role_config, result, requested_model=requested_model)
         metadata = self._prune_metadata(metadata, client_config, reason="normal")
@@ -688,6 +699,38 @@ class CLinkTool(SimpleTool):
                 type(events).__name__,
             )
         return cleaned
+
+    #: Seconds between MCP progress heartbeats while a CLI runs. Class-level so
+    #: tests can shrink it.
+    _PROGRESS_HEARTBEAT_INTERVAL_SECONDS = 10.0
+
+    async def _progress_heartbeat(self, cli_name: str) -> None:
+        """Emit MCP progress notifications while the spawned CLI runs.
+
+        ``ServerSession.report_progress`` is a no-op when the caller sent no
+        ``progressToken``, so this costs nothing for hosts that don't ask.
+        Hosts that reset their tool timeout on progress keep long CLI runs
+        alive; the rest at least surface liveness to the user. A heartbeat
+        failure must never break the CLI call itself.
+        """
+        ctx = get_current_request_context()
+        session = getattr(ctx, "session", None)
+        report = getattr(session, "report_progress", None)
+        if report is None:
+            return
+        started = time.monotonic()
+        sequence = 0
+        while True:
+            await asyncio.sleep(self._PROGRESS_HEARTBEAT_INTERVAL_SECONDS)
+            sequence += 1
+            elapsed = int(time.monotonic() - started)
+            try:
+                await report(float(sequence), None, f"clink: {cli_name} still running ({elapsed}s elapsed)")
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                logger.debug("clink progress heartbeat failed; stopping", exc_info=True)
+                return
 
     def _snapshot_budget_seconds(self) -> float:
         """Wall-clock budget per read-only verification snapshot."""
