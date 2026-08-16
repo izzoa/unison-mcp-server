@@ -1228,6 +1228,62 @@ mask_secret_args() {
 }
 
 # Check if MCP is added to Claude CLI and verify it's correct
+# Ensure Claude's own MCP tool timeout allows long clink CLI runs.
+# The knob lives in the TOP-LEVEL env block of ~/.claude/settings.json — the
+# Claude client's config, honored by both Claude Code CLI sessions and Claude
+# Desktop's local (embedded) sessions. Putting it under mcpServers.<name>.env
+# reaches the spawned SERVER process instead and does nothing. Adds
+# MCP_TOOL_TIMEOUT only when absent; a user-chosen value is never overwritten.
+ensure_claude_mcp_tool_timeout() {
+    local python_cmd="${1:-python3}"
+    [[ -n "${CLAUDE_MCP_TIMEOUT_ENSURED:-}" ]] && return 0
+    CLAUDE_MCP_TIMEOUT_ENSURED=1
+
+    local settings_path="$HOME/.claude/settings.json"
+    "$python_cmd" - "$settings_path" <<'PYEOF'
+import datetime
+import json
+import os
+import shutil
+import sys
+
+path = sys.argv[1]
+desired = "900000"  # 15 minutes, in milliseconds
+
+settings = {}
+if os.path.exists(path):
+    try:
+        with open(path, encoding="utf-8") as fh:
+            raw = fh.read().strip()
+        settings = json.loads(raw) if raw else {}
+    except (OSError, json.JSONDecodeError) as exc:
+        print(f"  Skipping MCP_TOOL_TIMEOUT setup: could not parse {path}: {exc}")
+        sys.exit(0)
+if not isinstance(settings, dict):
+    print(f"  Skipping MCP_TOOL_TIMEOUT setup: {path} is not a JSON object")
+    sys.exit(0)
+
+env = settings.get("env")
+if not isinstance(env, dict):
+    env = {}
+    settings["env"] = env
+if "MCP_TOOL_TIMEOUT" in env:
+    print(f"  MCP_TOOL_TIMEOUT already set in {path} (leaving as-is)")
+    sys.exit(0)
+
+env["MCP_TOOL_TIMEOUT"] = desired
+os.makedirs(os.path.dirname(path), exist_ok=True)
+if os.path.exists(path):
+    stamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    shutil.copy2(path, f"{path}.backup_{stamp}")
+with open(path, "w", encoding="utf-8") as fh:
+    json.dump(settings, fh, indent=2)
+    fh.write("\n")
+print(f"  Set MCP_TOOL_TIMEOUT={desired} (15 min) in {path}")
+print("  Long clink CLI runs need this; restart Claude sessions for it to apply")
+PYEOF
+}
+
 check_claude_cli_integration() {
     local python_cmd="$1"
     local server_path="$2"
@@ -1277,6 +1333,8 @@ check_claude_cli_integration() {
     done
 
     # Check if unison is registered
+    ensure_claude_mcp_tool_timeout "$python_cmd"
+
     local mcp_list=$(claude mcp list 2>/dev/null)
     if echo "$mcp_list" | grep -q "unison"; then
         # Check if it's using the old Docker command
@@ -1582,6 +1640,7 @@ with open('$temp_file', 'w') as f:
 
     if [[ $? -eq 0 ]]; then
         print_success "Successfully configured Claude Desktop"
+        ensure_claude_mcp_tool_timeout "$python_cmd"
         echo "  Config: $config_path"
         echo "  Restart Claude Desktop to use the new MCP server"
         touch "$DESKTOP_CONFIG_FLAG"

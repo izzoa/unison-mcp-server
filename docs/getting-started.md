@@ -314,7 +314,9 @@ Some MCP clients default to short timeouts and can disconnect from Unison during
 
 ### Claude Code & Claude Desktop
 
-Claude reads MCP-related environment variables either from your shell or from `~/.claude/settings.json`. Add (or update) the `env` block so both startup and tool execution use a 5-minute limit:
+**The setup scripts handle this automatically:** when `run-server.sh` / `run-server.ps1` detect Claude (CLI or Desktop), they add `MCP_TOOL_TIMEOUT=900000` (15 minutes) to the top-level `env` block of `~/.claude/settings.json` — creating the file if needed, backing it up first, and never overwriting a value you already set. Restart your Claude sessions afterward for it to apply.
+
+To tune it manually: Claude reads MCP-related environment variables either from your shell or from `~/.claude/settings.json`. Add (or update) the `env` block:
 
 ```json
 {

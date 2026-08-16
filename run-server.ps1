@@ -1761,6 +1761,7 @@ function Configure-McpClient {
         Write-Host "  Config: $configPath" -ForegroundColor Gray
         if ($Client.Name -eq "Claude Desktop") {
             Sync-ClaudeDesktopConfigMirror -WrittenPath $configPath
+            Set-ClaudeMcpToolTimeout
             Write-Host "  Fully quit Claude Desktop (system tray icon -> Quit; closing the window is not enough), then relaunch" -ForegroundColor Gray
             Write-Host "  The server appears under Settings -> Developer, and via the tools icon in chat" -ForegroundColor Gray
         }
@@ -1802,14 +1803,64 @@ function Invoke-McpClientConfiguration {
 }
 
 # Keep existing CLI integration functions
+# Ensure Claude's own MCP tool timeout allows long clink CLI runs.
+# The knob lives in the TOP-LEVEL env block of ~/.claude/settings.json — the
+# Claude client's config, honored by both Claude Code CLI sessions and Claude
+# Desktop's local (embedded) sessions. Putting it under mcpServers.<name>.env
+# reaches the spawned SERVER process instead and does nothing. Adds
+# MCP_TOOL_TIMEOUT only when absent; a user-chosen value is never overwritten.
+function Set-ClaudeMcpToolTimeout {
+    if ($script:ClaudeMcpTimeoutEnsured) { return }
+    $script:ClaudeMcpTimeoutEnsured = $true
+
+    $settingsPath = Join-Path $env:USERPROFILE ".claude\settings.json"
+    $desired = "900000"  # 15 minutes, in milliseconds
+
+    try {
+        $settings = New-Object PSObject
+        if (Test-Path $settingsPath) {
+            $raw = Get-Content $settingsPath -Raw
+            if ($raw.Trim()) {
+                $settings = $raw | ConvertFrom-Json -ErrorAction Stop
+            }
+        }
+        if ($null -eq $settings) { $settings = New-Object PSObject }
+
+        if (!$settings.PSObject.Properties["env"] -or $null -eq $settings.env) {
+            $settings | Add-Member -MemberType NoteProperty -Name "env" -Value (New-Object PSObject) -Force
+        }
+        if ($settings.env.PSObject.Properties["MCP_TOOL_TIMEOUT"]) {
+            Write-Info "MCP_TOOL_TIMEOUT already set in $settingsPath (leaving as-is)"
+            return
+        }
+
+        $settingsDir = Split-Path $settingsPath -Parent
+        if (!(Test-Path $settingsDir)) {
+            New-Item -ItemType Directory -Path $settingsDir -Force | Out-Null
+        }
+        if (Test-Path $settingsPath) {
+            Manage-ConfigBackups -ConfigFilePath $settingsPath | Out-Null
+        }
+
+        $settings.env | Add-Member -MemberType NoteProperty -Name "MCP_TOOL_TIMEOUT" -Value $desired -Force
+        Write-Utf8NoBom -Path $settingsPath -Content ($settings | ConvertTo-Json -Depth 20)
+        Write-Success "Set MCP_TOOL_TIMEOUT=$desired (15 min) in $settingsPath"
+        Write-Host "  Long clink CLI runs need this; restart Claude sessions for it to apply" -ForegroundColor Gray
+    }
+    catch {
+        Write-Warning "Could not update $settingsPath : $_"
+    }
+}
+
 function Test-ClaudeCliIntegration {
     param([string]$PythonPath, [string]$ServerPath)
-    
+
     if (!(Test-Command "claude")) {
         return
     }
-    
+
     Write-Info "Claude CLI detected - checking configuration..."
+    Set-ClaudeMcpToolTimeout
 
     foreach ($legacy in $script:LegacyServerNames) {
         try { claude mcp remove -s user $legacy 2>$null | Out-Null } catch {}
