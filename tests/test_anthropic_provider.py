@@ -297,10 +297,13 @@ class TestMidStreamErrorRetry:
         assert response.content == "recovered"
         assert len(requests) == 2
 
-    def test_caller_fault_mid_stream_is_not_retried(self):
-        provider, requests = self._provider("invalid_request_error", fail_times=1)
+    # rate_limit_error stays out: the SDK already retries 429s, so retrying
+    # here too would multiply the attempts.
+    @pytest.mark.parametrize("error_type", ["invalid_request_error", "rate_limit_error"])
+    def test_caller_fault_mid_stream_is_not_retried(self, error_type):
+        provider, requests = self._provider(error_type, fail_times=1)
 
-        with patch("providers.base.time.sleep"), pytest.raises(RuntimeError, match="invalid_request_error"):
+        with patch("providers.base.time.sleep"), pytest.raises(RuntimeError, match=error_type):
             provider.generate_content("hi", "claude-opus-5-5")
 
         assert len(requests) == 1
