@@ -47,10 +47,10 @@ Regardless of your default configuration, you can specify models per request:
 | **`gpt5`** (GPT-5) | OpenAI | 400K tokens | Advanced model with reasoning support | Complex problems requiring advanced reasoning |
 | **`gpt5-mini`** (GPT-5 Mini) | OpenAI | 400K tokens | Efficient variant with reasoning | Balanced performance and capability |
 | **`gpt5-nano`** (GPT-5 Nano) | OpenAI | 400K tokens | Fastest, cheapest GPT-5 variant | Summarization and classification tasks |
-| **`fable`** (Claude Fable 5) | Anthropic | 1M tokens | Anthropic's most capable model, extended thinking | Hardest reasoning, deep architectural analysis |
-| **`opus`** (Claude Opus 5) | Anthropic | 1M tokens | Flagship Claude with extended thinking | Complex analysis, critical code reviews |
-| **`sonnet`** (Claude Sonnet 5) | Anthropic | 1M tokens | Balanced Claude, extended thinking + vision | Everyday deep work, agentic flows |
-| **`haiku`** (Claude Haiku 4.5) | Anthropic | 200K tokens | Fast, cost-efficient Claude | Quick checks, summaries |
+| **`fable`** (Claude Fable 5.1) | Anthropic | 1M tokens | Anthropic's most capable model, adaptive thinking | Hardest reasoning, deep architectural analysis |
+| **`opus`** (Claude Opus 5.5) | Anthropic | 1M tokens | Flagship Claude with adaptive thinking | Complex analysis, critical code reviews |
+| **`sonnet`** (Claude Sonnet 5.5) | Anthropic | 1M tokens | Balanced Claude, adaptive thinking + vision | Everyday deep work, agentic flows |
+| **`haiku`** (Claude Haiku 5.5) | Anthropic | 1M tokens | Fast, cost-efficient Claude | Quick checks, summaries |
 | **`grok-4`** | X.AI | 256K tokens | Latest flagship Grok model with reasoning, vision | Complex analysis, reasoning tasks |
 | **`grok-4.1-fast-reasoning`** | X.AI | 2M tokens | High-performance Grok 4.1 Fast Reasoning with vision | Fast responses and light reasoning |
 | **`llama`** (Llama 3.2) | Custom/Local | 128K tokens | Local inference, privacy | On-device analysis, cost-free processing |
@@ -65,10 +65,11 @@ cloud models (expensive/powerful) AND local models (free/private) in the same co
   - **Flash 2.5**: Ultra-fast with thinking support (24K thinking tokens)
   - **Flash 2.0**: Latest fast model with audio/video input (24K thinking tokens)
   - **Flash Lite 2.0**: Text-only lightweight model (no thinking support)
-- **Claude Models (native)**: Extended-thinking budgets mapped from thinking modes, vision support
-  - **Fable 5 / Opus 5 / Sonnet 5**: 1M context, up to 128K output, deep extended thinking
+- **Claude Models (native)**: Thinking modes mapped onto adaptive-thinking effort levels (extended-thinking budgets on Sonnet 4.6 and Haiku 4.5), vision support
+  - **Fable 5.1 / Opus 5.5 / Sonnet 5.5 / Haiku 5.5**: current models behind the bare aliases; 1M context, up to 128K output
+  - **Fable 5 / Opus 5 / Sonnet 5**: superseded point releases, pinned via `fable5` / `opus5` / `sonnet5`
   - **Opus 4.8 / Sonnet 4.6**: previous generation, still first-class
-  - **Haiku 4.5**: 200K context, fast and cost-efficient
+  - **Haiku 4.5**: 200K context, budget-based extended thinking, pinned via `haiku4`
 - **O3/O4 Models**: Excellent reasoning, systematic analysis, 200K context
 - **GPT-4.1**: Extended context window (1M tokens), general capabilities
 - **GPT-5.2 Series**: Latest flagship reasoning models, 400K context
@@ -354,7 +355,7 @@ The Unison MCP server supports vision-capable models for analyzing images, diagr
 **Supported Models:**
 - **Gemini 3.0 Pro & Flash**: Excellent for diagrams, architecture analysis, UI mockups (up to 20MB total)
 - **OpenAI O3/O4 series**: Strong for visual debugging, error screenshots (up to 20MB total)
-- **Claude models (native)**: All six curated models (Fable, Opus, Sonnet, Haiku) are vision-capable via `ANTHROPIC_API_KEY`
+- **Claude models (native)**: All ten curated models (Fable, Opus, Sonnet, Haiku) are vision-capable via `ANTHROPIC_API_KEY`
 - **Claude models via OpenRouter**: Good for code screenshots, visual analysis (up to 5MB total)
 - **Custom models**: Support varies by model, with 40MB maximum enforced for abuse prevention
 

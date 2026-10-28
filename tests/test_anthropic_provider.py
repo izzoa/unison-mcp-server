@@ -1,10 +1,13 @@
 """Tests for the native Anthropic provider."""
 
+import json
 import os
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
+import httpx
 import pytest
+from anthropic import Anthropic
 
 from providers.anthropic import MIN_THINKING_BUDGET, AnthropicModelProvider
 from providers.registry import ModelProviderRegistry, set_default_registry
@@ -221,6 +224,86 @@ class TestGeneration:
         assert chunks[-1].is_final is True
         assert chunks[-1].usage["total_tokens"] == 46
         assert all(not c.is_final for c in chunks[:-1])
+
+
+class TestMidStreamErrorRetry:
+    """Errors delivered as SSE events after an HTTP 200, through the real SDK."""
+
+    MESSAGE_START = {
+        "type": "message_start",
+        "message": {
+            "id": "msg_1",
+            "type": "message",
+            "role": "assistant",
+            "model": "claude-opus-5-5",
+            "content": [],
+            "stop_reason": None,
+            "stop_sequence": None,
+            "usage": {"input_tokens": 5, "output_tokens": 1},
+        },
+    }
+    COMPLETION = [
+        (
+            "content_block_start",
+            {"type": "content_block_start", "index": 0, "content_block": {"type": "text", "text": ""}},
+        ),
+        (
+            "content_block_delta",
+            {"type": "content_block_delta", "index": 0, "delta": {"type": "text_delta", "text": "recovered"}},
+        ),
+        ("content_block_stop", {"type": "content_block_stop", "index": 0}),
+        (
+            "message_delta",
+            {
+                "type": "message_delta",
+                "delta": {"stop_reason": "end_turn", "stop_sequence": None},
+                "usage": {"output_tokens": 3},
+            },
+        ),
+        ("message_stop", {"type": "message_stop"}),
+    ]
+
+    @staticmethod
+    def _sse(events):
+        return httpx.Response(
+            200,
+            headers={"content-type": "text/event-stream"},
+            content="".join(f"event: {name}\ndata: {json.dumps(data)}\n\n" for name, data in events).encode(),
+        )
+
+    def _provider(self, error_type, fail_times):
+        requests = []
+
+        def handler(request):
+            requests.append(request)
+            if len(requests) <= fail_times:
+                error = {"type": "error", "error": {"type": error_type, "message": "boom"}}
+                return self._sse([("message_start", self.MESSAGE_START), ("error", error)])
+            return self._sse([("message_start", self.MESSAGE_START), *self.COMPLETION])
+
+        provider = AnthropicModelProvider(api_key="sk-ant-test")
+        provider._client = Anthropic(
+            api_key="sk-ant-test", max_retries=0, http_client=httpx.Client(transport=httpx.MockTransport(handler))
+        )
+        return provider, requests
+
+    @pytest.mark.parametrize("error_type", ["overloaded_error", "api_error"])
+    def test_server_fault_mid_stream_is_retried(self, error_type):
+        provider, requests = self._provider(error_type, fail_times=1)
+
+        with patch("providers.base.time.sleep"):
+            response = provider.generate_content("hi", "claude-opus-5-5")
+
+        assert response.content == "recovered"
+        assert len(requests) == 2
+
+    def test_caller_fault_mid_stream_is_not_retried(self):
+        provider, requests = self._provider("invalid_request_error", fail_times=1)
+
+        with patch("providers.base.time.sleep"), pytest.raises(RuntimeError, match="invalid_request_error"):
+            provider.generate_content("hi", "claude-opus-5-5")
+
+        assert len(requests) == 1
 
 
 class TestBaseUrlOverride:

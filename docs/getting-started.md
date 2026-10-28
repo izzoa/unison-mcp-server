@@ -33,7 +33,7 @@ You need at least one API key. Choose based on your needs:
 
 **Anthropic (Claude):**
 - Visit [Anthropic Console](https://console.anthropic.com/)
-- Generate an API key for native Claude access (Fable 5, Opus 5/4.8, Sonnet 5/4.6, Haiku 4.5) with extended thinking
+- Generate an API key for native Claude access (Fable 5.1/5, Opus 5.5/5/4.8, Sonnet 5.5/5/4.6, Haiku 5.5/4.5) with adaptive thinking (extended-thinking budgets on Sonnet 4.6 and Haiku 4.5)
 
 **X.AI (Grok):**
 - Visit [X.AI Console](https://console.x.ai/)

@@ -23,6 +23,10 @@ logger = logging.getLogger(__name__)
 # The Messages API rejects extended-thinking budgets below this floor.
 MIN_THINKING_BUDGET = 1024
 
+# Messages API error types that mean a transient server-side fault (the
+# equivalents of HTTP 529 and 500), whichever way they reach the client.
+RETRYABLE_API_ERROR_TYPES = frozenset({"overloaded_error", "api_error"})
+
 
 class AnthropicModelProvider(RegistryBackedProviderMixin, ModelProvider):
     """First-party Anthropic integration built on the official SDK (Messages API).
@@ -304,6 +308,20 @@ class AnthropicModelProvider(RegistryBackedProviderMixin, ModelProvider):
         if not self.get_capabilities(model_name).supports_temperature:
             return
         super().validate_parameters(model_name, temperature, **kwargs)
+
+    def _is_error_retryable(self, error: Exception) -> bool:
+        """Also retry server-side faults reported inside a stream.
+
+        A stream reports ``overloaded_error`` / ``api_error`` as an SSE error
+        event after the HTTP 200, so the SDK raises a plain ``APIStatusError``
+        with ``status_code == 200`` that the status-code tiers can't classify.
+        The structured error type identifies them as the 529 / 500 they stand in for.
+        """
+        body = getattr(error, "body", None)
+        api_error = body.get("error") if isinstance(body, dict) else None
+        if isinstance(api_error, dict) and api_error.get("type") in RETRYABLE_API_ERROR_TYPES:
+            return True
+        return super()._is_error_retryable(error)
 
     def _extract_usage(self, response) -> dict[str, int]:
         """Extract token usage from a Messages API response."""

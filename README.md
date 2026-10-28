@@ -592,7 +592,7 @@ DISABLED_TOOLS=
 
 **Model Support**
 - **Multiple providers** - Gemini, OpenAI, Anthropic, Azure, X.AI, OpenRouter, DIAL, Ollama
-- **Latest models** - Claude Fable 5 / Opus 5, GPT-5, Gemini 3.0 Pro, O3, Grok-4, local Llama
+- **Latest models** - Claude Fable 5.1 / Opus 5.5, GPT-5, Gemini 3.0 Pro, O3, Grok-4, local Llama
 - **Automatic model discovery** - New models appear at startup via [LiteLLM](https://github.com/BerriAI/litellm) integration, no manual config needed
 - **[Thinking modes](docs/advanced-usage.md#thinking-modes)** - Control reasoning depth vs cost
 - **Vision support** - Analyze images, diagrams, screenshots
