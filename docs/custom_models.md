@@ -31,7 +31,7 @@ This guide covers setting up multiple AI model providers including OpenRouter, c
 - Custom URLs for local models (Ollama Llama)
 - Native APIs for specific providers (Gemini Pro with extended thinking)
 
-**Note:** When multiple providers offer the same model name, native APIs take priority over OpenRouter. Concretely: the `opus`, `sonnet`, and `haiku` aliases exist in both the OpenRouter catalogue (below) and the native Anthropic catalogue — with `ANTHROPIC_API_KEY` set, those aliases route to native Claude (`claude-opus-5`, `claude-sonnet-5`, `claude-haiku-4-5`) instead of the OpenRouter entries.
+**Note:** When multiple providers offer the same model name, native APIs take priority over OpenRouter. Concretely: the `opus`, `sonnet`, and `haiku` aliases exist in both the OpenRouter catalogue (below) and the native Anthropic catalogue — with `ANTHROPIC_API_KEY` set, those aliases route to native Claude (`claude-opus-5-5`, `claude-sonnet-5-5`, `claude-haiku-5-5`) instead of the OpenRouter entries.
 
 ## Model Aliases
 
@@ -277,6 +277,7 @@ Edit `conf/openrouter_models.json` to tweak OpenRouter behaviour or `conf/custom
 - `aliases`: Array of short names users can type instead of the full model name
 - `context_window`: Total tokens the model can process (input + output combined)
 - `supports_extended_thinking`: Whether the model has extended reasoning capabilities
+- `supports_adaptive_thinking`: Anthropic models only. Whether the model takes adaptive thinking with depth set by an effort level (`thinking_mode` maps onto `output_config.effort`) instead of a `budget_tokens` budget
 - `supports_json_mode`: Whether the model can guarantee valid JSON output
 - `supports_function_calling`: Whether the model supports function/tool calling
 - `description`: Human-readable description of the model

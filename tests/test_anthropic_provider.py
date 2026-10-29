@@ -39,36 +39,95 @@ class TestRequestShape:
 
     def test_system_max_tokens_and_thinking_budget(self):
         provider = self._provider()
-        caps = provider.get_capabilities("claude-opus-5")
-        params = provider._build_request("hello", "claude-opus-5", caps, "be brief", 0.3, None, "medium", None)
+        caps = provider.get_capabilities("claude-haiku-4-5")
+        params = provider._build_request("hello", "claude-haiku-4-5", caps, "be brief", 0.3, None, "medium", None)
         assert params["system"] == "be brief"
-        assert params["max_tokens"] == 128000  # required by the Messages API
-        assert params["thinking"] == {"type": "enabled", "budget_tokens": int(64000 * 0.33)}
+        assert params["max_tokens"] == 64000  # required by the Messages API
+        assert params["thinking"] == {"type": "enabled", "budget_tokens": int(32000 * 0.33)}
+        assert "output_config" not in params
         # Extended thinking fixes temperature: the caller's value is dropped.
         assert "temperature" not in params
         assert params["messages"][0]["content"][0] == {"type": "text", "text": "hello"}
 
     def test_minimal_mode_clamps_to_api_floor(self):
         provider = self._provider()
-        caps = provider.get_capabilities("claude-opus-5")
-        params = provider._build_request("x", "claude-opus-5", caps, None, 0.3, None, "minimal", None)
-        # 0.5% of 64000 = 320, below the API's floor -> clamped up.
+        caps = provider.get_capabilities("claude-haiku-4-5")
+        params = provider._build_request("x", "claude-haiku-4-5", caps, None, 0.3, None, "minimal", None)
+        # 0.5% of 32000 = 160, below the API's floor -> clamped up.
         assert params["thinking"]["budget_tokens"] == MIN_THINKING_BUDGET
 
     def test_budget_must_fit_inside_max_tokens(self):
         provider = self._provider()
-        caps = provider.get_capabilities("claude-opus-5")
+        caps = provider.get_capabilities("claude-haiku-4-5")
         # A tiny output window leaves no room for a valid budget: thinking is
         # dropped entirely rather than sending an API-invalid combination.
-        params = provider._build_request("x", "claude-opus-5", caps, None, 0.3, 2000, "max", None)
+        params = provider._build_request("x", "claude-haiku-4-5", caps, None, 0.3, 2000, "max", None)
         assert "thinking" not in params
         assert params["temperature"] == 0.3
+
+    @pytest.mark.parametrize(
+        "model",
+        [
+            "claude-fable-5-1",
+            "claude-fable-5",
+            "claude-opus-5-5",
+            "claude-opus-5",
+            "claude-sonnet-5-5",
+            "claude-sonnet-5",
+            "claude-opus-4-8",
+            "claude-haiku-5-5",
+        ],
+    )
+    def test_adaptive_models_send_effort_and_no_sampling(self, model):
+        # These models reject budget_tokens and sampling parameters with a 400.
+        provider = self._provider()
+        caps = provider.get_capabilities(model)
+        params = provider._build_request("hello", model, caps, None, 0.3, None, "high", None)
+        assert params["thinking"] == {"type": "adaptive"}
+        assert params["output_config"] == {"effort": "high"}
+        assert params["max_tokens"] == 128000
+        for key in ("temperature", "top_p", "top_k"):
+            assert key not in params
+
+    @pytest.mark.parametrize(
+        "mode,effort",
+        [("minimal", "low"), ("low", "low"), ("medium", "medium"), ("high", "high"), ("max", "max")],
+    )
+    def test_thinking_modes_map_onto_effort(self, mode, effort):
+        provider = self._provider()
+        caps = provider.get_capabilities("claude-opus-5-5")
+        params = provider._build_request("x", "claude-opus-5-5", caps, None, 1.0, None, mode, None)
+        assert params["output_config"] == {"effort": effort}
+
+    def test_adaptive_model_without_thinking_mode_sends_neither(self):
+        provider = self._provider()
+        caps = provider.get_capabilities("claude-opus-5-5")
+        params = provider._build_request("x", "claude-opus-5-5", caps, None, 0.3, None, None, None)
+        assert "thinking" not in params
+        assert "output_config" not in params
+        assert "temperature" not in params
+
+    def test_adaptive_model_ignores_tight_output_window(self):
+        # No budget to fit, so a small max_tokens still gets thinking.
+        provider = self._provider()
+        caps = provider.get_capabilities("claude-sonnet-5-5")
+        params = provider._build_request("x", "claude-sonnet-5-5", caps, None, 0.3, 2000, "max", None)
+        assert params["max_tokens"] == 2000
+        assert params["thinking"] == {"type": "adaptive"}
+
+    def test_temperature_validation_skipped_for_samplingless_models(self):
+        provider = self._provider()
+        provider.validate_parameters("opus", 0.3)  # never sent, so never rejected
+        with pytest.raises(ValueError):
+            provider.validate_parameters("claude-haiku-4-5", 5.0)
 
     def test_non_thinking_model_keeps_temperature(self):
         provider = self._provider()
         caps = SimpleNamespace(
             supports_images=False,
             supports_extended_thinking=False,
+            supports_adaptive_thinking=False,
+            supports_temperature=True,
             max_output_tokens=4096,
         )
         params = provider._build_request("x", "claude-nothink", caps, None, 0.42, None, "high", None)
@@ -86,10 +145,20 @@ class TestGeneration:
             stop_reason="end_turn",
         )
 
+    def _streaming_client(self, text_deltas=()):
+        stream = MagicMock()
+        stream.text_stream = iter(text_deltas)
+        stream.get_final_message.return_value = self._response_stub()
+        stream_cm = MagicMock()
+        stream_cm.__enter__.return_value = stream
+        stream_cm.__exit__.return_value = False
+        mock_client = MagicMock()
+        mock_client.messages.stream.return_value = stream_cm
+        return mock_client
+
     def test_generate_content_extracts_text_and_usage(self):
         provider = AnthropicModelProvider(api_key="sk-ant-test")
-        mock_client = MagicMock()
-        mock_client.messages.create.return_value = self._response_stub()
+        mock_client = self._streaming_client()
         provider._client = mock_client
 
         response = provider.generate_content("say hello", "claude-sonnet-5", thinking_mode="low")
@@ -99,29 +168,52 @@ class TestGeneration:
         assert response.provider == ProviderType.ANTHROPIC
         assert response.model_name == "claude-sonnet-5"
         assert response.metadata["stop_reason"] == "end_turn"
-        sent = mock_client.messages.create.call_args.kwargs
+        sent = mock_client.messages.stream.call_args.kwargs
         assert sent["model"] == "claude-sonnet-5"
 
-    def test_alias_resolves_before_request(self):
+    def test_generate_content_streams_to_avoid_sdk_long_request_guard(self):
+        # The SDK raises before sending a non-streaming request whose
+        # max_tokens exceeds ~21K, which every catalogued model's default does.
         provider = AnthropicModelProvider(api_key="sk-ant-test")
-        mock_client = MagicMock()
-        mock_client.messages.create.return_value = self._response_stub()
+        mock_client = self._streaming_client()
         provider._client = mock_client
 
-        provider.generate_content("hi", "fable")
-        assert mock_client.messages.create.call_args.kwargs["model"] == "claude-fable-5"
+        provider.generate_content("hi", "claude-opus-5-5", temperature=0.3)
+
+        mock_client.messages.create.assert_not_called()
+        sent = mock_client.messages.stream.call_args.kwargs
+        assert sent["max_tokens"] == 128000
+        assert sent["thinking"] == {"type": "adaptive"}
+        assert sent["output_config"] == {"effort": "medium"}
+        assert "temperature" not in sent
+
+    @pytest.mark.parametrize(
+        "alias,model",
+        [
+            ("fable", "claude-fable-5-1"),
+            ("fable5", "claude-fable-5"),
+            ("opus", "claude-opus-5-5"),
+            ("opus5", "claude-opus-5"),
+            ("opus4", "claude-opus-4-8"),
+            ("sonnet", "claude-sonnet-5-5"),
+            ("claude", "claude-sonnet-5-5"),
+            ("sonnet5", "claude-sonnet-5"),
+            ("sonnet4", "claude-sonnet-4-6"),
+            ("haiku", "claude-haiku-5-5"),
+            ("haiku4", "claude-haiku-4-5"),
+        ],
+    )
+    def test_alias_resolves_before_request(self, alias, model):
+        provider = AnthropicModelProvider(api_key="sk-ant-test")
+        mock_client = self._streaming_client()
+        provider._client = mock_client
+
+        provider.generate_content("hi", alias)
+        assert mock_client.messages.stream.call_args.kwargs["model"] == model
 
     def test_streaming_yields_text_then_final_usage(self):
         provider = AnthropicModelProvider(api_key="sk-ant-test")
-        stream_cm = MagicMock()
-        stream = MagicMock()
-        stream.text_stream = iter(["hel", "lo"])
-        stream.get_final_message.return_value = self._response_stub()
-        stream_cm.__enter__.return_value = stream
-        stream_cm.__exit__.return_value = False
-        mock_client = MagicMock()
-        mock_client.messages.stream.return_value = stream_cm
-        provider._client = mock_client
+        provider._client = self._streaming_client(["hel", "lo"])
 
         chunks = list(provider.generate_content_stream("say hello", "claude-haiku-4-5"))
 

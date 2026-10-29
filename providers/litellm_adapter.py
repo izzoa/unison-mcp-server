@@ -80,6 +80,7 @@ JSON_OVERRIDE_FIELDS = frozenset(
         "friendly_name",
         "description",
         "max_thinking_tokens",
+        "supports_adaptive_thinking",
         "temperature_constraint",
         "supports_temperature",
         "allow_code_generation",

@@ -45,6 +45,10 @@ class ModelCapabilities:
 
     # Capability flags
     supports_extended_thinking: bool = False
+    # Thinking depth is set by an effort level rather than a fixed token
+    # budget (Anthropic's adaptive thinking). Models with this flag ignore
+    # ``max_thinking_tokens``.
+    supports_adaptive_thinking: bool = False
     supports_system_prompts: bool = True
     supports_streaming: bool = True
     supports_function_calling: bool = False

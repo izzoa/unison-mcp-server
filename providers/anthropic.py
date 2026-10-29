@@ -27,7 +27,8 @@ MIN_THINKING_BUDGET = 1024
 class AnthropicModelProvider(RegistryBackedProviderMixin, ModelProvider):
     """First-party Anthropic integration built on the official SDK (Messages API).
 
-    Advertises thinking-mode budgets for extended-thinking models, supports an
+    Maps thinking modes onto adaptive-thinking effort levels or, for older
+    models, extended-thinking token budgets; supports an
     ``ANTHROPIC_API_URL`` base override for enterprise gateways, and performs
     image pre-processing before forwarding a request.
     """
@@ -45,6 +46,17 @@ class AnthropicModelProvider(RegistryBackedProviderMixin, ModelProvider):
         "medium": 0.33,
         "high": 0.67,
         "max": 1.0,
+    }
+
+    # Adaptive-thinking models take an effort level instead of a budget.
+    # Thinking can't be switched off on every such model, so "minimal" maps
+    # to the lowest effort rather than to no thinking.
+    THINKING_EFFORTS = {
+        "minimal": "low",
+        "low": "low",
+        "medium": "medium",
+        "high": "high",
+        "max": "max",
     }
 
     def __init__(self, api_key: str, **kwargs):
@@ -91,10 +103,12 @@ class AnthropicModelProvider(RegistryBackedProviderMixin, ModelProvider):
     ) -> dict:
         """Assemble Messages API request parameters.
 
-        The Messages API requires ``max_tokens`` on every request, and fixes
-        sampling temperature when extended thinking is enabled — a
-        caller-supplied temperature is dropped in that case rather than
-        surfacing an API rejection.
+        The Messages API requires ``max_tokens`` on every request. Models
+        flagged ``supports_adaptive_thinking`` get ``thinking: adaptive`` with
+        the depth in ``output_config.effort``; older thinking models get a
+        token budget. Temperature is sent only to models that accept sampling
+        parameters, and never alongside thinking, which fixes it — the
+        caller's value is dropped rather than surfacing an API rejection.
         """
         blocks: list[dict] = [{"type": "text", "text": prompt}]
 
@@ -114,12 +128,18 @@ class AnthropicModelProvider(RegistryBackedProviderMixin, ModelProvider):
             "model": resolved_model_name,
             "messages": [{"role": "user", "content": blocks}],
             "max_tokens": max_output_tokens or capabilities.max_output_tokens,
-            "temperature": temperature,
         }
+        if capabilities.supports_temperature:
+            params["temperature"] = temperature
         if system_prompt:
             params["system"] = system_prompt
 
-        if capabilities.supports_extended_thinking and thinking_mode in self.THINKING_BUDGETS:
+        if capabilities.supports_adaptive_thinking:
+            if thinking_mode in self.THINKING_EFFORTS:
+                # Sent explicitly: some models run without thinking when it is omitted.
+                params["thinking"] = {"type": "adaptive"}
+                params["output_config"] = {"effort": self.THINKING_EFFORTS[thinking_mode]}
+        elif capabilities.supports_extended_thinking and thinking_mode in self.THINKING_BUDGETS:
             model_config = self.get_all_model_capabilities().get(resolved_model_name)
             if model_config and model_config.max_thinking_tokens > 0:
                 budget = int(model_config.max_thinking_tokens * self.THINKING_BUDGETS[thinking_mode])
@@ -129,14 +149,16 @@ class AnthropicModelProvider(RegistryBackedProviderMixin, ModelProvider):
                     budget = params["max_tokens"] - MIN_THINKING_BUDGET
                 if budget >= MIN_THINKING_BUDGET:
                     params["thinking"] = {"type": "enabled", "budget_tokens": budget}
-                    if temperature != 1.0:
-                        logger.debug(
-                            "Dropping temperature=%s for %s: the Messages API fixes temperature "
-                            "when extended thinking is enabled",
-                            temperature,
-                            resolved_model_name,
-                        )
-                    params.pop("temperature")
+
+        if "thinking" in params and "temperature" in params:
+            if temperature != 1.0:
+                logger.debug(
+                    "Dropping temperature=%s for %s: the Messages API fixes temperature "
+                    "when extended thinking is enabled",
+                    temperature,
+                    resolved_model_name,
+                )
+            params.pop("temperature")
 
         return params
 
@@ -176,7 +198,10 @@ class AnthropicModelProvider(RegistryBackedProviderMixin, ModelProvider):
 
         def _attempt() -> ModelResponse:
             attempt_counter["value"] += 1
-            response = self.client.messages.create(**params)
+            # Streamed even here: the SDK refuses non-streaming requests whose
+            # max_tokens could run past ten minutes (above ~21K tokens).
+            with self.client.messages.stream(**params) as stream:
+                response = stream.get_final_message()
             content = "".join(block.text for block in response.content if getattr(block, "type", None) == "text")
             return ModelResponse(
                 content=content,
@@ -269,6 +294,16 @@ class AnthropicModelProvider(RegistryBackedProviderMixin, ModelProvider):
     def get_provider_type(self) -> ProviderType:
         """Get the provider type."""
         return ProviderType.ANTHROPIC
+
+    def validate_parameters(self, model_name: str, temperature: float, **kwargs) -> None:
+        """Skip the temperature check for models that take no sampling parameters.
+
+        The value is never sent to those models, so rejecting it would only
+        break callers that pass the generic default.
+        """
+        if not self.get_capabilities(model_name).supports_temperature:
+            return
+        super().validate_parameters(model_name, temperature, **kwargs)
 
     def _extract_usage(self, response) -> dict[str, int]:
         """Extract token usage from a Messages API response."""
