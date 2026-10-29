@@ -245,6 +245,8 @@ module = [
     "utils.observability",
     "utils.json_log_formatter",
     "utils.mcp_context",
+    "clink.workdir",
+    "utils.launch_info",
     "build_mockups",
 ]
 follow_imports = "normal"

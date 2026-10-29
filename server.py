@@ -22,6 +22,7 @@ from handlers import prompt_handlers, tool_handlers
 from providers.configure import configure_providers
 from tools.registry import ToolRegistry
 from utils.env import env_override_enabled, get_env
+from utils.launch_info import record_cwd_substitution
 from utils.logging_setup import configure_logging
 
 # ---------------------------------------------------------------------------
@@ -193,7 +194,9 @@ def run():
     """Console script entry point for unison-mcp-server."""
     target = _resolve_pathological_cwd()
     if target is not None:
-        logger.info(f"Launched from non-workspace directory {Path.cwd()}; working directory set to {target}")
+        original = Path.cwd()  # captured before the chdir below
+        logger.info(f"Launched from non-workspace directory {original}; working directory set to {target}")
+        record_cwd_substitution(original, target)
         os.chdir(target)
     try:
         asyncio.run(main())

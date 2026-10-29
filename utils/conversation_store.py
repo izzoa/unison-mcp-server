@@ -100,6 +100,8 @@ class ThreadContext(BaseModel):
         tool_name: Name of the tool that initiated this thread
         turns: List of all conversation turns in chronological order
         initial_context: Original request data that started the conversation
+        working_dir: Directory a CLI-backed tool (clink) resolved for this conversation, if any
+        working_dir_source: How that directory was resolved ("explicit", "files", ...), if any
     """
 
     thread_id: str
@@ -109,6 +111,9 @@ class ThreadContext(BaseModel):
     tool_name: str  # Tool that created this thread (preserved for attribution)
     turns: list[ConversationTurn]
     initial_context: dict[str, Any]  # Original request parameters
+    # Resolved by clink and stored via set_thread_working_dir(); threads persisted before these existed load as None.
+    working_dir: str | None = None
+    working_dir_source: str | None = None
 
 
 def _is_valid_uuid(val: str) -> bool:
@@ -346,6 +351,69 @@ def add_turn(
         return True
     except Exception as e:
         logger.debug(f"[FLOW] Failed to save turn to storage: {type(e).__name__}")
+        return False
+
+
+def set_thread_working_dir(thread_id: str, working_dir: str, source: str) -> bool:
+    """
+    Store the resolved working directory (and how it was resolved) on an existing thread.
+
+    Both fields are written together so a reader never sees a directory paired with
+    another call's source. The thread's turns and files are left untouched.
+
+    Args:
+        thread_id: UUID of the conversation thread
+        working_dir: Directory the CLI ran in (absolute path)
+        source: How the directory was resolved (e.g. "explicit", "files", "continuation")
+
+    Returns:
+        bool: True if the fields were stored, False if the thread does not exist, has
+        expired, the id is invalid, or the write failed. Never raises.
+
+    Note:
+        - Refreshes thread TTL to configured timeout on successful update
+        - Uses the backend's atomic read-modify-write when available (SQLite), like add_turn
+    """
+    if not thread_id or not _is_valid_uuid(thread_id):
+        return False
+
+    key = f"thread:{thread_id}"
+
+    try:
+        storage = get_storage()
+
+        # Same atomic-vs-fallback split as add_turn: a plain get->modify->setex is a
+        # non-atomic RMW that could drop a concurrent turn on a shared SQLite DB.
+        from utils.sqlite_storage import SQLiteStorageBackend
+
+        if isinstance(storage, SQLiteStorageBackend):
+
+            def _mutate(current_json: str | None) -> str | None:
+                if not current_json:
+                    logger.debug(f"[FLOW] Thread {thread_id} not found for working_dir update")
+                    return None
+                ctx = ThreadContext.model_validate_json(current_json)
+                ctx.working_dir = working_dir
+                ctx.working_dir_source = source
+                ctx.last_updated_at = datetime.now(timezone.utc).isoformat()
+                return ctx.model_dump_json()
+
+            return bool(storage.atomic_update(key, CONVERSATION_TIMEOUT_SECONDS, _mutate))
+
+        # Fallback non-atomic RMW (safe within a single process: no await between
+        # the read and write, and all callers run on the event-loop thread).
+        context = get_thread(thread_id)
+        if not context:
+            logger.debug(f"[FLOW] Thread {thread_id} not found for working_dir update")
+            return False
+
+        context.working_dir = working_dir
+        context.working_dir_source = source
+        context.last_updated_at = datetime.now(timezone.utc).isoformat()
+        storage.setex(key, CONVERSATION_TIMEOUT_SECONDS, context.model_dump_json())  # Refresh TTL
+        return True
+    except Exception as e:
+        logger.debug(f"[FLOW] Failed to store working_dir on thread {thread_id}: {type(e).__name__}")
         return False
 
 

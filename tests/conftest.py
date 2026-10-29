@@ -285,3 +285,13 @@ def _stub_opencode_version_probe(request, monkeypatch):
     monkeypatch.setattr(opencode_agent, "_probe_opencode_version", lambda _path: None)
     yield
     opencode_agent.reset_version_cache()
+
+
+@pytest.fixture(autouse=True)
+def _reset_launch_info():
+    """The recorded server-cwd substitution is process-global; never let it leak between tests."""
+    from utils.launch_info import reset_launch_info_for_tests
+
+    reset_launch_info_for_tests()
+    yield
+    reset_launch_info_for_tests()

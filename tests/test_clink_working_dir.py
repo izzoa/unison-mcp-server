@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import os
+from pathlib import Path
 
 import pytest
 
@@ -69,7 +70,8 @@ async def test_nonexistent_working_dir_rejected(tmp_path):
         await tool.execute({"prompt": "hi", "cli_name": "gemini", "working_dir": str(missing)})
     payload = json.loads(exc_info.value.payload)
     assert payload["status"] == "error"
-    assert "does not exist or is not a directory" in payload["content"]
+    assert "does not exist" in payload["content"]
+    assert payload["metadata"]["error_code"] == "invalid_explicit"
 
 
 @pytest.mark.asyncio
@@ -94,14 +96,20 @@ async def test_working_dir_passed_to_agent_and_reported(monkeypatch, tmp_path):
 
 @pytest.mark.asyncio
 async def test_omitted_working_dir_defaults_to_server_cwd(monkeypatch):
+    """With no files and no operator defaults the server cwd is the last resort: always passed to the agent,
+    reported with its source, and warned about (the old behaviour passed None and reported os.getcwd())."""
     captured: dict = {}
     monkeypatch.setattr("tools.clink.create_agent", lambda c: _dummy_agent(captured))
+    monkeypatch.delenv("CLINK_DEFAULT_WORKING_DIR", raising=False)
+    monkeypatch.delenv("CLINK_WORKING_DIR_FALLBACK", raising=False)
 
     tool = CLinkTool()
     result = await tool.execute({"prompt": "hi", "cli_name": "gemini", "absolute_file_paths": [], "images": []})
     payload = json.loads(result[0].text)
-    assert captured["working_dir"] is None
-    assert payload["metadata"]["working_dir"] == os.getcwd()
+    assert captured["working_dir"] == Path(os.getcwd()).resolve()
+    assert payload["metadata"]["working_dir"] == str(Path(os.getcwd()).resolve())
+    assert payload["metadata"]["working_dir_source"] == "server_cwd"
+    assert payload["metadata"]["working_dir_warnings"]
 
 
 @pytest.mark.asyncio

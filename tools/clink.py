@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import functools
 import json
 import logging
 import os
@@ -20,6 +21,7 @@ from clink import get_registry
 from clink.agents import AgentOutput, CLIAgentError, create_agent
 from clink.constants import CLINK_DEPTH_ENV_VAR, CLINK_MAX_DEPTH_ENV_VAR, DEFAULT_CLINK_MAX_DEPTH
 from clink.models import ResolvedCLIClient, ResolvedCLIRole
+from clink.workdir import Derivation, WorkingDirError, derive_working_dir, roots_from_uris
 from config import TEMPERATURE_BALANCED
 from tools.clink_jobs import ClinkJob, get_clink_job_manager
 from tools.models import ToolModelCategory, ToolOutput
@@ -28,6 +30,7 @@ from tools.shared.exceptions import ToolExecutionError
 from tools.simple.base import SchemaBuilder, SimpleTool
 from utils.env import get_env
 from utils.fs_snapshot import SnapshotStats, capture_snapshot, classify_changes, diff_snapshots
+from utils.launch_info import cwd_substitution
 from utils.mcp_context import get_current_request_context
 
 #: clink arguments that steer job control rather than the CLI run itself;
@@ -40,10 +43,21 @@ _JOB_CONTROL_KEYS = frozenset({"job_id", "cancel", "wait_seconds", "idempotency_
 # budget. Override with CLINK_SNAPSHOT_BUDGET_SECONDS.
 _DEFAULT_SNAPSHOT_BUDGET_SECONDS = 30.0
 
+# Working-directory derivation (clink/workdir.py) is filesystem work: it runs off the event loop under a
+# cooperative deadline, with an outer wait_for as a backstop for a probe blocked inside the kernel (a
+# hung network mount). Module-level so tests can shrink them.
+_WORKDIR_DEADLINE_SECONDS = 2.0
+_WORKDIR_WAIT_SECONDS = 2.5
+
 logger = logging.getLogger(__name__)
 
 MAX_RESPONSE_CHARS = 20_000
 SUMMARY_PATTERN = re.compile(r"<SUMMARY>(.*?)</SUMMARY>", re.IGNORECASE | re.DOTALL)
+
+
+def _json_safe(text: str) -> str:
+    """Escape lone surrogates (a surrogateescape'd non-UTF-8 directory name) so the response serializes as UTF-8."""
+    return text.encode("utf-8", "backslashreplace").decode("utf-8")
 
 
 def _check_recursion_guard() -> None:
@@ -162,12 +176,14 @@ class CLinkRequest(BaseModel):
     working_dir: str | None = Field(
         default=None,
         description=(
+            "Optional: may be omitted, in which case clink derives it (the directory this conversation "
+            "already used, else the project root of absolute_file_paths, else the host's MCP roots, else the "
+            "operator's configured defaults, else the MCP server's own working directory) and reports the choice in the "
+            "response. Pass it to override, or when a call is refused as ambiguous or underivable. "
             "Absolute path to the directory the spawned CLI should run in (set as both its cwd and "
-            "its PWD). Pass your project or "
+            "its PWD); broad directories such as / or /tmp are refused. Pass your project or "
             "worktree root so the CLI can see your files — some CLIs (e.g. Copilot) root their "
-            "file tools at their working directory and refuse paths outside it. When omitted, "
-            "falls back to the CLI manifest's working_dir, then the MCP server's own working "
-            "directory."
+            "file tools at their working directory and refuse paths outside it."
         ),
     )
 
@@ -356,11 +372,15 @@ class CLinkTool(SimpleTool):
             "working_dir": {
                 "type": "string",
                 "description": (
-                    "Absolute path to the directory the spawned CLI should run in (set as both its cwd "
-                    "and its PWD). Pass your "
-                    "project or worktree root so the CLI can see your files (some CLIs root "
-                    "their file tools at their cwd). Omit to use the CLI manifest's working_dir, "
-                    "then the server's own working directory."
+                    "Optional: may be omitted, in which case clink derives it (the directory this "
+                    "conversation already used, else the project root of absolute_file_paths, else the host's "
+                    "MCP roots, else the operator's configured defaults, else the server's own working "
+                    "directory) and reports "
+                    "the choice in the response. Pass it to override, or when a call is refused as "
+                    "ambiguous or underivable. Absolute path to the directory the spawned CLI should run "
+                    "in (set as both its cwd and its PWD); broad directories such as / or /tmp are "
+                    "refused. Pass your project or worktree root so the CLI can see your files (some "
+                    "CLIs root their file tools at their cwd)."
                 ),
             },
         }
@@ -515,6 +535,16 @@ class CLinkTool(SimpleTool):
         # contract.
         _check_recursion_guard()
 
+        # Files passed on THIS call, captured by the handler before the continuation merge replayed the first
+        # turn's files (only present on continuation calls). Private: never reaches the request model.
+        passed_files_raw = arguments.pop("_passed_file_paths", None)
+
+        # The host's roots, resolved by the MCP handler in the foreground before any state changed (never by this
+        # tool, and never by a background job, which only receives them through its run arguments). Private: always
+        # popped, even for an explicit working_dir, so it never reaches the request model or the CLI invocation.
+        # The handler is what keeps a client from smuggling this key in: this tool trusts whatever it receives.
+        mcp_roots_raw = arguments.pop("_mcp_roots", None)
+
         self._current_arguments = arguments
         request = self.get_request_model()(**arguments)
 
@@ -544,19 +574,21 @@ class CLinkTool(SimpleTool):
                     f"'{client_config.name}'. Allowed values: {allowed}."
                 )
 
-        working_dir_override: Path | None = None
-        raw_working_dir = (request.working_dir or "").strip()
-        if raw_working_dir:
-            candidate = Path(raw_working_dir)
-            if not candidate.is_absolute():
-                self._raise_tool_error(f"working_dir must be an absolute path, got: {raw_working_dir}")
-            if not candidate.is_dir():
-                self._raise_tool_error(f"working_dir does not exist or is not a directory: {raw_working_dir}")
-            working_dir_override = candidate
-
         absolute_file_paths = self.get_request_files(request)
-        images = self.get_request_images(request)
         continuation_id = self.get_request_continuation_id(request)
+
+        # One derived directory drives the spawn, PWD, the read-only snapshot and the reported metadata.
+        if passed_files_raw is None:
+            passed_files = list(absolute_file_paths)
+        else:
+            passed_files = [p for p in passed_files_raw if isinstance(p, str)]
+        derivation = await self._derive_working_dir(
+            request, client_config, passed_files, continuation_id, mcp_roots=mcp_roots_raw
+        )
+        working_dir = derivation.path
+        provenance = self._provenance_metadata(derivation)
+
+        images = self.get_request_images(request)
 
         from utils.tool_execution_context import ToolExecutionContext
 
@@ -576,14 +608,13 @@ class CLinkTool(SimpleTool):
             )
         except Exception as exc:
             logger.exception("Failed to prepare clink prompt")
-            self._raise_tool_error(f"Failed to prepare prompt: {exc}")
+            self._raise_tool_error(f"Failed to prepare prompt: {exc}", metadata=provenance)
 
         # Capture pre-execution filesystem snapshot for read-only verification.
         # Rooted at the same directory the CLI will actually run in.
         pre_snapshot = None
         read_only = getattr(request, "read_only", False)
-        effective_working_dir = working_dir_override or client_config.working_dir
-        snapshot_dir = str(effective_working_dir) if effective_working_dir else "."
+        snapshot_dir = str(working_dir)
         snapshot_budget = self._snapshot_budget_seconds()
         pre_stats = SnapshotStats()
         if read_only:
@@ -613,10 +644,10 @@ class CLinkTool(SimpleTool):
                 images=images,
                 read_only=read_only,
                 model=requested_model,
-                working_dir=working_dir_override,
+                working_dir=working_dir,
             )
         except CLIAgentError as exc:
-            metadata = self._build_error_metadata(client_config, exc)
+            metadata = self._build_error_metadata(client_config, exc, provenance=provenance)
             self._raise_tool_error(
                 f"CLI '{client_config.name}' execution failed: {exc}",
                 metadata=metadata,
@@ -631,8 +662,8 @@ class CLinkTool(SimpleTool):
         metadata = self._build_success_metadata(client_config, role_config, result, requested_model=requested_model)
         metadata = self._prune_metadata(metadata, client_config, reason="normal")
 
-        # Report where the CLI actually ran so callers never have to ask it.
-        metadata["working_dir"] = str(effective_working_dir) if effective_working_dir else os.getcwd()
+        # Report where the CLI actually ran, and how that directory was chosen, so callers never have to ask.
+        metadata.update(provenance)
 
         # Post-execution read-only verification
         if read_only and pre_snapshot is not None:
@@ -701,6 +732,7 @@ class CLinkTool(SimpleTool):
                 logger.debug("Failed to record assistant turn for continuation %s", continuation_id, exc_info=True)
 
         continuation_offer = self._create_continuation_offer(request, model_info)
+        self._store_working_dir(continuation_id, continuation_offer, derivation)
         if continuation_offer:
             tool_output = self._create_continuation_offer_response(
                 content,
@@ -960,7 +992,13 @@ class CLinkTool(SimpleTool):
                 logger.warning("Ignoring invalid CLINK_SNAPSHOT_BUDGET_SECONDS=%r (must be positive)", raw)
         return _DEFAULT_SNAPSHOT_BUDGET_SECONDS
 
-    def _build_error_metadata(self, client: ResolvedCLIClient, exc: CLIAgentError) -> dict[str, Any]:
+    def _build_error_metadata(
+        self,
+        client: ResolvedCLIClient,
+        exc: CLIAgentError,
+        *,
+        provenance: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """Assemble metadata for failed CLI calls.
 
         Read-only verification (``read_only_enforced``, ``read_only_sandbox_flags``,
@@ -977,7 +1015,145 @@ class CLinkTool(SimpleTool):
             metadata["stdout"] = exc.stdout.strip()
         if exc.stderr:
             metadata["stderr"] = exc.stderr.strip()
+        if provenance:
+            # A failing call still says where (and why there) the CLI ran.
+            metadata.update(provenance)
         return metadata
+
+    async def _derive_working_dir(
+        self,
+        request: CLinkRequest,
+        client: ResolvedCLIClient,
+        passed_files: list[str],
+        continuation_id: str | None,
+        mcp_roots: Any = None,
+    ) -> Derivation:
+        """Choose the one directory this call runs in (see ``clink/workdir.py`` for the precedence chain).
+
+        Gathers the inputs, runs the filesystem work off the event loop under a deadline, logs the derivation's
+        warnings, and turns a refusal into a ``ToolExecutionError`` that carries ``error_code``, ``candidates``,
+        ``tried`` and ``warnings`` in its ``ToolOutput`` metadata. ``mcp_roots`` is the handler's private
+        ``{"uris": [...], "warnings": [...]}`` (None when no roots were requested); an explicit ``working_dir``
+        ignores it, so such a call is neither fenced by roots nor warned about them.
+        """
+        explicit = (request.working_dir or "").strip() or None
+        roots, roots_warnings = (None, []) if explicit else self._roots_from_private_argument(mcp_roots)
+
+        continuation_dir: str | None = None
+        continuation_source: str | None = None
+        if continuation_id:
+            try:
+                from utils import conversation_store
+
+                thread = conversation_store.get_thread(continuation_id)
+                if thread is not None:
+                    continuation_dir = thread.working_dir
+                    continuation_source = thread.working_dir_source
+            except Exception:
+                logger.debug("Failed to load stored working_dir for continuation %s", continuation_id, exc_info=True)
+
+        try:
+            server_cwd: str | None = os.getcwd()
+        except OSError:  # the launch directory was deleted under the server
+            server_cwd = None
+
+        derive = functools.partial(
+            derive_working_dir,
+            explicit=explicit,
+            roots=roots,
+            file_paths=passed_files,
+            continuation_dir=continuation_dir,
+            continuation_source=continuation_source,
+            manifest_dir=client.working_dir,
+            env_default=(get_env("CLINK_DEFAULT_WORKING_DIR") or "").strip() or None,
+            server_cwd=server_cwd,
+            server_cwd_substituted=cwd_substitution() is not None,
+            fallback_policy=get_env("CLINK_WORKING_DIR_FALLBACK"),
+            deadline=time.monotonic() + _WORKDIR_DEADLINE_SECONDS,
+            extra_warnings=roots_warnings,
+        )
+        try:
+            derivation = await asyncio.wait_for(asyncio.to_thread(derive), timeout=_WORKDIR_WAIT_SECONDS)
+        except asyncio.TimeoutError:
+            # Backstop for a probe blocked in the kernel; the abandoned thread finishes on its own.
+            error = WorkingDirError(
+                "underivable",
+                "The project-root search timed out before a working directory could be derived. "
+                "Pass working_dir (an absolute path to the project root).",
+                warnings=roots_warnings,
+            )
+            self._raise_working_dir_error(error)
+        except WorkingDirError as error:
+            self._raise_working_dir_error(error)
+
+        for warning in derivation.warnings:
+            logger.warning("clink working_dir (%s): %s", derivation.source, warning)
+        return derivation
+
+    @staticmethod
+    def _roots_from_private_argument(raw: Any) -> tuple[list[str] | None, list[str]]:
+        """Turn the handler's ``_mcp_roots`` into ``(root directory paths or None, warnings)``.
+
+        The handler resolved the host's roots in the foreground and left ``{"uris": [...], "warnings": [...]}``;
+        a missing or malformed value means no roots. URIs that cannot be converted (a non-local host, a non-``file``
+        scheme, an encoded separator, ...) are skipped with a warning; the handler's own warnings (a timeout, a
+        protocol error) come first. Existence and broadness are ``derive_working_dir``'s to judge.
+        """
+        if not isinstance(raw, dict):
+            return None, []
+        uris = raw.get("uris")
+        handler_warnings = raw.get("warnings")
+        paths, conversion_warnings = roots_from_uris(
+            list(uris) if isinstance(uris, (list, tuple)) else [], windows=(os.name == "nt")
+        )
+        warnings = [w for w in handler_warnings if isinstance(w, str)] if isinstance(handler_warnings, list) else []
+        return paths or None, warnings + conversion_warnings
+
+    def _raise_working_dir_error(self, error: WorkingDirError) -> NoReturn:
+        for warning in error.warnings:
+            logger.warning("clink working_dir (%s): %s", error.code, warning)
+        self._raise_tool_error(
+            error.message,
+            metadata={
+                "error_code": error.code,
+                "candidates": [_json_safe(str(candidate)) for candidate in error.candidates],
+                "tried": [_json_safe(item) for item in error.tried],
+                "warnings": [_json_safe(item) for item in error.warnings],
+            },
+        )
+
+    @staticmethod
+    def _provenance_metadata(derivation: Derivation) -> dict[str, Any]:
+        """The three fields every response that chose a directory carries."""
+        return {
+            "working_dir": _json_safe(str(derivation.path)),
+            "working_dir_source": derivation.source,
+            "working_dir_warnings": [_json_safe(item) for item in derivation.warnings],
+        }
+
+    def _store_working_dir(
+        self,
+        continuation_id: str | None,
+        continuation_offer: dict[str, Any] | None,
+        derivation: Derivation,
+    ) -> None:
+        """Remember the resolved directory on the conversation thread so later turns reuse it.
+
+        Skipped when this turn merely reused the stored directory: rewriting it would replace the stored source
+        (a stored explicit home directory must stay ``explicit`` to remain reusable). A storage failure never
+        fails the call.
+        """
+        if derivation.source == "continuation":
+            return
+        thread_id = continuation_id or (continuation_offer or {}).get("continuation_id")
+        if not thread_id:
+            return
+        try:
+            from utils import conversation_store
+
+            conversation_store.set_thread_working_dir(str(thread_id), str(derivation.path), derivation.source)
+        except Exception:
+            logger.debug("Failed to store working_dir on thread %s", thread_id, exc_info=True)
 
     def _raise_tool_error(self, message: str, metadata: dict[str, Any] | None = None) -> NoReturn:
         error_output = ToolOutput(status="error", content=message, content_type="text", metadata=metadata)

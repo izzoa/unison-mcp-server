@@ -82,7 +82,7 @@ Continue with clink gemini - implement the recommended feature
 
 ## How to clink
 
-The `clink` tool takes five parameters that matter day-to-day: `cli_name`, `role`, `model`, `read_only`, and `working_dir`. Everything else (file attachments, continuation IDs) works the same as any other Unison tool.
+The `clink` tool takes five parameters that matter day-to-day: `cli_name`, `role`, `model`, `read_only`, and `working_dir` (optional — derived from the files you pass or the conversation when omitted). Everything else (file attachments, continuation IDs) works the same as any other Unison tool.
 
 Long runs can't be killed by your MCP host's tool timeout: every `clink` call waits a bounded ~45s, and a CLI that needs longer returns `status: "running"` with a `job_id` — call `clink` again with just that `job_id` to keep waiting (or `cancel: true` to abort), and the full result arrives the moment the CLI finishes. Fast runs are byte-identical to a normal blocking call. See [docs/tools/clink.md](docs/tools/clink.md) for the contract.
 
@@ -103,9 +103,11 @@ clink with opencode using openai/gpt-5 to write a property-based test suite
 # Read-only mode (analysis without file writes)
 clink with claude codereviewer in read-only mode to review PR #482
 
-# Point the spawned CLI at your project/worktree root so it can see your files
-# (important when the MCP server runs elsewhere — e.g. spawned by Claude Desktop,
-#  or when you work in a git worktree; Copilot's file tools are rooted at its cwd)
+# working_dir is optional: clink derives it from the files you pass (their git/project root,
+# worktrees included), the conversation, or the host's MCP roots, and refuses rather than guesses.
+# Pass it to pin the project/worktree root explicitly — important when the MCP server runs
+# elsewhere (Claude Desktop launches it from /, which says nothing about your project) or when a
+# worktree subagent passes no files; Copilot's file tools are rooted at its cwd
 clink with copilot working_dir="/abs/path/to/your/repo" to summarize this codebase
 ```
 
@@ -278,6 +280,7 @@ Unison inherits the entire PAL feature set. Every row below is an addition or ha
 |---|---|---|
 | **CLI-to-CLI orchestration** | — | **`clink`** spawns **8 CLIs** as subagents — Claude, Codex, Gemini, opencode, Aider, Crush, Amp, GitHub Copilot — with role presets (`planner`, `codereviewer`), optional `supported_models` allowlist per CLI, and a cross-cutting recursion guard for MCP-aware targets |
 | **Read-only mode for sub-CLIs** | — | Native CLI flags (`--sandbox read-only`, `--approval-mode plan`, `--permission-mode plan`, `--dry-run`) + prompt instruction + full-tree post-call filesystem-snapshot diff; `read_only_enforced` metadata reflects whether a real sandbox flag was applied; CLI bookkeeping (e.g. `.opencode/`) classified separately so it doesn't drown out genuine model writes |
+| **Safe working directory for sub-CLIs** | — | `working_dir` is **optional**: clink derives it — conversation → the project root of the files you pass (VCS root outranks package markers, git worktrees resolve to the worktree) → host MCP roots as a fence (on by default; `CLINK_MCP_ROOTS=legacy` skips the modern-era exchange Claude Code needs, `off` never asks) → manifest → `CLINK_DEFAULT_WORKING_DIR` → a guarded server cwd — and **refuses** (`ambiguous`, `roots_conflict`, `underivable`, …) instead of guessing. A broadness guard rejects `/`, system directories, shared containers and temp roots, and every response reports `working_dir`, `working_dir_source` and `working_dir_warnings` |
 | **Provider reach via one integration** | One provider per implementation | **75+ providers** through opencode via `provider/model` syntax (OpenAI, Anthropic, Google, Ollama, OpenRouter, xAI, Mistral, Groq, DeepSeek, …) |
 | **Native Anthropic (Claude) provider** | — (Claude reachable only via OpenRouter) | `ANTHROPIC_API_KEY` activates the Messages API directly: latest-two-generations catalog (Fable 5.1/5, Opus 5.5/5/4.8, Sonnet 5.5/5/4.6, Haiku 5.5/4.5), thinking modes mapped onto adaptive-thinking effort or extended-thinking budgets per model, `ANTHROPIC_ALLOWED_MODELS` restrictions, `ANTHROPIC_API_URL` gateway override |
 | **Model catalog** | Static JSON files, manually curated — go stale the day a provider ships a new model | **2000+ models auto-discovered** via [LiteLLM](https://github.com/BerriAI/litellm) at startup, with curated overrides for tuned metadata |
@@ -589,6 +592,7 @@ DISABLED_TOOLS=
 - **Multi-model workflows** - Chain different models in single conversations
 - **Conversation continuity** - Context preserved across tools and models
 - **[Context revival](docs/context-revival.md)** - Continue conversations even after context resets
+- **[Safe sub-CLI working directory](docs/tools/clink.md#working-directory)** - clink derives where a spawned CLI runs from your files, conversation and host roots, refuses broad or ambiguous directories, and reports how it decided
 
 **Model Support**
 - **Multiple providers** - Gemini, OpenAI, Anthropic, Azure, X.AI, OpenRouter, DIAL, Ollama

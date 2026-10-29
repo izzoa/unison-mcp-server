@@ -7,12 +7,29 @@ server.py for tests and callers) plus the on_* adapters that server.py
 passes to the mcp 2.x Server constructor.
 """
 
+import asyncio
 import logging
+from collections.abc import Mapping
 from typing import Any, NamedTuple
 
 import jsonschema
-from mcp.types import CallToolResult, ListToolsResult, TextContent, Tool, ToolAnnotations
+import pydantic
+from mcp.shared.exceptions import MCPError, NoBackChannelError
+from mcp.types import (
+    CallToolResult,
+    ClientCapabilities,
+    InputRequiredResult,
+    ListRootsRequest,
+    ListRootsResult,
+    ListToolsResult,
+    RootsCapability,
+    TextContent,
+    Tool,
+    ToolAnnotations,
+)
+from mcp.types.version import MODERN_PROTOCOL_VERSIONS
 
+from clink.workdir import parse_roots_mode
 from config import DEFAULT_MODEL
 from tools.models import ToolOutput
 from tools.shared.exceptions import ToolExecutionError
@@ -37,6 +54,107 @@ def _sanitize_for_log(value: Any, max_len: int = 128) -> str:
     if len(text) > max_len:
         text = text[:max_len] + "...(truncated)"
     return text
+
+
+# How long clink waits for the host to answer a roots/list server request before treating roots as unavailable.
+ROOTS_REQUEST_TIMEOUT_SECONDS = 3.0
+# The key of the roots entry in an input-request exchange, and the opaque state that marks a retry of that exchange.
+ROOTS_INPUT_KEY = "roots"
+ROOTS_REQUEST_STATE = "roots1"
+
+
+def _roots_outcome(uris: list[str], warnings: list[str]) -> dict[str, Any] | None:
+    """The private ``_mcp_roots`` argument, or ``None`` when there is nothing to hand to the tool."""
+    if not uris and not warnings:
+        return None
+    return {"uris": uris, "warnings": warnings}
+
+
+def _roots_reply_uris(reply: Any) -> list[str]:
+    """URI strings of a ``ListRootsResult`` or a ``ListRootsResult``-shaped mapping; raises ``ValueError`` otherwise."""
+    if isinstance(reply, Mapping):
+        reply = ListRootsResult.model_validate(reply)
+    if not isinstance(reply, ListRootsResult):
+        raise ValueError(f"unexpected reply type {type(reply).__name__}")
+    return [str(root.uri) for root in reply.roots]
+
+
+async def resolve_clink_roots(ctx: Any, params: Any) -> InputRequiredResult | dict[str, Any] | None:
+    """Ask the host for its MCP roots for one clink call (design D9). Never raises.
+
+    Returns ``None`` when there is nothing to report (roots not requested, no capability, no back-channel or an empty
+    list), ``{"uris": [...], "warnings": [...]}`` for the private ``_mcp_roots`` argument (a warning only for a failure
+    after a request or reply, or for an unrecognised ``CLINK_MCP_ROOTS``), or an ``InputRequiredResult`` the request
+    handler must return as-is (only under ``CLINK_MCP_ROOTS=auto``, the default when it is unset, on a modern-era
+    connection that cannot carry server requests, and never a second time for the retry of that exchange; ``legacy``,
+    which an unrecognised value also means, and ``off`` never return one).
+
+    Must run before any state is written: the input-request exchange re-executes the call.
+    """
+    try:
+        return await _resolve_clink_roots(ctx, params)
+    except Exception as exc:  # roots are opportunistic: whatever goes wrong, the call proceeds without them
+        logger.debug("Resolving MCP roots failed unexpectedly: %s", exc, exc_info=True)
+        return _roots_outcome([], [f"roots unavailable: unexpected {type(exc).__name__} while resolving them"])
+
+
+async def _resolve_clink_roots(ctx: Any, params: Any) -> InputRequiredResult | dict[str, Any] | None:
+    mode, warnings = parse_roots_mode(get_env("CLINK_MCP_ROOTS"))
+    if mode == "off":
+        return None
+    session = getattr(ctx, "session", None)
+    if session is None or not session.check_client_capability(ClientCapabilities(roots=RootsCapability())):
+        return _roots_outcome([], warnings)
+
+    if session.can_send_request:
+        try:
+            result = await session.send_request(
+                ListRootsRequest(),
+                ListRootsResult,
+                request_read_timeout_seconds=ROOTS_REQUEST_TIMEOUT_SECONDS,
+            )
+            return _roots_outcome(_roots_reply_uris(result), warnings)
+        except (
+            MCPError,
+            TimeoutError,
+            asyncio.TimeoutError,
+            NoBackChannelError,
+            ValueError,
+            pydantic.ValidationError,
+        ) as exc:
+            logger.debug("roots/list request failed: %s: %s", type(exc).__name__, exc)
+            warnings.append(f"roots unavailable: the roots/list request failed ({type(exc).__name__})")
+            return _roots_outcome([], warnings)
+
+    # The era is the negotiated protocol version, never inferred from can_send_request: a legacy connection that cannot
+    # carry server requests must not be sent an input-request result (it crashes serialization).
+    modern = getattr(session, "protocol_version", None) in MODERN_PROTOCOL_VERSIONS
+    if mode != "auto" or not modern:
+        return _roots_outcome([], warnings)
+
+    reply = (getattr(params, "input_responses", None) or {}).get(ROOTS_INPUT_KEY)
+    if reply is None:
+        if getattr(params, "request_state", None) == ROOTS_REQUEST_STATE:
+            logger.debug("roots input retry carried no roots reply; treating roots as unavailable")
+            warnings.append("roots unavailable: the retry of the roots input request carried no roots reply")
+            return _roots_outcome([], warnings)
+        return InputRequiredResult(
+            input_requests={ROOTS_INPUT_KEY: ListRootsRequest()},
+            request_state=ROOTS_REQUEST_STATE,
+        )
+    try:
+        return _roots_outcome(_roots_reply_uris(reply), warnings)
+    except (ValueError, pydantic.ValidationError) as exc:
+        logger.debug("roots input reply rejected: %s: %s", type(exc).__name__, exc)
+        warnings.append(f"roots unavailable: the host's roots reply was rejected ({type(exc).__name__})")
+        return _roots_outcome([], warnings)
+
+
+def _wants_roots(arguments: dict[str, Any]) -> bool:
+    """Whether a clink call needs roots: a start without an explicit ``working_dir`` (a job poll never does)."""
+    if str(arguments.get("job_id") or "").strip():
+        return False
+    return not str(arguments.get("working_dir") or "").strip()
 
 
 class ToolHandlers(NamedTuple):
@@ -157,7 +275,15 @@ def build_handlers(tool_registry):
             except Exception:
                 pass
 
+            # clink derives its working directory from the files passed on THIS
+            # call; the initial-context merge below replays the first turn's
+            # files, so capture them before it runs (consumed and popped by
+            # CLinkTool._execute_blocking).
+            passed_file_paths = list(arguments.get("absolute_file_paths") or []) if name == "clink" else None
+
             arguments = await reconstruct_thread_context(arguments, tool_registry)
+            if passed_file_paths is not None:
+                arguments["_passed_file_paths"] = passed_file_paths
             logger.debug(
                 "[CONVERSATION_DEBUG] After thread reconstruction, arguments keys: %s",
                 list(arguments.keys()),
@@ -350,7 +476,7 @@ def build_handlers(tool_registry):
             _tool_cache[tool.name] = tool
         return ListToolsResult(tools=tools)
 
-    async def on_call_tool(ctx, params) -> CallToolResult:
+    async def on_call_tool(ctx, params) -> CallToolResult | InputRequiredResult:
         token = set_current_request_context(ctx)
         try:
             name = params.name
@@ -364,6 +490,17 @@ def build_handlers(tool_registry):
                     jsonschema.validate(instance=arguments, schema=tool.input_schema)
                 except jsonschema.ValidationError as e:
                     return _error_result(f"Input validation error: {e.message}")
+
+            if name == "clink":
+                # Private arguments come from the handler, never from a caller.
+                arguments = {k: v for k, v in arguments.items() if k not in ("_mcp_roots", "_passed_file_paths")}
+                if tool_registry.is_available(name) and _wants_roots(arguments):
+                    # Before any state is written: an input-request exchange re-executes the call.
+                    roots = await resolve_clink_roots(ctx, params)
+                    if isinstance(roots, InputRequiredResult):
+                        return roots
+                    if roots is not None:
+                        arguments["_mcp_roots"] = roots
 
             results = await handle_call_tool(name, arguments)
 
@@ -587,7 +724,7 @@ async def reconstruct_thread_context(arguments: dict[str, Any], tool_registry: A
             len(context.initial_context),
         )
         for key, value in context.initial_context.items():
-            if key not in enhanced_arguments and key not in ["temperature", "thinking_mode", "model"]:
+            if key not in enhanced_arguments and key not in ["temperature", "thinking_mode", "model", "working_dir"]:
                 enhanced_arguments[key] = value
                 logger.debug("[CONVERSATION_DEBUG] Merged initial context param: %s", key)
 

@@ -116,7 +116,8 @@ if [[ -n "$MYPY" ]]; then
         clink/agents/crush.py clink/parsers/crush.py \
         clink/agents/amp.py clink/parsers/amp.py \
         clink/agents/copilot.py clink/parsers/copilot.py \
-        utils/observability.py utils/json_log_formatter.py utils/mcp_context.py
+        utils/observability.py utils/json_log_formatter.py utils/mcp_context.py \
+        clink/workdir.py utils/launch_info.py
     echo "✅ Step 1b Complete: Type checking passed!"
 fi
 echo ""
