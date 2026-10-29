@@ -150,17 +150,20 @@ class CLinkRequest(BaseModel):
         description=(
             "Optional model identifier forwarded to the selected CLI. Opencode uses the "
             "'provider/model' convention (e.g. 'anthropic/claude-sonnet-4-5', 'openai/gpt-5', "
-            "'ollama/llama3.2'); other CLIs accept their own forms (e.g. 'sonnet' for claude, "
+            "'ollama/llama3.2'; opencode v2 also accepts 'provider/model#variant'); other CLIs "
+            "accept their own forms (e.g. 'sonnet' for claude, "
             "model aliases for gemini/codex). When omitted, the CLI uses whatever default is "
             "set by its manifest. Validation is best-effort: if the selected CLI defines a "
             "'supported_models' allowlist in its manifest, the value is checked against it; "
-            "otherwise invalid model strings surface as CLI-level errors in response metadata."
+            "otherwise invalid model strings surface as CLI-level errors (opencode's own error "
+            "type and message lead the error text)."
         ),
     )
     working_dir: str | None = Field(
         default=None,
         description=(
-            "Absolute path to the directory the spawned CLI should run in. Pass your project or "
+            "Absolute path to the directory the spawned CLI should run in (set as both its cwd and "
+            "its PWD). Pass your project or "
             "worktree root so the CLI can see your files — some CLIs (e.g. Copilot) root their "
             "file tools at their working directory and refuse paths outside it. When omitted, "
             "falls back to the CLI manifest's working_dir, then the MCP server's own working "
@@ -342,16 +345,19 @@ class CLinkTool(SimpleTool):
                 "type": "string",
                 "description": (
                     "Optional model forwarded to the selected CLI. Opencode uses 'provider/model' "
-                    "(e.g. 'anthropic/claude-sonnet-4-5', 'openai/gpt-5', 'ollama/llama3.2'); other CLIs "
+                    "(e.g. 'anthropic/claude-sonnet-4-5', 'openai/gpt-5', 'ollama/llama3.2'; opencode v2 "
+                    "also accepts 'provider/model#variant'); other CLIs "
                     "accept their own forms (e.g. 'sonnet' for claude). Omit to use the CLI's manifest "
-                    "default. Validation is best-effort — invalid models surface as CLI-level errors in "
-                    "response metadata unless the manifest declares a 'supported_models' allowlist."
+                    "default. Validation is best-effort — invalid models surface as CLI-level errors "
+                    "(opencode's own error type and message lead the text) unless the manifest declares a "
+                    "'supported_models' allowlist."
                 ),
             },
             "working_dir": {
                 "type": "string",
                 "description": (
-                    "Absolute path to the directory the spawned CLI should run in. Pass your "
+                    "Absolute path to the directory the spawned CLI should run in (set as both its cwd "
+                    "and its PWD). Pass your "
                     "project or worktree root so the CLI can see your files (some CLIs root "
                     "their file tools at their cwd). Omit to use the CLI manifest's working_dir, "
                     "then the server's own working directory."
@@ -380,6 +386,10 @@ class CLinkTool(SimpleTool):
     #: deadline (Claude Desktop's local-agent mode cancels around a minute).
     _DEFAULT_JOB_WAIT_SECONDS = 45.0
     _MAX_JOB_WAIT_SECONDS = 50.0
+    # How long a cancel reply waits for the CLI to actually stop. Must cover the
+    # longest interrupt grace period any agent declares (opencode: 5 s) plus
+    # margin, or a cancel of a slow-to-exit CLI would report "running".
+    _CANCEL_WAIT_SECONDS = 7.0
 
     async def execute(self, arguments: dict[str, Any]) -> list[TextContent]:
         """Dispatcher: start a run (bounded wait) or continue/cancel a job.
@@ -417,7 +427,7 @@ class CLinkTool(SimpleTool):
                     f"Unknown clink job '{job_id}'. It may have expired or the MCP server restarted "
                     "(jobs are in-memory)."
                 )
-            await self._wait_for_job(job, 2.0)
+            await self._wait_for_job(job, self._CANCEL_WAIT_SECONDS)
             return self._job_response(job)
 
         job = manager.get(job_id)
@@ -470,13 +480,19 @@ class CLinkTool(SimpleTool):
         if job.state == "failed" and job.error_json:
             raise ToolExecutionError(job.error_json)
 
+        cancelling = job.state == "running" and job.cancel_requested
         payload: dict[str, Any] = {
-            "status": job.state,
+            "status": "cancelling" if cancelling else job.state,
             "job_id": job.job_id,
             "cli_name": job.cli_name,
             "elapsed_seconds": round(job.elapsed_seconds(), 1),
         }
-        if job.state == "running":
+        if cancelling:
+            payload["instructions"] = (
+                "The cancel was accepted and the CLI is being stopped. Do not resubmit the task. "
+                f"Call clink again with ONLY job_id='{job.job_id}' to confirm it reports 'cancelled'."
+            )
+        elif job.state == "running":
             payload["instructions"] = (
                 "The CLI is still working. Call clink again with ONLY job_id="
                 f"'{job.job_id}' to continue waiting (each call waits up to "

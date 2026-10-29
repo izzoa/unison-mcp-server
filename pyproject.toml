@@ -6,6 +6,7 @@ license = "AGPL-3.0"
 requires-python = ">=3.10"
 dependencies = [
     "mcp>=2,<3",
+    "anyio>=4,<5",  # Shielded grace-period wait in clink's graceful process stop (also a transitive dep of mcp)
     "jsonschema>=4.20.0",  # Input-schema validation in the call_tool adapter (was the 1.x SDK's job)
     "anthropic>=0.121,<1",  # Native Anthropic provider (Messages API, extended thinking)  # Input-schema validation in the call_tool adapter (was the 1.x SDK's job)
     "google-genai>=1.19.0",
@@ -230,6 +231,7 @@ module = [
     "utils.file_utils",
     "tools.registry",
     "smoke_test_wheel",
+    "clink.agents.base",
     "clink.agents.opencode",
     "clink.parsers.opencode",
     "clink.agents.aider",

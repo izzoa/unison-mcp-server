@@ -136,7 +136,7 @@ clink with copilot working_dir="/abs/path/to/your/repo" to summarize this codeba
 opencode models                          # all models from authenticated providers
 opencode models | grep ^anthropic/        # filter by provider
 opencode models | wc -l                   # count (typically 300+ once you've authed a few providers)
-opencode providers list                   # check which providers are authenticated
+opencode auth list                        # check which providers are authenticated
 ```
 
 | CLI | How to discover valid models | Format |
@@ -150,7 +150,7 @@ opencode providers list                   # check which providers are authentica
 | `amp` | `amp --help` · [Amp owner's manual](https://ampcode.com/manual) | **Named modes only**: `deep`, `large`, `rush`, `smart` (mapped to `--mode`, not arbitrary model strings) |
 | `copilot` | `copilot help` · [Copilot CLI reference](https://docs.github.com/copilot/reference/copilot-cli-reference/cli-programmatic-reference) | model IDs (e.g. `gpt-5.3-codex`, `claude-sonnet-4.6`, `claude-haiku-4.5`) via `--model` |
 
-**Validation behavior:** the `model` field is free-text — invalid values come back as a CLI-level error in response metadata, not a schema rejection. Authentication for opencode providers is opencode's own concern (`opencode auth`); Unison doesn't manage credentials.
+**Validation behavior:** the `model` field is free-text — invalid values come back as a CLI-level error in response metadata, not a schema rejection. Authentication for opencode providers is opencode's own concern (`opencode auth`); Unison doesn't manage credentials. On opencode v2, clink runs opencode on a private server by default (`CLINK_OPENCODE_MODE=standalone`), so provider API keys exported in Unison's environment reach it — and are withheld when `UNISON_CLINK_STRIP_SECRETS` is set; credentials saved with `opencode auth` live in opencode's own database. See [opencode v2](docs/tools/clink.md#opencode-v2).
 
 ### Curating models per CLI (optional)
 

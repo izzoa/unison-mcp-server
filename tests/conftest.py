@@ -264,3 +264,24 @@ def disable_force_env_override(monkeypatch):
         yield
     finally:
         env_config.reload_env()
+
+
+@pytest.fixture(autouse=True)
+def _stub_opencode_version_probe(request, monkeypatch):
+    """No unit test may run a real ``opencode --version``.
+
+    clink probes the resolved opencode binary once to gate v2-only flags. The
+    result must never depend on which opencode the developer has on PATH, so
+    every non-integration test sees an unknown version (pre-v2 command line)
+    unless it overrides the probe itself.
+    """
+    if request.node.get_closest_marker("integration"):
+        yield
+        return
+
+    import clink.agents.opencode as opencode_agent
+
+    opencode_agent.reset_version_cache()
+    monkeypatch.setattr(opencode_agent, "_probe_opencode_version", lambda _path: None)
+    yield
+    opencode_agent.reset_version_cache()

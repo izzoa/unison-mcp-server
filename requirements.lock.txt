@@ -20,6 +20,7 @@ anyio==4.14.2
     #   openai
     #   sse-starlette
     #   starlette
+    #   unison-mcp-server
 async-timeout==5.0.1 ; python_full_version < '3.11'
     # via aiohttp
 attrs==26.1.0

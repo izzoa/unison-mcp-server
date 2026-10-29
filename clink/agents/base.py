@@ -17,6 +17,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+import anyio
+
 from clink.constants import CLINK_DEPTH_ENV_VAR, DEFAULT_STREAM_LIMIT
 from clink.models import ResolvedCLIClient, ResolvedCLIRole
 from clink.parsers import BaseParser, ParsedCLIResponse, ParserError, get_parser
@@ -136,6 +138,20 @@ class BaseCLIAgent:
     #: post-execution snapshot diff in :mod:`tools.clink`.
     fs_violation_ignore_patterns: tuple[str, ...] = ()
 
+    #: Signal sent to the CLI's process group *before* SIGKILL whenever clink
+    #: stops it (timeout, job cancel, shutdown, host cancel in blocking mode).
+    #: ``None`` keeps the immediate group SIGKILL. A CLI whose session lives
+    #: server-side (opencode) needs a chance to release it on a clean interrupt;
+    #: a SIGKILL leaves an execution claim that the user's service later resumes.
+    #: A declaring agent also has its output captured live (see
+    #: :meth:`_communicate_live`) so a forced kill can still report what the CLI
+    #: printed first.
+    interrupt_signal: signal.Signals | None = None
+
+    #: Seconds to wait for the CLI to exit after :attr:`interrupt_signal`
+    #: before force-killing. Ignored when no signal is declared.
+    interrupt_grace_seconds: float = 0.0
+
     def __init__(self, client: ResolvedCLIClient):
         self.client = client
         self._parser: BaseParser = get_parser(client.parser)
@@ -237,7 +253,6 @@ class BaseCLIAgent:
     ) -> AgentOutput:
         # The runner simply executes the configured CLI command for the selected role.
         command = self._build_command(role=role, system_prompt=system_prompt, model=model)
-        env = self._build_environment()
 
         # Resolve executable path for cross-platform compatibility (especially Windows)
         executable_name = command[0]
@@ -261,6 +276,7 @@ class BaseCLIAgent:
         # files the spawned CLI can see at all.
         effective_working_dir = working_dir if working_dir is not None else self.client.working_dir
         cwd = str(effective_working_dir) if effective_working_dir else None
+        env = self._build_environment(cwd)
         limit = DEFAULT_STREAM_LIMIT
 
         stdout_text = ""
@@ -324,29 +340,60 @@ class BaseCLIAgent:
             cleanup_plan()
             raise CLIAgentError(f"Executable not found for CLI '{self.client.name}': {exc}") from exc
 
+        # Agents that declare an interrupt signal read output into buffers owned
+        # here: ``communicate()`` discards what it already read when ``wait_for``
+        # cancels it, so a forced kill could never say what the CLI printed, and
+        # the readers must keep draining while the CLI is given its grace period
+        # (a child blocked on a full pipe cannot exit on the interrupt).
+        live = self.interrupt_signal is not None
+        stdout_buf = bytearray()
+        stderr_buf = bytearray()
+        io_task: asyncio.Future[None] | None = None
+
         try:
-            stdout_bytes, stderr_bytes = await asyncio.wait_for(
-                process.communicate(stdin_data),
-                timeout=self.client.timeout_seconds,
-            )
+            if live:
+                io_task = asyncio.ensure_future(self._communicate_live(process, stdin_data, stdout_buf, stderr_buf))
+                # shield: a timeout or cancellation must not cancel the readers.
+                await asyncio.wait_for(asyncio.shield(io_task), timeout=self.client.timeout_seconds)
+                stdout_bytes, stderr_bytes = bytes(stdout_buf), bytes(stderr_buf)
+            else:
+                stdout_bytes, stderr_bytes = await asyncio.wait_for(
+                    process.communicate(stdin_data),
+                    timeout=self.client.timeout_seconds,
+                )
         except asyncio.CancelledError:
             # The MCP host cancelled the request — its own tool timeout, a user
             # abort, or a dropped connection. Without this, the CLI subprocess
             # kept running orphaned after the caller stopped listening (an
-            # agentic CLI can burn minutes of paid usage that way). Kill the
-            # tree and re-raise immediately; no bounded drain here, because
-            # cancellation is latency-sensitive and the event loop reaps the
-            # dead child on its own.
-            self._terminate_process_tree(process)
+            # agentic CLI can burn minutes of paid usage that way). Stop the
+            # tree and re-raise; no bounded drain here, because cancellation is
+            # latency-sensitive and the event loop reaps the dead child on its
+            # own.
+            try:
+                await self._stop_process(process, stdout_buf if live else None, cwd)
+            finally:
+                # Even when a second cancellation interrupts the stop itself.
+                if io_task is not None:
+                    io_task.cancel()
             raise
         except asyncio.TimeoutError as exc:
-            # Kill the whole process group (not just the direct child) so no
-            # descendants are orphaned, then bound the cleanup drain so a survivor
+            # Stop the whole process group (not just the direct child) so no
+            # descendants are orphaned (an agent that declares an interrupt signal
+            # only escalates to the group SIGKILL if the leader itself ignores the
+            # interrupt), then bound the cleanup drain so a survivor
             # holding the stdout/stderr pipe cannot make communicate() hang
             # forever and defeat the timeout.
-            self._terminate_process_tree(process)
             try:
-                await asyncio.wait_for(process.communicate(), timeout=5)
+                await self._stop_process(process, stdout_buf if live else None, cwd)
+            except asyncio.CancelledError:
+                if io_task is not None:
+                    io_task.cancel()
+                raise
+            try:
+                if io_task is not None:
+                    await asyncio.wait_for(io_task, timeout=5)
+                else:
+                    await asyncio.wait_for(process.communicate(), timeout=5)
             except (asyncio.TimeoutError, ProcessLookupError):
                 pass
             except Exception:  # pragma: no cover - best-effort drain
@@ -359,7 +406,8 @@ class BaseCLIAgent:
             cleanup_plan()
 
         duration = time.monotonic() - start_time
-        return_code = process.returncode
+        # communicate()/wait() have completed, so the status is set; a missing one is a failure.
+        return_code = process.returncode if process.returncode is not None else -1
         stdout_text = stdout_bytes.decode("utf-8", errors="replace")
         stderr_text = stderr_bytes.decode("utf-8", errors="replace")
 
@@ -463,7 +511,104 @@ class BaseCLIAgent:
         except Exception:  # pragma: no cover - defensive
             logger.debug("Failed to terminate CLI '%s' process tree", self.client.name, exc_info=True)
 
-    def _build_environment(self) -> dict[str, str]:
+    @staticmethod
+    async def _communicate_live(
+        process: asyncio.subprocess.Process,
+        stdin_data: bytes | None,
+        stdout_buf: bytearray,
+        stderr_buf: bytearray,
+    ) -> None:
+        """Feed stdin and pump stdout/stderr into caller-owned buffers.
+
+        Equivalent to ``process.communicate`` except that bytes are visible in
+        the buffers as they arrive, so they survive the task being abandoned.
+        """
+
+        async def feed() -> None:
+            stdin = process.stdin
+            if stdin is None:
+                return
+            try:
+                if stdin_data:
+                    stdin.write(stdin_data)
+                    await stdin.drain()
+            except (BrokenPipeError, ConnectionResetError):
+                pass
+            finally:
+                try:
+                    stdin.close()
+                except (BrokenPipeError, ConnectionResetError, OSError):
+                    pass
+
+        async def pump(stream: asyncio.StreamReader | None, buf: bytearray) -> None:
+            if stream is None:
+                return
+            while True:
+                chunk = await stream.read(65536)
+                if not chunk:
+                    return
+                buf.extend(chunk)
+
+        await asyncio.gather(feed(), pump(process.stdout, stdout_buf), pump(process.stderr, stderr_buf))
+        await process.wait()
+
+    async def _stop_process(
+        self,
+        process: asyncio.subprocess.Process,
+        captured: bytearray | None,
+        cwd: str | None,
+    ) -> None:
+        """Stop the CLI: interrupt first when the agent declares a signal, then SIGKILL.
+
+        Agents without :attr:`interrupt_signal` keep the immediate group SIGKILL.
+        A declaring agent's process group gets the interrupt, then up to
+        :attr:`interrupt_grace_seconds` to exit. The wait runs in an anyio
+        shielded scope: under the MCP dispatcher the request's anyio cancel
+        scope re-delivers its cancellation on every await, so ``asyncio.shield``
+        would give a grace of zero. The ``finally`` runs the SIGKILL whenever
+        the process is still alive, so a second cancellation can cut the grace
+        short but never skip the kill.
+        """
+        # Windows has no process-group signal to send, so it behaves exactly like an
+        # agent that declares none: immediate kill, and no false "ignored the
+        # interrupt" report.
+        sig = self.interrupt_signal if os.name == "posix" else None
+        if sig is None:
+            self._terminate_process_tree(process)
+            return
+        try:
+            if process.returncode is None:
+                self._signal_process_group(process, sig)
+                with anyio.CancelScope(shield=True):
+                    with anyio.move_on_after(self.interrupt_grace_seconds):
+                        await process.wait()
+        finally:
+            if process.returncode is None:
+                self._terminate_process_tree(process)
+                try:
+                    self._on_force_kill(bytes(captured or b""), cwd)
+                except Exception:  # pragma: no cover - a hook must never mask the stop
+                    logger.debug("Force-kill hook failed for CLI '%s'", self.client.name, exc_info=True)
+
+    def _signal_process_group(self, process: asyncio.subprocess.Process, sig: signal.Signals) -> None:
+        """Send ``sig`` to the CLI's process group, falling back to the child alone."""
+        try:
+            os.killpg(os.getpgid(process.pid), sig)
+        except (ProcessLookupError, PermissionError, OSError):
+            try:
+                process.send_signal(sig)
+            except ProcessLookupError:
+                pass
+
+    def _on_force_kill(self, captured_stdout: bytes, cwd: str | None) -> None:
+        """Called after SIGKILL was needed because the CLI ignored the interrupt.
+
+        ``captured_stdout`` is everything the CLI wrote before the kill. The
+        default does nothing; an agent whose CLI leaves server-side state behind
+        overrides this to report it.
+        """
+
+    def _build_environment(self, cwd: str | None = None) -> dict[str, str]:
         env = os.environ.copy()
 
         # Security: optionally withhold Unison's own provider secrets from the
@@ -480,6 +625,21 @@ class BaseCLIAgent:
                     env.pop(var, None)
 
         env.update(self.client.env)
+
+        # Some CLIs (opencode) root their session at $PWD rather than the
+        # process cwd. The inherited PWD names the directory the Unison server
+        # was launched from, so without this a per-call working_dir is silently
+        # ignored. Set after the manifest env so a stale manifest PWD can't win.
+        if cwd:
+            env["PWD"] = cwd
+        else:
+            try:
+                env["PWD"] = os.getcwd()
+            except FileNotFoundError:
+                # The server's own cwd was deleted: drop the stale value so the
+                # CLI falls back to its process cwd instead of a dead path.
+                env.pop("PWD", None)
+
         # Propagate the clink recursion depth (incremented by one) so that any
         # CLI we spawn — if it itself re-invokes Unison via MCP — trips the
         # recursion guard in CLinkTool.execute() at the child process

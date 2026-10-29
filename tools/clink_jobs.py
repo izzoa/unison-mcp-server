@@ -59,6 +59,10 @@ class ClinkJob:
     done_event: asyncio.Event = field(default_factory=asyncio.Event)
     result_json: str | None = None
     error_json: str | None = None
+    #: Set when a cancel was requested. The job stays ``running`` until its CLI
+    #: has actually been stopped (an agent may be given a grace period to exit
+    #: cleanly), and this flag is what lets replies say "cancelling" meanwhile.
+    cancel_requested: bool = False
 
     @property
     def terminal(self) -> bool:
@@ -147,7 +151,10 @@ class ClinkJobManager:
         job = self.get(job_id)
         if job is None:
             return None
-        if not job.terminal and job.task is not None:
+        # Idempotent: a second native cancel during the CLI's grace period would cut
+        # it short and force-kill a client that was exiting cleanly.
+        if not job.terminal and job.task is not None and not job.cancel_requested:
+            job.cancel_requested = True
             job.task.cancel()
         return job
 
@@ -168,8 +175,10 @@ class ClinkJobManager:
     async def shutdown(self) -> None:
         """Cancel and await all running jobs (server teardown)."""
         tasks = [job.task for job in self._jobs.values() if job.task is not None and not job.task.done()]
-        for task in tasks:
-            task.cancel()
+        for job in self._jobs.values():
+            if job.task is not None and not job.task.done() and not job.cancel_requested:
+                job.cancel_requested = True
+                job.task.cancel()
         for task in tasks:
             try:
                 await task
