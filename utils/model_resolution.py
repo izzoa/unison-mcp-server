@@ -1,8 +1,9 @@
 """
 Model resolution utilities for the MCP server.
 
-Contains parse_model_option() for parsing model:option format strings,
-and resolve_fallback_model() for unified fallback model resolution.
+Contains trim_model_identifier() (identifier preservation), resolution_metadata() (reporting
+alias resolution in response metadata), and resolve_fallback_model() for unified fallback
+model resolution.
 """
 
 import logging
@@ -11,38 +12,52 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 
-def parse_model_option(model_string: str) -> tuple[str, str | None]:
+def trim_model_identifier(model_string: str) -> str:
     """
-    Parse model:option format into model name and option.
+    Return a caller-supplied model identifier exactly as given, minus surrounding whitespace.
 
-    Handles different formats:
-    - OpenRouter models: preserve :free, :beta, :preview suffixes as part of model name
-    - Ollama/Custom models: split on : to extract tags like :latest
-    - Consensus stance: extract options like :for, :against
+    A model identifier belongs to the provider that serves it, so nothing inside it is
+    interpreted here. A colon-delimited segment (``:free``, ``:batch``, ``:online``,
+    ``:exacto``, an Ollama ``:3b`` tag, or a variant a provider has not shipped yet) is part of
+    the identifier and reaches the provider intact. Interpreting segments against a server-side
+    list silently resolved a different (often pricier, or less capable) model than the caller
+    named; an identifier the provider does not serve now fails visibly as an unknown model.
+
+    Server-defined per-model options are never encoded into the identifier: consensus stance is
+    read from its own ``stance`` field.
 
     Args:
-        model_string: String that may contain "model:option" format
+        model_string: The model identifier as supplied by the caller.
 
     Returns:
-        tuple: (model_name, option) where option may be None
+        The identifier with leading and trailing whitespace removed.
     """
-    if ":" in model_string and not model_string.startswith("http"):  # Avoid parsing URLs
-        # Check if this looks like an OpenRouter model (contains /)
-        if "/" in model_string and model_string.count(":") == 1:
-            # Could be openai/gpt-4:something - check what comes after colon
-            parts = model_string.split(":", 1)
-            suffix = parts[1].strip().lower()
+    return model_string.strip()
 
-            # Known OpenRouter suffixes to preserve
-            if suffix in ["free", "beta", "preview"]:
-                return model_string.strip(), None
 
-        # For other patterns (Ollama tags, consensus stances), split normally
-        parts = model_string.split(":", 1)
-        model_name = parts[0].strip()
-        model_option = parts[1].strip() if len(parts) > 1 else None
-        return model_name, model_option
-    return model_string.strip(), None
+def resolution_metadata(requested: str | None, resolved: str | None) -> dict[str, str]:
+    """
+    Describe a difference between the model a caller named and the model that ran.
+
+    Alias resolution legitimately maps one identifier to another (``flash`` to
+    ``gemini-2.5-flash``). When it does, the response says so instead of hiding it, which keeps a
+    resolution to a differently priced or differently capable model from ever being silent.
+
+    Args:
+        requested: The identifier the caller supplied.
+        resolved: The identifier the provider actually used.
+
+    Returns:
+        ``{"model_requested": ..., "model_resolved": ...}`` when the two differ (ignoring case
+        and surrounding whitespace), otherwise an empty dict.
+    """
+    if not isinstance(requested, str) or not isinstance(resolved, str) or not requested or not resolved:
+        return {}
+    requested = requested.strip()
+    resolved = resolved.strip()
+    if requested.casefold() == resolved.casefold():
+        return {}
+    return {"model_requested": requested, "model_resolved": resolved}
 
 
 def resolve_fallback_model(tool: Any, error_context: str) -> str:

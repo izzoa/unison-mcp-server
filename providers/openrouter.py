@@ -1,5 +1,6 @@
 """OpenRouter provider implementation."""
 
+import dataclasses
 import logging
 
 from utils.env import get_env
@@ -73,7 +74,18 @@ class OpenRouterProvider(OpenAICompatibleProvider):
         if capabilities:
             return capabilities
 
-        base_identifier = canonical_name.split(":", 1)[0]
+        base_identifier, separator, _variant = canonical_name.partition(":")
+
+        # The catalog lists a handful of models and none of their provider-published variants
+        # (``:batch``, ``:free``, ``:online`` ...). A variant the catalog does not list inherits
+        # its base model's capabilities rather than the generic defaults, which would understate
+        # the context window and disable features the model supports. A catalogued variant entry
+        # was already returned above and so takes precedence.
+        if separator:
+            inherited = self._inherit_variant_capabilities(base_identifier, canonical_name)
+            if inherited is not None:
+                return inherited
+
         if "/" in base_identifier:
             logging.debug(
                 "Using generic OpenRouter capabilities for %s (provider/model format detected)", canonical_name
@@ -99,6 +111,23 @@ class OpenRouterProvider(OpenAICompatibleProvider):
             canonical_name,
         )
         return None
+
+    def _inherit_variant_capabilities(self, base_identifier: str, variant_identifier: str) -> ModelCapabilities | None:
+        """Return the base model's capabilities re-keyed to a variant identifier.
+
+        Only a base that is itself a catalogued model name qualifies. An alias is not
+        accepted: ``opus:batch`` is not an identifier OpenRouter serves, so it must not be
+        given capabilities and then sent to the provider as if it were.
+        """
+
+        base = self._registry.get_capabilities(base_identifier)
+        if base is None or base.model_name.lower() != base_identifier.lower():
+            return None
+
+        logging.debug(
+            "Variant %s inherits capabilities from catalogued base model %s", variant_identifier, base.model_name
+        )
+        return dataclasses.replace(base, model_name=variant_identifier, aliases=[])
 
     # ------------------------------------------------------------------
     # Provider identity

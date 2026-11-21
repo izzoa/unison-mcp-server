@@ -32,6 +32,7 @@ from mcp.types import TextContent
 
 from config import MCP_PROMPT_SIZE_LIMIT
 from utils.conversation_memory import add_turn, create_thread
+from utils.model_resolution import resolution_metadata
 from utils.observability import instrument_generate as _instrument_generate
 
 from ..shared.base_models import ConsolidatedFindings
@@ -1205,6 +1206,14 @@ class BaseWorkflowMixin(ABC):
                     "model_used": resolved_model_name,
                     "provider_used": provider_name,
                 }
+
+                # Report when the provider resolves the supplied identifier to a different model.
+                try:
+                    canonical_name = model_context.capabilities.model_name
+                except Exception as resolution_error:
+                    logger.debug("Could not determine the resolved model name: %s", resolution_error)
+                    canonical_name = None
+                metadata.update(resolution_metadata(resolved_model_name, canonical_name))
 
                 # Preserve existing metadata and add workflow metadata
                 if "metadata" not in response_data:

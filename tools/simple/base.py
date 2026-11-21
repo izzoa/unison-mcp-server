@@ -20,6 +20,7 @@ from tools.shared.base_models import ToolRequest
 from tools.shared.base_tool import BaseTool
 from tools.shared.exceptions import ToolExecutionError
 from tools.shared.schema_builders import SchemaBuilder
+from utils.model_resolution import resolution_metadata
 from utils.observability import instrument_generate as _instrument_generate
 
 
@@ -655,6 +656,7 @@ class SimpleTool(BaseTool):
                         except AttributeError:
                             # Fallback if provider doesn't have get_provider_type method
                             metadata["provider_used"] = str(provider)
+                metadata.update(self._model_resolution_metadata(model_info))
 
             return ToolOutput(
                 status="success",
@@ -662,6 +664,14 @@ class SimpleTool(BaseTool):
                 content_type="text",
                 metadata=metadata if metadata else None,
             )
+
+    @staticmethod
+    def _model_resolution_metadata(model_info: dict | None) -> dict[str, str]:
+        """Name the requested and resolved model when alias resolution made them differ."""
+        if not model_info:
+            return {}
+        model_response = model_info.get("model_response")
+        return resolution_metadata(model_info.get("model_name"), getattr(model_response, "model_name", None))
 
     def _create_continuation_offer(self, request, model_info: dict | None = None):
         """Create continuation offer following old base.py pattern"""
@@ -751,6 +761,7 @@ class SimpleTool(BaseTool):
                         except AttributeError:
                             # Fallback if provider doesn't have get_provider_type method
                             metadata["provider_used"] = str(provider)
+                metadata.update(self._model_resolution_metadata(model_info))
 
             return ToolOutput(
                 status="continuation_available",

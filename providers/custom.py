@@ -1,5 +1,6 @@
 """Custom API provider implementation."""
 
+import dataclasses
 import logging
 
 from utils.env import get_env
@@ -109,6 +110,16 @@ class CustomProvider(OpenAICompatibleProvider):
             registry_entry.provider = ProviderType.CUSTOM
             return registry_entry
 
+        # A tagged identifier (``llama3.2:3b``) that is not itself declared inherits the
+        # declared base model's capabilities; the full identifier is still what gets sent.
+        base_identifier, separator, _tag = canonical_name.partition(":")
+        if separator:
+            base_entry = self._registry.resolve(base_identifier)
+            if base_entry:
+                return dataclasses.replace(
+                    base_entry, model_name=canonical_name, provider=ProviderType.CUSTOM, aliases=[]
+                )
+
         logging.debug(
             "Custom provider cannot resolve model '%s'; ensure it is declared in custom_models.json",
             canonical_name,
@@ -125,7 +136,11 @@ class CustomProvider(OpenAICompatibleProvider):
     # ------------------------------------------------------------------
 
     def _resolve_model_name(self, model_name: str) -> str:
-        """Resolve registry aliases and strip version tags for local models."""
+        """Resolve registry aliases while keeping a version tag (``llama3.2:3b``) intact.
+
+        The tag selects which model Ollama serves, so it is never dropped: an alias in front
+        of a tag resolves to its canonical name and the tag is re-attached.
+        """
 
         cache_key = model_name.lower()
         if cache_key in self._alias_cache:
@@ -140,19 +155,17 @@ class CustomProvider(OpenAICompatibleProvider):
             self._alias_cache.setdefault(resolved.lower(), resolved)
             return resolved
 
-        if ":" in model_name:
-            base_model = model_name.split(":")[0]
-            logging.debug(f"Stripped version tag from '{model_name}' -> '{base_model}'")
-
+        base_model, separator, tag = model_name.partition(":")
+        if separator:
             base_config = self._registry.resolve(base_model)
             if base_config:
-                logging.debug("Resolved base model '%s' to '%s'", base_model, base_config.model_name)
-                resolved = base_config.model_name
+                resolved = f"{base_config.model_name}:{tag}"
+                logging.debug("Resolved tagged model '%s' to '%s'", model_name, resolved)
                 self._alias_cache[cache_key] = resolved
-                self._alias_cache.setdefault(resolved.lower(), resolved)
                 return resolved
-            self._alias_cache[cache_key] = base_model
-            return base_model
+            # Not a model this endpoint declares: forward the identifier whole.
+            self._alias_cache[cache_key] = model_name
+            return model_name
 
         logging.debug(f"Model '{model_name}' not found in registry, using as-is")
         # Attempt to resolve via OpenRouter registry so aliases still map cleanly.

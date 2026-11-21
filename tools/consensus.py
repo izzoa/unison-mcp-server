@@ -32,6 +32,7 @@ from systemprompts import CONSENSUS_PROMPT
 from tools.shared.base_models import ConsolidatedFindings, WorkflowRequest
 from utils.circuit_breaker import ProviderUnavailable
 from utils.conversation_memory import MAX_CONVERSATION_TURNS, create_thread, get_thread
+from utils.model_resolution import resolution_metadata
 
 from .workflow.base import WorkflowTool
 
@@ -683,6 +684,7 @@ of the evidence, even when it strongly points in one direction.""",
                 "metadata": {
                     "provider": provider.get_provider_type().value,
                     "model_name": model_name,
+                    **resolution_metadata(model_name, getattr(response, "model_name", None)),
                 },
             }
 

@@ -60,9 +60,8 @@ class ModelContext:
     token calculations, ensuring consistency across the system.
     """
 
-    def __init__(self, model_name: str, model_option: str | None = None):
+    def __init__(self, model_name: str):
         self.model_name = model_name
-        self.model_option = model_option  # Store optional model option (e.g., "for", "against", etc.)
         self._provider = None
         self._capabilities = None
         self._token_allocation = None

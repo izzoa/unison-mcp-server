@@ -35,7 +35,7 @@ from tools.models import ToolOutput
 from tools.shared.exceptions import ToolExecutionError
 from utils.env import get_env
 from utils.mcp_context import reset_current_request_context, set_current_request_context
-from utils.model_resolution import parse_model_option
+from utils.model_resolution import trim_model_identifier
 from utils.observability import tool_span
 from utils.request_helpers import get_follow_up_instructions
 
@@ -326,16 +326,18 @@ def build_handlers(tool_registry):
             model_name = arguments.get("model") or DEFAULT_MODEL
             logger.debug("Initial model for %s: %s", name, model_name)
 
-            model_name, model_option = parse_model_option(model_name)
-            if model_option:
-                logger.info("Parsed model format - model: '%s', option: '%s'", model_name, model_option)
-            else:
-                logger.info("Parsed model format - model: '%s'", model_name)
+            # The identifier belongs to the provider: only surrounding whitespace is removed.
+            model_name = trim_model_identifier(model_name)
+            logger.info("Model identifier for %s: '%s'", name, model_name)
 
             # Skip model resolution for tools that don't require models
             if not tool.requires_model():
                 logger.debug("Tool %s doesn't require model resolution - skipping model validation", name)
                 return await tool.execute(arguments)
+
+            # Hand the tool the same trimmed identifier the provider is validated against.
+            if arguments.get("model") and arguments["model"] != model_name:
+                arguments["model"] = model_name
 
             # Handle auto mode at MCP boundary
             if model_name.lower() == "auto":
@@ -372,7 +374,7 @@ def build_handlers(tool_registry):
                 raise ToolExecutionError(error_output.model_dump_json())
 
             # Create model context and typed execution context
-            model_context = ModelContext(model_name, model_option)
+            model_context = ModelContext(model_name)
             import dataclasses
 
             from utils.tool_execution_context import ToolExecutionContext
@@ -403,8 +405,6 @@ def build_handlers(tool_registry):
                 model_name,
                 model_context.capabilities.context_window,
             )
-            if model_option:
-                logger.debug("Model option stored in context: '%s'", model_option)
 
             # EARLY FILE SIZE VALIDATION AT MCP BOUNDARY
             argument_files = arguments.get("absolute_file_paths")
