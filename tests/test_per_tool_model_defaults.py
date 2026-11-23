@@ -460,11 +460,15 @@ class TestSchemaGeneration:
         """Test schema when DEFAULT_MODEL='auto'."""
         with patch("config.DEFAULT_MODEL", "auto"):
             with patch("config.IS_AUTO_MODE", True):
-                tool = ChatTool()
-                schema = tool.get_input_schema()
+                schema = ChatTool().get_input_schema()
+                # chat leaves model out of the schema-level requirements so a handle-only
+                # (batch resume/cancel) call validates. A start-work call that omits it is not
+                # refused: the MCP boundary resolves a missing model to the category's preferred
+                # one before ``execute`` runs (pinned in tests/test_batch_execution_selection.py).
+                assert "model" not in schema["required"]
 
-                # Model should be required
-                assert "model" in schema["required"]
+                # A tool with no batch controls keeps the schema-level requirement.
+                assert "model" in AnalyzeTool().get_input_schema()["required"]
 
     def test_schema_with_unavailable_default_model(self):
         """Test schema when DEFAULT_MODEL is set but unavailable."""

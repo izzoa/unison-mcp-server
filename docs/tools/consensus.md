@@ -73,13 +73,19 @@ Get a consensus from gemini supporting the idea for implementing X, grok opposin
 ## Tool Parameters
 
 - `prompt`: Detailed description of the proposal or decision to analyze (required)
-- `models`: List of model configurations with optional stance and custom instructions (required)
+- `models`: List of model configurations with optional stance, custom instructions and, per entry, `execution_mode` (required on step 1)
 - `files`: Context files for informed analysis (absolute paths)
 - `images`: Visual references like diagrams or mockups (absolute paths)
 - `focus_areas`: Specific aspects to emphasize
-- `temperature`: Control consistency (default: 0.2 for stable consensus)
+- `temperature`: Control consistency (default: 0.2 for stable consensus). Each consulted model's own published range is applied to it; the value is never taken from the caller's request beyond the tool default.
 - `thinking_mode`: Analysis depth (minimal/low/medium/high/max)
 - `continuation_id`: Continue previous consensus discussions
+- `execution_mode`: `"batch"` consults the models through OpenRouter's asynchronous Batch API at about half price, one batch per model; also accepted on each `models[]` entry (omitted or `null` inherits the request value). Step 1 only. See the [batch guide](batch.md)
+- `batch_handle`: Resume (or, with `cancel`, cancel) a batched run that returned `status: "running"`. Pass only this field
+- `wait_seconds`: How long this call may wait for the batches (0-50, default 45)
+- `cancel`: With `batch_handle`, cancel locally; OpenRouter has no cancel endpoint, so provider batches continue and are still billed
+
+A missing, `null` or empty `stance` is the neutral stance, so it counts as a duplicate of an explicit `neutral` for the same model.
 
 ## Model Configuration Examples
 
@@ -106,6 +112,15 @@ Get a consensus from gemini supporting the idea for implementing X, grok opposin
     {"model": "o3", "stance": "neutral"}
 ]
 ```
+
+**Batched models (half price, slower):**
+```json
+[
+    {"model": "anthropic/claude-opus-4.5", "stance": "for", "execution_mode": "batch"},
+    {"model": "openai/gpt-5", "stance": "against", "execution_mode": "batch"}
+]
+```
+Each distinct batched model becomes one provider batch, joined under one `batch_handle`. If they do not finish within the bounded wait the call returns `status: "running"`; resume with only the handle, and the final result is rebuilt from the stored record even after a server restart. Only models OpenRouter lists as `:batch` qualify: a family alias (`gemini`, `opus`, ...) resolves under batch to the latest batch-listed model of its family, and each entry reports `model_requested` / `model_resolved` when it did. See the [batch guide](batch.md).
 
 ## Usage Examples
 

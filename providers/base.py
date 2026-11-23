@@ -4,7 +4,8 @@ import asyncio
 import logging
 import time
 from abc import ABC, abstractmethod
-from collections.abc import Callable, Generator
+from collections.abc import Callable, Generator, Sequence
+from contextlib import AbstractContextManager, nullcontext
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
@@ -13,7 +14,19 @@ if TYPE_CHECKING:
 
 from utils.circuit_breaker import CircuitBreaker, CircuitState, ProviderUnavailable
 
-from .shared import ModelCapabilities, ModelResponse, ProviderType
+from .shared import (
+    BatchListing,
+    BatchOutcome,
+    BatchRequest,
+    BatchStatus,
+    CancelOutcome,
+    ModelCapabilities,
+    ModelResponse,
+    ProviderType,
+    UnsupportedBatchOperation,
+)
+from .shared.batch_catalog import warn_once
+from .shared.published_limits import apply_published_limits
 
 
 @dataclass
@@ -153,7 +166,45 @@ class ModelProvider(ABC):
             self._raise_unsupported_model(model_name)
 
         self._ensure_model_allowed(capabilities, resolved_model_name, model_name)
-        return self._finalise_capabilities(capabilities, resolved_model_name, model_name)
+        finalised = self._finalise_capabilities(capabilities, resolved_model_name, model_name)
+        # The one choke point every tool, provider and path reads a model's limits through: the output cap and the
+        # temperature rules are checked against what LiteLLM publishes, min only (providers/shared/published_limits.py;
+        # the OpenRouter batch listing bounds a batch request only, never a capability read here: D17). Same object
+        # back when nothing changes.
+        return apply_published_limits(self.get_provider_type(), resolved_model_name, finalised)
+
+    def _bound_output_tokens(
+        self, capabilities: ModelCapabilities | None, requested: int | None, model_name: str
+    ) -> int | None:
+        """A caller's ``max_output_tokens`` reduced to the model's effective output cap (D12, D16).
+
+        The cap is ``capabilities.max_output_tokens``, already the smallest of the curated and the published figures
+        (see :func:`providers.shared.published_limits.apply_published_limits`), so a request is never sent above a
+        published limit. A request at or below it, no request, and a model whose cap is unknown go through
+        unchanged, and so does a request to a generic (uncurated) capability whose default cap is a stand-in unless a
+        figure was published for it. One WARNING per model and cap per process names a reduction.
+        """
+
+        if not requested or capabilities is None or capabilities.max_output_tokens <= 0:
+            return requested
+        cap = capabilities.max_output_tokens
+        if getattr(capabilities, "_is_generic", False):
+            # A generic (uncurated) capability carries a made-up default cap, which is not a limit and must never
+            # shrink a request. Only a figure somebody PUBLISHED for the model bounds it.
+            cap = getattr(capabilities, "_published_output_cap", 0)
+            if not isinstance(cap, int) or cap <= 0:
+                return requested
+        if requested <= cap:
+            return requested
+        warn_once(
+            ("output-request-clamp", self.get_provider_type().value, model_name, cap),
+            "%s model %s: max_output_tokens %d is above the model's output limit (%d) and is reduced to it",
+            self.get_provider_type().value,
+            model_name,
+            requested,
+            cap,
+        )
+        return cap
 
     def get_all_model_capabilities(self) -> dict[str, ModelCapabilities]:
         """Return statically declared capabilities when available."""
@@ -323,6 +374,118 @@ class ModelProvider(ABC):
                        or the model is restricted by policy
             RuntimeError: If the API call fails after retries
         """
+
+    # ------------------------------------------------------------------
+    # Batch execution (asynchronous, single-model)
+    # ------------------------------------------------------------------
+    # Additive to the single-phase generate_content* surfaces. Providers that can
+    # batch override all four; the defaults fail loudly rather than silently
+    # running the work synchronously at standard prices.
+    def submit_batch(self, model_name: str, requests: list[BatchRequest], resolution: Any = None) -> str:
+        """Submit ``requests`` as one batch for a single model.
+
+        Returns exactly one provider-issued batch identifier without waiting for any
+        result. Splitting work across models or batches is the caller's concern.
+
+        ``resolution`` is the value :meth:`resolve_batch_model` returned for ``model_name`` at admission. A
+        provider that produces one MUST submit under it (no second resolution) so the slug and limits applied to
+        the call cannot differ from the ones sent. Callers pass it only when the provider produced one.
+        """
+
+        raise UnsupportedBatchOperation(self._batch_provider_name(), "submit_batch")
+
+    def poll_batch(self, batch_id: str) -> BatchStatus:
+        """Report the processing state of a previously submitted batch."""
+
+        raise UnsupportedBatchOperation(self._batch_provider_name(), "poll_batch")
+
+    def fetch_batch(self, batch_id: str, expected_custom_ids: Sequence[str] | None = None) -> list[BatchOutcome]:
+        """Return one outcome per submitted request once the batch is terminal.
+
+        ``expected_custom_ids`` are the ids that were submitted. When given, every one of
+        them gets exactly one outcome: a request the provider returned no result for is
+        reported as a failed outcome rather than silently absent. Callers that persist the
+        submitted ids (the durable store) should always pass them.
+        """
+
+        raise UnsupportedBatchOperation(self._batch_provider_name(), "fetch_batch")
+
+    def cancel_batch(self, batch_id: str) -> CancelOutcome:
+        """Request cancellation, reporting honestly whether the batch continues."""
+
+        raise UnsupportedBatchOperation(self._batch_provider_name(), "cancel_batch")
+
+    def list_batches(self, limit: int = 100) -> BatchListing:
+        """List the caller's recent batches (metadata only, newest first).
+
+        Optional: used solely by reconciliation to look for a batch whose submission
+        outcome was never recorded. A provider without it makes such intent
+        ``indeterminate`` rather than guessed at.
+        """
+
+        raise UnsupportedBatchOperation(self._batch_provider_name(), "list_batches")
+
+    def can_batch_model(self, model_name: str) -> bool:
+        """True when ``submit_batch`` would accept ``model_name`` rather than refuse it locally.
+
+        Provider selection under batch execution asks this instead of reading the capability flag,
+        so admission and the adapter cannot disagree about a model: a request admitted here must not
+        be refused at submit time (which, partway through a multi-model call, would strand the
+        batches already accepted). The default trusts the model's ``supports_batch`` capability; a
+        provider whose adapter applies further rules (OpenRouter's variant-identifier rule) overrides.
+        """
+
+        try:
+            capabilities = self.get_capabilities(model_name)
+        except Exception:
+            return False
+        return bool(getattr(capabilities, "supports_batch", False))
+
+    def resolve_batch_model(self, model_name: str) -> Any:
+        """What ``model_name`` resolves to under batch: the slug, the limits that apply to it, and a note.
+
+        Called once, at admission, inside :meth:`batch_resolution_scope`; the value is handed to the call's
+        planning (token budgets, temperature validation) and to :meth:`submit_batch`, and persisted with the child
+        record. The default has no such value (``None``): the model's own capabilities apply as they always did.
+        May raise what :meth:`can_batch_model` would have refused.
+        """
+
+        return None
+
+    def batch_submission_model(self, model_name: str) -> str:
+        """Model identifier ``submit_batch`` would actually send for ``model_name``.
+
+        Recorded with submission intent so reconciliation can match a listed batch.
+        Providers that rewrite the identifier (alias resolution, suffix mapping) override.
+        """
+
+        return model_name
+
+    def batch_resolution_scope(self) -> AbstractContextManager[None]:
+        """Context in which every model of one submission resolves against the same data.
+
+        The coordinator enters it around a whole submission (intent recording and every ``submit_batch``).
+        Providers whose batch model resolution depends on data that can change between calls (OpenRouter's
+        catalog of batch listings) pin that data for the duration; the default pins nothing.
+        """
+
+        return nullcontext()
+
+    def explain_batch_refusal(self, model_name: str) -> str | None:
+        """Why this provider deliberately refuses ``model_name`` under batch, for the caller; else ``None``.
+
+        Used to say something more useful than "no provider can batch it" when the refusal has a specific
+        reason (a variant identifier, a model family with no batch listing). ``None`` means no specific
+        reason to add.
+        """
+
+        return None
+
+    def _batch_provider_name(self) -> str:
+        try:
+            return self.get_provider_type().value
+        except Exception:
+            return type(self).__name__
 
     def generate_content_stream(
         self,

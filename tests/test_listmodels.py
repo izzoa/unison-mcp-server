@@ -205,3 +205,41 @@ class TestListModelsTool:
         from tools.models import ToolModelCategory
 
         assert tool.get_model_category() == ToolModelCategory.FAST_RESPONSE
+
+
+class TestListModelsBatchFlag:
+    """listmodels surfaces OpenRouter batch support."""
+
+    @pytest.mark.asyncio
+    async def test_openrouter_listing_flags_batch_capable_models_only(self):
+        from providers.openrouter import OpenRouterProvider
+        from providers.registry import get_default_registry
+        from providers.shared import ProviderType
+
+        env_vars = {"OPENROUTER_API_KEY": "test-key", "DEFAULT_MODEL": "auto"}
+
+        import utils.model_restrictions
+
+        # The restriction service is a process-wide singleton, and an earlier test file (test_openrouter_provider)
+        # leaves one built from an OPENROUTER_ALLOWED_MODELS list behind; this test's environment has none, so it
+        # must not inherit it.
+        utils.model_restrictions._restriction_service = None
+        try:
+            with patch.dict(os.environ, env_vars, clear=True):
+                get_default_registry().register_provider(ProviderType.OPENROUTER, OpenRouterProvider)
+                result = await ListModelsTool().execute({})
+        finally:
+            utils.model_restrictions._restriction_service = None
+
+        content = json.loads(result[0].text)["content"]
+        lines = {line.strip(): line for line in content.splitlines()}
+
+        def entry(model_name: str) -> str:
+            matches = [line for line in lines if f"→ `{model_name}`" in line or line.startswith(f"- `{model_name}`")]
+            assert matches, f"{model_name} not listed"
+            return matches[0]
+
+        assert "batch" in entry("anthropic/claude-opus-4.5")
+        assert "batch" in entry("openai/gpt-5.2")
+        assert "batch" not in entry("google/gemini-2.5-pro")
+        assert "asynchronous batch API" in content

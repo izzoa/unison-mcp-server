@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 
 from config import TEMPERATURE_CREATIVE
 from systemprompts import THINKDEEP_PROMPT
-from tools.shared.base_models import WorkflowRequest
+from tools.shared.base_models import MAX_TEMPERATURE, WorkflowRequest
 
 from .workflow.base import WorkflowTool
 
@@ -75,9 +75,9 @@ class ThinkDeepWorkflowRequest(WorkflowRequest):
     # in expert analysis (commented out exclude=True)
     temperature: float | None = Field(
         default=None,
-        description="Creative thinking temp (0-1, default 0.7)",
+        description="Creative thinking temp (0-2, clamped to the model's published range; default 0.7)",
         ge=0.0,
-        le=1.0,
+        le=MAX_TEMPERATURE,
     )
     thinking_mode: str | None = Field(
         default=None,

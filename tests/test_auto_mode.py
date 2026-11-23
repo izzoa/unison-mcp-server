@@ -89,8 +89,13 @@ class TestAutoMode:
             tool = ChatTool()
             schema = tool.get_input_schema()
 
-            # Model should be required
-            assert "model" in schema["required"]
+            # chat publishes no schema-level requirements so a handle-only (batch resume/cancel)
+            # call validates. A start-work call that omits ``model`` is NOT refused for it, at the
+            # schema or at runtime: the MCP boundary (handlers/tool_handlers.py) resolves a missing
+            # model to the category's preferred one before ``execute`` runs (pinned in
+            # tests/test_batch_execution_selection.py). Only reaching ``execute`` directly with no
+            # model still raises "Model parameter is required in auto mode".
+            assert "model" not in schema["required"]
 
             # Model field should have detailed descriptions
             model_schema = schema["properties"]["model"]

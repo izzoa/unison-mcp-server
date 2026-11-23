@@ -28,6 +28,10 @@ import utils.env as env_config  # noqa: E402
 # Ensure tests operate with runtime environment rather than .env overrides during imports
 env_config.reload_env({"UNISON_MCP_FORCE_ENV_OVERRIDE": "false"})
 
+# Importing litellm fetches its model map from GitHub (5 s timeout) unless this is set, and a unit test must never
+# touch the network. The bundled map of the pinned litellm version serves the adapter tests instead.
+os.environ.setdefault("LITELLM_LOCAL_MODEL_COST_MAP", "True")
+
 # Disable LiteLLM auto-discovery during tests so that only JSON-configured
 # models appear in registries.  The litellm adapter tests re-enable it locally.
 from providers.litellm_adapter import set_discovery_enabled  # noqa: E402
@@ -295,3 +299,50 @@ def _reset_launch_info():
     reset_launch_info_for_tests()
     yield
     reset_launch_info_for_tests()
+
+
+@pytest.fixture(autouse=True)
+def batch_catalog_guard(monkeypatch):
+    """No unit test may reach OpenRouter's public model list.
+
+    Every test starts with a process-wide batch catalog source that serves the trimmed fixture under
+    ``tests/fixtures`` through an injected fetcher, and the real HTTP fetch is replaced by a guard that
+    records the attempt and fails. A test that lets the real fetcher run unstubbed therefore fails at
+    teardown (the source swallows the guard's error by design, so the record is what catches it).
+    A test that triggers the guard on purpose clears the returned list.
+    """
+
+    from providers.shared import batch_catalog
+    from tests.batch_test_helpers import RecordingFetcher
+
+    attempts: list[float] = []
+
+    def guard(timeout: float):
+        attempts.append(timeout)
+        raise AssertionError("a unit test reached the live OpenRouter model list; inject a fixture catalog instead")
+
+    monkeypatch.setattr(batch_catalog, "_http_fetch", guard)
+    batch_catalog.set_batch_catalog_source(batch_catalog.BatchCatalogSource(fetcher=RecordingFetcher()))
+    # "One warning per situation per process" must not leak from one test into the next.
+    batch_catalog.reset_warn_once()
+    yield attempts
+    batch_catalog.reset_batch_catalog_source()
+    batch_catalog.reset_warn_once()
+    assert not attempts, "a unit test reached the live OpenRouter model list"
+
+
+#: The pinned extract of LiteLLM's published limits every test runs against (a real subset, see its ``fetched_at``).
+#: The committed ``conf/litellm_published_limits.json`` is refreshed weekly, so a test that asserts a number must
+#: not read it; one that asserts an invariant over every model opts in with ``use_packaged_published_limits``.
+PUBLISHED_LIMITS_FIXTURE = Path(__file__).resolve().parent / "fixtures" / "litellm_published_limits.json"
+
+
+@pytest.fixture(autouse=True)
+def published_limits_fixture():
+    """Every test sees the same, pinned LiteLLM limits and reads nothing else (the check is offline by design)."""
+
+    from providers.shared import published_limits
+
+    published_limits.set_published_index(PUBLISHED_LIMITS_FIXTURE)
+    yield PUBLISHED_LIMITS_FIXTURE
+    published_limits.set_published_index(None)

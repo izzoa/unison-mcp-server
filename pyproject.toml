@@ -35,6 +35,8 @@ py-modules = ["server", "config"]
     "conf/anthropic_models.json",
     "conf/custom_models.json",
     "conf/openrouter_models.json",
+    "conf/openrouter_batch_catalog.json",
+    "conf/litellm_published_limits.json",
     "conf/azure_models.json",
     "conf/openai_models.json",
     "conf/gemini_models.json",
@@ -219,6 +221,16 @@ module = [
     # Tier 1: zero errors
     "providers.shared.provider_type",
     "providers.shared.model_response",
+    "providers.shared.batch",
+    "providers.shared.batch_catalog",
+    "providers.shared.batch_resolution",
+    "providers.shared.published_limits",
+    "providers.openrouter_batch_wire",
+    "utils.batch_store",
+    "utils.batch_coordinator",
+    "utils.batch_execution",
+    "utils.consensus_batch",
+    "tools.shared.batch_support",
     "utils.file_types",
     "utils.security_config",
     "utils.conversation_memory",
@@ -248,6 +260,7 @@ module = [
     "clink.workdir",
     "utils.launch_info",
     "build_mockups",
+    "refresh_openrouter_batch_catalog",
 ]
 follow_imports = "normal"
 disallow_untyped_defs = true

@@ -51,14 +51,18 @@ word verdict in the end.
 
 ## Tool Parameters
 
-- `prompt`: Your question or discussion topic (required)
+- `prompt`: Your question or discussion topic (required to start a call; not needed when resuming with `batch_handle`)
 - `model`: auto|pro|flash|flash-2.0|flashlite|o3|o3-mini|o4-mini|gpt4.1|gpt5.2|gpt5.1-codex|gpt5.1-codex-mini|gpt5|gpt5-mini|gpt5-nano|opus|sonnet|haiku|fable (default: server default)
 - `absolute_file_paths`: Optional absolute file or directory paths for additional context
 - `images`: Optional images for visual context (absolute paths)
-- `working_directory_absolute_path`: **Required** - Absolute path to an existing directory where generated code artifacts will be saved
-- `temperature`: Response creativity (0-1, default 0.5)
+- `working_directory_absolute_path`: **Required to start a call** - Absolute path to an existing directory where generated code artifacts will be saved
+- `temperature`: Response creativity (default 0.5). Accepted from 0 to 2; the selected model's published limit then applies (most models 0-1, OpenAI, Google and xAI up to 2) and a higher value is reduced to the model's maximum. With `execution_mode: "batch"` the same per-model rule applies to the batched request.
 - `thinking_mode`: minimal|low|medium|high|max (default: medium, Gemini only)
 - `continuation_id`: Continue previous conversations
+- `execution_mode`: `"batch"` runs the call through OpenRouter's asynchronous Batch API at about half price (text only, models OpenRouter lists as `:batch` only; family aliases such as `opus` resolve to the latest batch-listed model); omit or `null` for a normal call. See the [batch guide](batch.md)
+- `batch_handle`: Resume (or, with `cancel`, cancel) a batch call that returned `status: "running"`. Pass only this field
+- `wait_seconds`: How long this call may wait for a batch (0-50, default 45)
+- `cancel`: With `batch_handle`, cancel locally; OpenRouter has no cancel endpoint, so the provider batch continues and is still billed
 
 ## Structured Code Generation
 
@@ -123,6 +127,14 @@ See the [Configuration Guide](../configuration.md#code-generation-capability) fo
 ```
 "Chat with gemini about this UI mockup screenshot - is the user flow intuitive?"
 ```
+
+## Batch Execution
+
+```
+"Run this chat as a batch with gpt5: compare event sourcing with an audit table for billing"
+```
+
+Passing `execution_mode="batch"` trades latency for cost: the call waits up to 45 seconds and returns the reply if the batch finished, otherwise `status: "running"` with a `batch_handle` to resume with `{"batch_handle": "..."}`. Limits (OpenRouter only, text only, no provider cancel) and the full lifecycle are in the [batch guide](batch.md).
 
 ## Best Practices
 

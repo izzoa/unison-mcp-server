@@ -444,5 +444,26 @@ class WorkflowTool(BaseTool, BaseWorkflowMixin):
 
     # Default execute method - delegates to workflow
     async def execute(self, arguments: dict[str, Any]) -> list:
-        """Execute the workflow tool - delegates to BaseWorkflowMixin."""
+        """Execute the workflow tool - delegates to BaseWorkflowMixin.
+
+        A workflow tool without a batch path refuses ``execution_mode`` instead of ignoring it, so a
+        call that asked for batch pricing is never quietly run at full price. (consensus is the one
+        workflow tool with a batch path; its batch mixin consumes the field before this point.)
+        """
+        from tools.models import ToolOutput
+        from tools.shared.batch_support import BatchResumableToolMixin, execution_mode_rejection
+        from tools.shared.exceptions import ToolExecutionError
+
+        rejection = execution_mode_rejection(
+            self.get_name(), arguments, accepts_execution_mode=isinstance(self, BatchResumableToolMixin)
+        )
+        if rejection:
+            raise ToolExecutionError(
+                ToolOutput(
+                    status="error",
+                    content=rejection,
+                    content_type="text",
+                    metadata={"tool_name": self.get_name(), "batch_error": "execution_mode_unsupported"},
+                ).model_dump_json()
+            )
         return await self.execute_workflow(arguments)

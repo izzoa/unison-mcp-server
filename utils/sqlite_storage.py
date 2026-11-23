@@ -108,6 +108,7 @@ class SQLiteStorageBackend:
 
         # Serialise all writes
         self._lock = threading.Lock()
+        self._closed = False
 
         # Schema bootstrap + migrations
         self._init_schema()
@@ -129,6 +130,11 @@ class SQLiteStorageBackend:
             self._db_path,
             self._sweep_interval,
         )
+
+    @property
+    def is_durable(self) -> bool:
+        """True while the SQLite connection is live; False once the backend is shut down."""
+        return not self._closed
 
     # ------------------------------------------------------------------
     # Schema management
@@ -291,6 +297,7 @@ class SQLiteStorageBackend:
 
     def shutdown(self) -> None:
         """Stop the sweep thread and close the database connection."""
+        self._closed = True
         self._shutdown_event.set()
         if self._sweep_thread.is_alive():
             self._sweep_thread.join(timeout=2)

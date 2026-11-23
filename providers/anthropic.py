@@ -114,6 +114,7 @@ class AnthropicModelProvider(RegistryBackedProviderMixin, ModelProvider):
         parameters, and never alongside thinking, which fixes it — the
         caller's value is dropped rather than surfacing an API rejection.
         """
+        max_output_tokens = self._bound_output_tokens(capabilities, max_output_tokens, resolved_model_name)
         blocks: list[dict] = [{"type": "text", "text": prompt}]
 
         if images and capabilities.supports_images:

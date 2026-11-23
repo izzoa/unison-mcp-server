@@ -726,6 +726,14 @@ When recommending searches, be specific about what information you need and why 
             capabilities = model_context.capabilities
             constraint = capabilities.temperature_constraint
 
+            accepts = getattr(capabilities, "accepts_parameter", None)
+            if callable(accepts) and accepts("temperature") is False:
+                # The model's own listing says it takes no temperature (a batch call whose limits were derived
+                # from that listing): nothing will be sent, so there is no range to clamp into.
+                return temperature, [
+                    f"Model {model_context.model_name} does not accept a temperature (per its listing); none is sent."
+                ]
+
             warnings = []
             if not constraint.validate(temperature):
                 corrected = constraint.get_corrected_value(temperature)

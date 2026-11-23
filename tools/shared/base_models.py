@@ -14,13 +14,18 @@ import logging
 
 from pydantic import BaseModel, Field, field_validator
 
+from providers.shared.batch_catalog import MAX_TEMPERATURE  # noqa: F401  (re-exported: the one tool-input bound)
+
 logger = logging.getLogger(__name__)
 
 
 # Shared field descriptions to avoid duplication
 COMMON_FIELD_DESCRIPTIONS = {
     "model": "Model to run. Supply a name if requested by the user or stay in auto mode. When in auto mode, use `listmodels` tool for model discovery.",
-    "temperature": "0 = deterministic · 1 = creative.",
+    "temperature": (
+        "Sampling temperature, 0 = deterministic. Accepted from 0 to 2: the selected model's published limit then "
+        "applies (most models 0-1; OpenAI, Google and xAI up to 2) and a higher value is reduced to the model's maximum."
+    ),
     "thinking_mode": "Reasoning depth: minimal, low, medium, high, or max.",
     "continuation_id": (
         "Unique thread continuation ID for multi-turn conversations. Works across different tools. "
@@ -67,7 +72,9 @@ class ToolRequest(BaseModel):
 
     # Model configuration
     model: str | None = Field(None, description=COMMON_FIELD_DESCRIPTIONS["model"])
-    temperature: float | None = Field(None, ge=0.0, le=1.0, description=COMMON_FIELD_DESCRIPTIONS["temperature"])
+    temperature: float | None = Field(
+        None, ge=0.0, le=MAX_TEMPERATURE, description=COMMON_FIELD_DESCRIPTIONS["temperature"]
+    )
     thinking_mode: str | None = Field(None, description=COMMON_FIELD_DESCRIPTIONS["thinking_mode"])
 
     # Conversation support

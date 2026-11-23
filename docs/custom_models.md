@@ -100,7 +100,7 @@ To control ordering in auto mode or the `listmodels` summary, adjust the
 [`intelligence_score`](model_ranking.md) for each entry (or rely on the automatic
 heuristic described there).
 
-**Note:** While you can use any OpenRouter model by its full name, models not in the config file will use generic capabilities (32K context window, no extended thinking, etc.) which may not match the model's actual capabilities. For best results, add new models to the config file with their proper specifications.
+**Note:** While you can use any OpenRouter model by its full name, models not in the config file will use generic capabilities (32K context window, no extended thinking, etc.) which may not match the model's actual capabilities. (Under `execution_mode="batch"` a slug OpenRouter lists as `:batch` gets the limits of that listing instead, and a model that is in the config file keeps its configured limits but sends only the request parameters its `:batch` listing names; see [batch](tools/batch.md).) For best results, add new models to the config file with their proper specifications.
 
 ## Quick Start
 

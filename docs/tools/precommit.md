@@ -146,7 +146,7 @@ Use unison and perform a thorough precommit ensuring there aren't any new regres
 - `include_staged`: Include staged changes in the review (default: true)
 - `include_unstaged`: Include uncommitted changes in the review (default: true)
 - `focus_on`: Specific aspects to focus on
-- `temperature`: Temperature for response (default: 0.2)
+- `temperature`: Temperature for response (default: 0.2). Accepted from 0 to 2; the selected model's published limit then applies (most models 0-1, OpenAI, Google and xAI up to 2) and a higher value is reduced to the model's maximum.
 - `thinking_mode`: minimal|low|medium|high|max (default: medium, Gemini only)
 - `use_assistant_model`: Whether to use expert validation phase (default: true, set to false to use Claude only)
 - `continuation_id`: Continue previous validation discussions

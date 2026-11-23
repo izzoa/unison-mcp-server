@@ -3,6 +3,7 @@
 import math
 from dataclasses import dataclass, field
 
+from .batch_catalog import BatchFamilyRule
 from .provider_type import ProviderType
 from .temperature import RangeTemperatureConstraint, TemperatureConstraint
 
@@ -60,6 +61,18 @@ class ModelCapabilities:
     allow_code_generation: bool = (
         False  # Enables structured code generation in chat tool for substantial implementations
     )
+    # True when the model can be executed through a provider's asynchronous batch API
+    # (at reduced pricing). Declared per catalog entry; never inferred from a model-name suffix.
+    supports_batch: bool = False
+    # Under batch execution the aliases named here resolve to the latest member of the family that
+    # OpenRouter lists as ``:batch`` (see providers/shared/batch_catalog.py). JSON entries give this as an
+    # object; it is validated and converted when the capability is built.
+    batch_family: BatchFamilyRule | None = None
+    # The request parameters the provider's own listing says the model accepts (sorted names), or ``None`` when no
+    # listing was consulted. Set only for a model whose capabilities were derived from a live or snapshot listing
+    # under batch (see providers/shared/batch_resolution.py); every other entry leaves it ``None``, and callers then
+    # fall back to the supports_* flags exactly as before.
+    supported_parameters: tuple[str, ...] | None = None
 
     # Additional attributes
     max_image_size_mb: float = 0.0
@@ -67,6 +80,19 @@ class ModelCapabilities:
         default_factory=lambda: RangeTemperatureConstraint(0.0, 2.0, 0.3)
     )
     auto_discovered: bool = False  # True when model was discovered via LiteLLM without a JSON override
+
+    def __post_init__(self) -> None:
+        if isinstance(self.batch_family, dict):
+            self.batch_family = BatchFamilyRule.from_config(
+                self.batch_family, model_name=self.model_name, entry_aliases=self.aliases
+            )
+
+    def accepts_parameter(self, name: str) -> bool | None:
+        """Whether the listing says the model accepts request parameter ``name``; ``None`` when no listing is known."""
+
+        if self.supported_parameters is None:
+            return None
+        return name in self.supported_parameters
 
     def get_effective_temperature(self, requested_temperature: float) -> float | None:
         """Return the temperature that should be sent to the provider.

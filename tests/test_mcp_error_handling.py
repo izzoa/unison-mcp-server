@@ -72,11 +72,28 @@ async def test_unknown_tool_returns_text_response_not_error():
 
 @pytest.mark.asyncio
 async def test_input_validation_error_matches_1x_decorator_shape():
-    """The adapter replicates the 1.x SDK's jsonschema input validation."""
-    result = await on_call_tool(None, CallToolRequestParams(name="chat", arguments={}))
+    """The adapter replicates the 1.x SDK's jsonschema input validation.
+
+    chat no longer lists ``prompt`` as schema-required (a handle-only batch call must validate), so the
+    schema violation exercised here is a wrongly typed field rather than a missing one.
+    """
+    result = await on_call_tool(None, CallToolRequestParams(name="chat", arguments={"prompt": 42}))
     assert result.is_error is True
     assert result.content[0].text.startswith("Input validation error: ")
-    assert "'prompt' is a required property" in result.content[0].text
+    assert "42 is not of type 'string'" in result.content[0].text
+
+
+@pytest.mark.asyncio
+async def test_chat_without_a_prompt_is_refused_at_runtime_naming_it(monkeypatch):
+    """The missing-prompt case moved from the published schema to a runtime error that names the field."""
+    _install_dummy_provider(monkeypatch)
+    arguments = {"working_directory_absolute_path": "/tmp", "model": "gemini-2.5-flash"}
+
+    result = await on_call_tool(None, CallToolRequestParams(name="chat", arguments=arguments))
+
+    assert result.is_error is True
+    assert not result.content[0].text.startswith("Input validation error")
+    assert "'prompt'" in result.content[0].text
 
 
 @pytest.mark.asyncio

@@ -258,6 +258,33 @@ MAX_CONVERSATION_TURNS=20
 LOG_LEVEL=DEBUG  # Default: shows detailed operational messages
 ```
 
+### Batch Store
+
+Batch execution (`execution_mode="batch"` on `chat` and `consensus`, see the [batch guide](tools/batch.md)) keeps its records in a dedicated SQLite file. **It works without any configuration** and is independent of `STORAGE_BACKEND` and `STORAGE_SQLITE_PATH`; set these only to move or shorten it:
+
+```env
+# Where the batch store lives. Default: <server working directory>/.unison/batches.db
+# Set an absolute path when the server is launched from / or a read-only directory.
+# The parent directory is set to 0700 and gets a .gitignore of "*" - use a dedicated directory.
+# In-memory paths are refused; if the store cannot be opened, batch calls are refused.
+BATCH_STORE_PATH=/absolute/path/to/unison-batches/batches.db
+
+# Days a batch record (prompts, consensus state, responses) is kept, counted from creation.
+# Default: 30 (OpenRouter keeps batch results 30 days). Afterwards only a tombstone remains.
+# Invalid or non-positive values (including 0) log a warning and use 30.
+BATCH_RETENTION_DAYS=30
+
+# Under batch, family aliases (opus, gemini, flash, ...) resolve to the latest model OpenRouter lists as
+# "<slug>:batch", read lazily from OpenRouter's public model list (no key, 5 s timeout, cached in memory).
+# false = never fetch it; the committed snapshot and the curated supports_batch flags are used. Default: true
+# (any value other than a true/false word is treated as false, with a warning)
+OPENROUTER_BATCH_LIVE_CATALOG=true
+# Seconds a fetched catalog is trusted. Default: 3600
+OPENROUTER_BATCH_CATALOG_TTL_SECONDS=3600
+```
+
+The file holds prompts and generated text in plaintext (directory `0700`, files `0600`), so treat it like the conversation database. Batch needs `OPENROUTER_API_KEY`.
+
 ## Configuration Examples
 
 ### Development Setup

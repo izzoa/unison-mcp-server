@@ -32,6 +32,7 @@ from mcp.types.version import MODERN_PROTOCOL_VERSIONS
 from clink.workdir import parse_roots_mode
 from config import DEFAULT_MODEL
 from tools.models import ToolOutput
+from tools.shared.batch_support import BatchResumableToolMixin, execution_mode_rejection, is_batch_control_call
 from tools.shared.exceptions import ToolExecutionError
 from utils.env import get_env
 from utils.mcp_context import reset_current_request_context, set_current_request_context
@@ -157,6 +158,67 @@ def _wants_roots(arguments: dict[str, Any]) -> bool:
     return not str(arguments.get("working_dir") or "").strip()
 
 
+def _execution_mode_error_payload(tool_registry: Any, name: str, arguments: dict[str, Any]) -> str | None:
+    """The tool-error payload for ``execution_mode`` sent to a tool with no batch path, else ``None``.
+
+    Only a non-null ``execution_mode`` is ever refused, so a call that does not use the field never
+    pays for the tool lookup. A tool that cannot be instantiated is left to the normal path to report.
+    """
+
+    if arguments.get("execution_mode") is None:
+        return None
+    try:
+        tool = tool_registry.get_tool_instance(name)
+    except Exception:
+        return None
+    message = execution_mode_rejection(
+        name, arguments, accepts_execution_mode=isinstance(tool, BatchResumableToolMixin)
+    )
+    if message is None:
+        return None
+    return ToolOutput(
+        status="error",
+        content=message,
+        content_type="text",
+        metadata={"tool_name": name, "batch_error": "execution_mode_unsupported"},
+    ).model_dump_json()
+
+
+def _without_null_execution_mode(tool_registry: Any, name: str, arguments: dict[str, Any]) -> dict[str, Any]:
+    """``arguments`` with a ``null`` ``execution_mode`` removed when the tool does not publish the field.
+
+    ``null`` means "synchronous", exactly like omitting the field, on every tool. The batch-capable tools
+    publish the field and take ``null`` as it comes; every other tool has a closed schema without it, so a
+    host that serialises ``null`` for an optional field would otherwise be told the property is unexpected.
+    A non-null value is not touched here (it is refused with its reason by the gate above).
+    """
+
+    if "execution_mode" not in arguments or arguments["execution_mode"] is not None:
+        return arguments
+    try:
+        tool = tool_registry.get_tool_instance(name)
+    except Exception:
+        return arguments
+    if isinstance(tool, BatchResumableToolMixin):
+        return arguments
+    return {key: value for key, value in arguments.items() if key != "execution_mode"}
+
+
+def _is_batch_control_for_tool(tool_registry: Any, name: str, arguments: dict[str, Any]) -> bool:
+    """True when this call resumes or cancels a batch (a non-blank ``batch_handle``) on a batch-capable tool.
+
+    A tool that cannot be instantiated is left to the normal path to report, so this never raises.
+    """
+
+    if not is_batch_control_call(arguments):
+        return False
+    try:
+        tool = tool_registry.get_tool_instance(name)
+    except Exception:
+        return False
+    return isinstance(tool, BatchResumableToolMixin)
+
+
 class ToolHandlers(NamedTuple):
     """Handler bundle: legacy-shaped impls plus mcp 2.x constructor adapters."""
 
@@ -256,8 +318,21 @@ def build_handlers(tool_registry):
         if not tool_registry.is_available(name):
             return [TextContent(type="text", text=f"Unknown tool: {name}")]
 
+        # execution_mode asks for server-side batch execution; a tool with no batch path (clink and the
+        # multi-step workflow tools) refuses it here, before any state is written.
+        rejection = _execution_mode_error_payload(tool_registry, name, arguments)
+        if rejection is not None:
+            raise ToolExecutionError(rejection)
+        arguments = _without_null_execution_mode(tool_registry, name, arguments)
+
+        # A resumption or cancellation never reads the conversation: the thread was captured when the batch
+        # was submitted, and the tool ignores a continuation_id sent beside a handle. Reconstructing it here
+        # would fail a perfectly good handle on an expired thread, and would record a user turn for a call
+        # that runs nothing.
+        batch_control = _is_batch_control_for_tool(tool_registry, name, arguments)
+
         # Handle thread context reconstruction if continuation_id is present
-        if "continuation_id" in arguments and arguments["continuation_id"]:
+        if "continuation_id" in arguments and arguments["continuation_id"] and not batch_control:
             continuation_id = arguments["continuation_id"]
             safe_cid = _sanitize_for_log(continuation_id)
             logger.debug("Resuming conversation thread: %s", safe_cid)
@@ -315,6 +390,15 @@ def build_handlers(tool_registry):
                     logger.warning("Tool '%s' unavailable: %s", safe_name, exc.reason)
                     return [TextContent(type="text", text=f"Tool '{name}' is unavailable: {exc.reason}")]
                 raise
+
+            # A call carrying a batch_handle resumes or cancels a batch that was submitted earlier: it names no
+            # model, and the model recorded at submission governs it. Resolving it here would substitute the
+            # default model and fail outright on a server with no provider for that default, and token
+            # allocation and size checks apply to work being started, not to a resumption. The tool gives the
+            # handle precedence over any start-work inputs sent with it, so nothing can be resubmitted.
+            if isinstance(tool, BatchResumableToolMixin) and is_batch_control_call(arguments):
+                logger.debug("Tool %s received a batch_handle - skipping model resolution for the resumption", name)
+                return await tool.execute(arguments)
 
             # EARLY MODEL RESOLUTION AT MCP BOUNDARY
             from providers.registry import get_default_registry
@@ -481,6 +565,13 @@ def build_handlers(tool_registry):
         try:
             name = params.name
             arguments = params.arguments or {}
+
+            # execution_mode on a tool with no batch path is answered with the reason, ahead of the generic
+            # "additional properties are not allowed" its closed schema would otherwise produce.
+            rejection = _execution_mode_error_payload(tool_registry, name, arguments)
+            if rejection is not None:
+                return _error_result(rejection)
+            arguments = _without_null_execution_mode(tool_registry, name, arguments)
 
             # Input-schema validation, exactly as the 1.x decorator did it
             # (same jsonschema mechanism and error text).

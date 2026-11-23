@@ -39,9 +39,10 @@ class TestChatTool:
         assert "properties" in schema
         assert "required" in schema
 
-        # Required fields
-        assert "prompt" in schema["required"]
-        assert "working_directory_absolute_path" in schema["required"]
+        # No schema-level start-work inputs: a call carrying only batch_handle (resume/cancel) must
+        # validate. prompt and working_directory_absolute_path are enforced at runtime instead.
+        assert "prompt" not in schema["required"]
+        assert "working_directory_absolute_path" not in schema["required"]
 
         # Properties
         properties = schema["properties"]

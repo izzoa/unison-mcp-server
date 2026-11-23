@@ -60,10 +60,20 @@ class ModelContext:
     token calculations, ensuring consistency across the system.
     """
 
-    def __init__(self, model_name: str):
+    def __init__(self, model_name: str, provider: Any = None, capabilities: ModelCapabilities | None = None):
+        """``provider`` pins the provider the context uses instead of resolving one from the registry.
+
+        Batch execution passes the provider that will actually batch the model (selection under batch
+        can differ from synchronous selection), so token budgets and capabilities describe that provider.
+
+        ``capabilities`` pins the capabilities too: batch execution passes those of the slug the name resolved to
+        (derived from that slug's own listing), so token allocation, input-size checks and temperature validation
+        use the limits of the model that will run, not an alias's curated entry.
+        """
+
         self.model_name = model_name
-        self._provider = None
-        self._capabilities = None
+        self._provider = provider
+        self._capabilities = capabilities
         self._token_allocation = None
 
     @property

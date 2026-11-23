@@ -1,0 +1,3287 @@
+{
+ "_note": "Trimmed copy of OpenRouter's public GET https://openrouter.ai/api/v1/models (fetched 2026-11-22; 476 models, 92 ':batch' listings): every ':batch' entry plus the plain entries the tests name, reduced to the fields the server reads (id, context_length, architecture input/output modalities, top_provider.max_completion_tokens, supported_parameters). Tests read this file; none fetches the live list.",
+ "data": [
+  {
+   "id": "google/gemini-4-neon:batch",
+   "canonical_slug": "google/gemini-4-neon-20261118",
+   "name": "Google: Gemini 4 Neon (batch)",
+   "created": 1795006977,
+   "context_length": 1048576,
+   "architecture": {
+    "input_modalities": [
+     "audio",
+     "file",
+     "image",
+     "text",
+     "video"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 943718
+   },
+   "supported_parameters": [
+    "include_reasoning",
+    "max_tokens",
+    "reasoning",
+    "reasoning_effort",
+    "response_format",
+    "seed",
+    "stop",
+    "structured_outputs",
+    "temperature",
+    "tool_choice",
+    "tools",
+    "top_p"
+   ]
+  },
+  {
+   "id": "openai/gpt-6.2-astra-pro:batch",
+   "canonical_slug": "openai/gpt-6.2-astra-pro-20261117",
+   "name": "OpenAI: GPT-6.2 Astra Pro (batch)",
+   "created": 1794938432,
+   "context_length": 1050000,
+   "architecture": {
+    "input_modalities": [
+     "file",
+     "image",
+     "text"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 128000
+   },
+   "supported_parameters": [
+    "include_reasoning",
+    "max_tokens",
+    "reasoning",
+    "reasoning_effort",
+    "response_format",
+    "seed",
+    "structured_outputs",
+    "tool_choice",
+    "tools",
+    "verbosity"
+   ]
+  },
+  {
+   "id": "openai/gpt-6.2-astra:batch",
+   "canonical_slug": "openai/gpt-6.2-astra-20261117",
+   "name": "OpenAI: GPT-6.2 Astra (batch)",
+   "created": 1794938423,
+   "context_length": 1050000,
+   "architecture": {
+    "input_modalities": [
+     "file",
+     "image",
+     "text"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 128000
+   },
+   "supported_parameters": [
+    "include_reasoning",
+    "max_tokens",
+    "reasoning",
+    "reasoning_effort",
+    "response_format",
+    "seed",
+    "structured_outputs",
+    "tool_choice",
+    "tools",
+    "verbosity"
+   ]
+  },
+  {
+   "id": "openai/gpt-6.2-sol-pro:batch",
+   "canonical_slug": "openai/gpt-6.2-sol-pro-20261117",
+   "name": "OpenAI: GPT-6.2 Sol Pro (batch)",
+   "created": 1794938409,
+   "context_length": 1050000,
+   "architecture": {
+    "input_modalities": [
+     "file",
+     "image",
+     "text"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 128000
+   },
+   "supported_parameters": [
+    "include_reasoning",
+    "max_tokens",
+    "reasoning",
+    "reasoning_effort",
+    "response_format",
+    "seed",
+    "structured_outputs",
+    "tool_choice",
+    "tools",
+    "verbosity"
+   ]
+  },
+  {
+   "id": "openai/gpt-6.2-sol:batch",
+   "canonical_slug": "openai/gpt-6.2-sol-20261117",
+   "name": "OpenAI: GPT-6.2 Sol (batch)",
+   "created": 1794938371,
+   "context_length": 1050000,
+   "architecture": {
+    "input_modalities": [
+     "file",
+     "image",
+     "text"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 128000
+   },
+   "supported_parameters": [
+    "include_reasoning",
+    "max_tokens",
+    "reasoning",
+    "reasoning_effort",
+    "response_format",
+    "seed",
+    "structured_outputs",
+    "tool_choice",
+    "tools",
+    "verbosity"
+   ]
+  },
+  {
+   "id": "google/gemini-4-hydrogen:batch",
+   "canonical_slug": "google/gemini-4-hydrogen-20261112",
+   "name": "Google: Gemini 4 Hydrogen (batch)",
+   "created": 1794506460,
+   "context_length": 1048576,
+   "architecture": {
+    "input_modalities": [
+     "audio",
+     "file",
+     "image",
+     "text",
+     "video"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 943718
+   },
+   "supported_parameters": [
+    "include_reasoning",
+    "max_tokens",
+    "reasoning",
+    "reasoning_effort",
+    "response_format",
+    "seed",
+    "stop",
+    "structured_outputs",
+    "temperature",
+    "tool_choice",
+    "tools",
+    "top_p"
+   ]
+  },
+  {
+   "id": "google/gemini-4-carbon:batch",
+   "canonical_slug": "google/gemini-4-carbon-20261110",
+   "name": "Google: Gemini 4 Carbon (batch)",
+   "created": 1794326871,
+   "context_length": 1048576,
+   "architecture": {
+    "input_modalities": [
+     "audio",
+     "file",
+     "image",
+     "text",
+     "video"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 943718
+   },
+   "supported_parameters": [
+    "include_reasoning",
+    "max_tokens",
+    "reasoning",
+    "reasoning_effort",
+    "response_format",
+    "seed",
+    "stop",
+    "structured_outputs",
+    "temperature",
+    "tool_choice",
+    "tools",
+    "top_p"
+   ]
+  },
+  {
+   "id": "anthropic/claude-fable-5.2:batch",
+   "canonical_slug": "anthropic/claude-fable-5.2-20261109",
+   "name": "Anthropic: Claude Fable 5.2 (batch)",
+   "created": 1794253781,
+   "context_length": 1000000,
+   "architecture": {
+    "input_modalities": [
+     "text",
+     "image",
+     "file"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 128000
+   },
+   "supported_parameters": [
+    "include_reasoning",
+    "max_tokens",
+    "reasoning",
+    "reasoning_effort",
+    "response_format",
+    "stop",
+    "structured_outputs",
+    "tool_choice",
+    "tools",
+    "verbosity"
+   ]
+  },
+  {
+   "id": "openai/gpt-6.1-terra-pro:batch",
+   "canonical_slug": "openai/gpt-6.1-terra-pro-20261026",
+   "name": "OpenAI: GPT-6.1 Terra Pro (batch)",
+   "created": 1793038556,
+   "context_length": 1050000,
+   "architecture": {
+    "input_modalities": [
+     "file",
+     "image",
+     "text"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 128000
+   },
+   "supported_parameters": [
+    "include_reasoning",
+    "max_tokens",
+    "reasoning",
+    "reasoning_effort",
+    "response_format",
+    "seed",
+    "structured_outputs",
+    "tool_choice",
+    "tools",
+    "verbosity"
+   ]
+  },
+  {
+   "id": "openai/gpt-6.1-terra:batch",
+   "canonical_slug": "openai/gpt-6.1-terra-20261026",
+   "name": "OpenAI: GPT-6.1 Terra (batch)",
+   "created": 1793038409,
+   "context_length": 1050000,
+   "architecture": {
+    "input_modalities": [
+     "file",
+     "image",
+     "text"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 128000
+   },
+   "supported_parameters": [
+    "include_reasoning",
+    "max_tokens",
+    "reasoning",
+    "reasoning_effort",
+    "response_format",
+    "seed",
+    "structured_outputs",
+    "tool_choice",
+    "tools",
+    "verbosity"
+   ]
+  },
+  {
+   "id": "moonshotai/kimi-k3.1-pro:batch",
+   "canonical_slug": "moonshotai/kimi-k3.1-pro-20261023",
+   "name": "MoonshotAI: Kimi K3.1 Pro (batch)",
+   "created": 1792778188,
+   "context_length": 1048576,
+   "architecture": {
+    "input_modalities": [
+     "text",
+     "image",
+     "video"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 943718
+   },
+   "supported_parameters": [
+    "frequency_penalty",
+    "include_reasoning",
+    "logit_bias",
+    "max_tokens",
+    "min_p",
+    "presence_penalty",
+    "reasoning",
+    "reasoning_effort",
+    "repetition_penalty",
+    "response_format",
+    "seed",
+    "stop",
+    "structured_outputs",
+    "temperature",
+    "tool_choice",
+    "tools",
+    "top_k",
+    "top_p"
+   ]
+  },
+  {
+   "id": "deepseek/deepseek-v4.1-flash-1017:batch",
+   "canonical_slug": "deepseek/deepseek-v4.1-flash-20261017",
+   "name": "DeepSeek: DeepSeek V4.1 Flash 1017 (batch)",
+   "created": 1792225624,
+   "context_length": 1048576,
+   "architecture": {
+    "input_modalities": [
+     "text",
+     "image"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 943718
+   },
+   "supported_parameters": [
+    "frequency_penalty",
+    "include_reasoning",
+    "logit_bias",
+    "logprobs",
+    "max_tokens",
+    "min_p",
+    "presence_penalty",
+    "reasoning",
+    "reasoning_effort",
+    "repetition_penalty",
+    "response_format",
+    "seed",
+    "stop",
+    "structured_outputs",
+    "temperature",
+    "tool_choice",
+    "tools",
+    "top_k",
+    "top_logprobs",
+    "top_p"
+   ]
+  },
+  {
+   "id": "google/gemini-4-argon:batch",
+   "canonical_slug": "google/gemini-4-argon-20261013",
+   "name": "Google: Gemini 4 Argon (batch)",
+   "created": 1791907477,
+   "context_length": 1048576,
+   "architecture": {
+    "input_modalities": [
+     "audio",
+     "file",
+     "image",
+     "text",
+     "video"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 943718
+   },
+   "supported_parameters": [
+    "include_reasoning",
+    "max_tokens",
+    "reasoning",
+    "reasoning_effort",
+    "response_format",
+    "seed",
+    "stop",
+    "structured_outputs",
+    "temperature",
+    "tool_choice",
+    "tools",
+    "top_p"
+   ]
+  },
+  {
+   "id": "anthropic/claude-haiku-5.5:batch",
+   "canonical_slug": "anthropic/claude-haiku-5.5-20261007",
+   "name": "Anthropic: Claude Haiku 5.5 (batch)",
+   "created": 1791397883,
+   "context_length": 1000000,
+   "architecture": {
+    "input_modalities": [
+     "text",
+     "image",
+     "file"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 128000
+   },
+   "supported_parameters": [
+    "include_reasoning",
+    "max_tokens",
+    "reasoning",
+    "reasoning_effort",
+    "response_format",
+    "stop",
+    "structured_outputs",
+    "tool_choice",
+    "tools",
+    "verbosity"
+   ]
+  },
+  {
+   "id": "openai/gpt-6.1-sol-pro:batch",
+   "canonical_slug": "openai/gpt-6.1-sol-pro-20260929",
+   "name": "OpenAI: GPT-6.1 Sol Pro (batch)",
+   "created": 1790702886,
+   "context_length": 1050000,
+   "architecture": {
+    "input_modalities": [
+     "file",
+     "image",
+     "text"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 128000
+   },
+   "supported_parameters": [
+    "include_reasoning",
+    "max_tokens",
+    "reasoning",
+    "reasoning_effort",
+    "response_format",
+    "seed",
+    "structured_outputs",
+    "tool_choice",
+    "tools",
+    "verbosity"
+   ]
+  },
+  {
+   "id": "openai/gpt-6.1-sol:batch",
+   "canonical_slug": "openai/gpt-6.1-sol-20260929",
+   "name": "OpenAI: GPT-6.1 Sol (batch)",
+   "created": 1790702882,
+   "context_length": 1050000,
+   "architecture": {
+    "input_modalities": [
+     "file",
+     "image",
+     "text"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 128000
+   },
+   "supported_parameters": [
+    "include_reasoning",
+    "max_tokens",
+    "reasoning",
+    "reasoning_effort",
+    "response_format",
+    "seed",
+    "structured_outputs",
+    "tool_choice",
+    "tools",
+    "verbosity"
+   ]
+  },
+  {
+   "id": "anthropic/claude-sonnet-5.5",
+   "canonical_slug": "anthropic/claude-sonnet-5.5-20260928",
+   "name": "Anthropic: Claude Sonnet 5.5",
+   "created": 1790618686,
+   "context_length": 1000000,
+   "architecture": {
+    "input_modalities": [
+     "text",
+     "image",
+     "file"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 128000
+   },
+   "supported_parameters": [
+    "include_reasoning",
+    "max_completion_tokens",
+    "max_tokens",
+    "reasoning",
+    "reasoning_effort",
+    "response_format",
+    "stop",
+    "structured_outputs",
+    "tool_choice",
+    "tools",
+    "verbosity"
+   ]
+  },
+  {
+   "id": "anthropic/claude-sonnet-5.5:batch",
+   "canonical_slug": "anthropic/claude-sonnet-5.5-20260928",
+   "name": "Anthropic: Claude Sonnet 5.5 (batch)",
+   "created": 1790618686,
+   "context_length": 1000000,
+   "architecture": {
+    "input_modalities": [
+     "text",
+     "image",
+     "file"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 128000
+   },
+   "supported_parameters": [
+    "include_reasoning",
+    "max_tokens",
+    "reasoning",
+    "reasoning_effort",
+    "response_format",
+    "stop",
+    "structured_outputs",
+    "tool_choice",
+    "tools",
+    "verbosity"
+   ]
+  },
+  {
+   "id": "openai/gpt-6-luna-pro:batch",
+   "canonical_slug": "openai/gpt-6-luna-pro-20260922",
+   "name": "OpenAI: GPT-6 Luna Pro (batch)",
+   "created": 1790100791,
+   "context_length": 1050000,
+   "architecture": {
+    "input_modalities": [
+     "file",
+     "image",
+     "text"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 128000
+   },
+   "supported_parameters": [
+    "include_reasoning",
+    "max_tokens",
+    "reasoning",
+    "reasoning_effort",
+    "response_format",
+    "seed",
+    "structured_outputs",
+    "tool_choice",
+    "tools",
+    "verbosity"
+   ]
+  },
+  {
+   "id": "openai/gpt-6-luna:batch",
+   "canonical_slug": "openai/gpt-6-luna-20260922",
+   "name": "OpenAI: GPT-6 Luna (batch)",
+   "created": 1790100786,
+   "context_length": 1050000,
+   "architecture": {
+    "input_modalities": [
+     "file",
+     "image",
+     "text"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 128000
+   },
+   "supported_parameters": [
+    "include_reasoning",
+    "max_tokens",
+    "reasoning",
+    "reasoning_effort",
+    "response_format",
+    "seed",
+    "structured_outputs",
+    "tool_choice",
+    "tools",
+    "verbosity"
+   ]
+  },
+  {
+   "id": "openai/gpt-6-sol-pro:batch",
+   "canonical_slug": "openai/gpt-6-sol-pro-20260922",
+   "name": "OpenAI: GPT-6 Sol Pro (batch)",
+   "created": 1790100781,
+   "context_length": 1050000,
+   "architecture": {
+    "input_modalities": [
+     "file",
+     "image",
+     "text"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 128000
+   },
+   "supported_parameters": [
+    "include_reasoning",
+    "max_tokens",
+    "reasoning",
+    "reasoning_effort",
+    "response_format",
+    "seed",
+    "structured_outputs",
+    "tool_choice",
+    "tools",
+    "verbosity"
+   ]
+  },
+  {
+   "id": "openai/gpt-6-sol:batch",
+   "canonical_slug": "openai/gpt-6-sol-20260922",
+   "name": "OpenAI: GPT-6 Sol (batch)",
+   "created": 1790100775,
+   "context_length": 1050000,
+   "architecture": {
+    "input_modalities": [
+     "file",
+     "image",
+     "text"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 128000
+   },
+   "supported_parameters": [
+    "include_reasoning",
+    "max_tokens",
+    "reasoning",
+    "reasoning_effort",
+    "response_format",
+    "seed",
+    "structured_outputs",
+    "tool_choice",
+    "tools",
+    "verbosity"
+   ]
+  },
+  {
+   "id": "anthropic/claude-opus-5.5",
+   "canonical_slug": "anthropic/claude-opus-5.5-20260921",
+   "name": "Anthropic: Claude Opus 5.5",
+   "created": 1790094732,
+   "context_length": 1000000,
+   "architecture": {
+    "input_modalities": [
+     "text",
+     "image",
+     "file"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 128000
+   },
+   "supported_parameters": [
+    "include_reasoning",
+    "max_completion_tokens",
+    "max_tokens",
+    "reasoning",
+    "reasoning_effort",
+    "response_format",
+    "stop",
+    "structured_outputs",
+    "tool_choice",
+    "tools",
+    "verbosity"
+   ]
+  },
+  {
+   "id": "anthropic/claude-opus-5.5:batch",
+   "canonical_slug": "anthropic/claude-opus-5.5-20260921",
+   "name": "Anthropic: Claude Opus 5.5 (batch)",
+   "created": 1790094732,
+   "context_length": 1000000,
+   "architecture": {
+    "input_modalities": [
+     "text",
+     "image",
+     "file"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 128000
+   },
+   "supported_parameters": [
+    "include_reasoning",
+    "max_tokens",
+    "reasoning",
+    "reasoning_effort",
+    "response_format",
+    "stop",
+    "structured_outputs",
+    "tool_choice",
+    "tools",
+    "verbosity"
+   ]
+  },
+  {
+   "id": "x-ai/grok-4.7:batch",
+   "canonical_slug": "x-ai/grok-4.7-20260916",
+   "name": "SpaceXSI: Grok 4.7 (batch)",
+   "created": 1790007541,
+   "context_length": 500000,
+   "architecture": {
+    "input_modalities": [
+     "text",
+     "image",
+     "file"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 450000
+   },
+   "supported_parameters": [
+    "include_reasoning",
+    "logprobs",
+    "max_tokens",
+    "reasoning",
+    "reasoning_effort",
+    "response_format",
+    "seed",
+    "structured_outputs",
+    "temperature",
+    "tool_choice",
+    "tools",
+    "top_logprobs",
+    "top_p"
+   ]
+  },
+  {
+   "id": "deepseek/deepseek-v4.1-flash:batch",
+   "canonical_slug": "deepseek/deepseek-v4.1-flash-20260910",
+   "name": "DeepSeek: DeepSeek V4.1 Flash (batch)",
+   "created": 1789021285,
+   "context_length": 1048576,
+   "architecture": {
+    "input_modalities": [
+     "text",
+     "image"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 384000
+   },
+   "supported_parameters": [
+    "frequency_penalty",
+    "include_reasoning",
+    "logit_bias",
+    "logprobs",
+    "max_tokens",
+    "min_p",
+    "presence_penalty",
+    "reasoning",
+    "reasoning_effort",
+    "repetition_penalty",
+    "response_format",
+    "seed",
+    "stop",
+    "structured_outputs",
+    "temperature",
+    "tool_choice",
+    "tools",
+    "top_k",
+    "top_logprobs",
+    "top_p"
+   ]
+  },
+  {
+   "id": "openai/gpt-6-astra:batch",
+   "canonical_slug": "openai/gpt-6-astra-20260903",
+   "name": "OpenAI: GPT-6 Astra (batch)",
+   "created": 1788552838,
+   "context_length": 1050000,
+   "architecture": {
+    "input_modalities": [
+     "file",
+     "image",
+     "text"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 128000
+   },
+   "supported_parameters": [
+    "include_reasoning",
+    "max_tokens",
+    "reasoning",
+    "reasoning_effort",
+    "response_format",
+    "seed",
+    "structured_outputs",
+    "tool_choice",
+    "tools",
+    "verbosity"
+   ]
+  },
+  {
+   "id": "openai/gpt-6-astra-pro:batch",
+   "canonical_slug": "openai/gpt-6-astra-pro-20260903",
+   "name": "OpenAI: GPT-6 Astra Pro (batch)",
+   "created": 1788552835,
+   "context_length": 1050000,
+   "architecture": {
+    "input_modalities": [
+     "file",
+     "image",
+     "text"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 128000
+   },
+   "supported_parameters": [
+    "include_reasoning",
+    "max_tokens",
+    "reasoning",
+    "reasoning_effort",
+    "response_format",
+    "seed",
+    "structured_outputs",
+    "tool_choice",
+    "tools",
+    "verbosity"
+   ]
+  },
+  {
+   "id": "qwen/qwen3.8-max-0902:batch",
+   "canonical_slug": "qwen/qwen3.8-max-20260902",
+   "name": "Qwen: Qwen3.8 Max (0902) (batch)",
+   "created": 1788469704,
+   "context_length": 262144,
+   "architecture": {
+    "input_modalities": [
+     "text",
+     "image",
+     "video"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 131072
+   },
+   "supported_parameters": [
+    "frequency_penalty",
+    "include_reasoning",
+    "logprobs",
+    "max_tokens",
+    "presence_penalty",
+    "reasoning",
+    "reasoning_effort",
+    "response_format",
+    "seed",
+    "stop",
+    "structured_outputs",
+    "temperature",
+    "tool_choice",
+    "tools",
+    "top_k",
+    "top_logprobs",
+    "top_p"
+   ]
+  },
+  {
+   "id": "google/gemini-3.8-flash",
+   "canonical_slug": "google/gemini-3.8-flash-20260902",
+   "name": "Google: Gemini 3.8 Flash",
+   "created": 1788362056,
+   "context_length": 1048576,
+   "architecture": {
+    "input_modalities": [
+     "text",
+     "image",
+     "video",
+     "file",
+     "audio"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 65536
+   },
+   "supported_parameters": [
+    "include_reasoning",
+    "max_tokens",
+    "reasoning",
+    "reasoning_effort",
+    "response_format",
+    "seed",
+    "stop",
+    "structured_outputs",
+    "temperature",
+    "tool_choice",
+    "tools",
+    "top_p"
+   ]
+  },
+  {
+   "id": "google/gemini-3.8-flash:batch",
+   "canonical_slug": "google/gemini-3.8-flash-20260902",
+   "name": "Google: Gemini 3.8 Flash (batch)",
+   "created": 1788362056,
+   "context_length": 1048576,
+   "architecture": {
+    "input_modalities": [
+     "text",
+     "image",
+     "video",
+     "file",
+     "audio"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 65536
+   },
+   "supported_parameters": [
+    "include_reasoning",
+    "max_tokens",
+    "reasoning",
+    "reasoning_effort",
+    "response_format",
+    "seed",
+    "stop",
+    "structured_outputs",
+    "tool_choice",
+    "tools"
+   ]
+  },
+  {
+   "id": "anthropic/claude-fable-5.1:batch",
+   "canonical_slug": "anthropic/claude-fable-5.1-20260831",
+   "name": "Anthropic: Claude Fable 5.1 (batch)",
+   "created": 1788285838,
+   "context_length": 1000000,
+   "architecture": {
+    "input_modalities": [
+     "text",
+     "image",
+     "file"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 128000
+   },
+   "supported_parameters": [
+    "include_reasoning",
+    "max_tokens",
+    "reasoning",
+    "reasoning_effort",
+    "response_format",
+    "stop",
+    "structured_outputs",
+    "tool_choice",
+    "tools",
+    "verbosity"
+   ]
+  },
+  {
+   "id": "z-ai/glm-5.3-flash:batch",
+   "canonical_slug": "z-ai/glm-5.3-flash-20260826",
+   "name": "Z.ai: GLM 5.3 Flash (batch)",
+   "created": 1787752741,
+   "context_length": 1048576,
+   "architecture": {
+    "input_modalities": [
+     "text",
+     "image",
+     "video"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 943717
+   },
+   "supported_parameters": [
+    "frequency_penalty",
+    "include_reasoning",
+    "logit_bias",
+    "logprobs",
+    "max_tokens",
+    "min_p",
+    "presence_penalty",
+    "reasoning",
+    "reasoning_effort",
+    "repetition_penalty",
+    "response_format",
+    "seed",
+    "stop",
+    "structured_outputs",
+    "temperature",
+    "tool_choice",
+    "tools",
+    "top_k",
+    "top_logprobs",
+    "top_p"
+   ]
+  },
+  {
+   "id": "z-ai/glm-5.3:batch",
+   "canonical_slug": "z-ai/glm-5.3-20260816",
+   "name": "Z.ai: GLM 5.3 (batch)",
+   "created": 1787086655,
+   "context_length": 1048576,
+   "architecture": {
+    "input_modalities": [
+     "text"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 943717
+   },
+   "supported_parameters": [
+    "frequency_penalty",
+    "include_reasoning",
+    "logit_bias",
+    "logprobs",
+    "max_tokens",
+    "min_p",
+    "presence_penalty",
+    "reasoning",
+    "reasoning_effort",
+    "repetition_penalty",
+    "response_format",
+    "seed",
+    "stop",
+    "structured_outputs",
+    "temperature",
+    "tool_choice",
+    "tools",
+    "top_k",
+    "top_logprobs",
+    "top_p"
+   ]
+  },
+  {
+   "id": "qwen/qwen3.8-27b:batch",
+   "canonical_slug": "qwen/qwen3.8-27b-20260814",
+   "name": "Qwen: Qwen3.8 27B (batch)",
+   "created": 1786722910,
+   "context_length": 262144,
+   "architecture": {
+    "input_modalities": [
+     "text",
+     "image",
+     "video"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 235929
+   },
+   "supported_parameters": [
+    "frequency_penalty",
+    "include_reasoning",
+    "logit_bias",
+    "max_tokens",
+    "min_p",
+    "presence_penalty",
+    "reasoning",
+    "reasoning_effort",
+    "repetition_penalty",
+    "response_format",
+    "seed",
+    "stop",
+    "structured_outputs",
+    "temperature",
+    "tool_choice",
+    "tools",
+    "top_k",
+    "top_p"
+   ]
+  },
+  {
+   "id": "google/gemini-3.7-flash:batch",
+   "canonical_slug": "google/gemini-3.7-flash-20260813",
+   "name": "Google: Gemini 3.7 Flash (batch)",
+   "created": 1786640581,
+   "context_length": 1048576,
+   "architecture": {
+    "input_modalities": [
+     "text",
+     "image",
+     "video",
+     "file",
+     "audio"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 65536
+   },
+   "supported_parameters": [
+    "include_reasoning",
+    "max_tokens",
+    "reasoning",
+    "reasoning_effort",
+    "response_format",
+    "seed",
+    "stop",
+    "structured_outputs",
+    "tool_choice",
+    "tools"
+   ]
+  },
+  {
+   "id": "x-ai/grok-4.6:batch",
+   "canonical_slug": "x-ai/grok-4.6-20260810",
+   "name": "SpaceXSI: Grok 4.6 (batch)",
+   "created": 1786548957,
+   "context_length": 500000,
+   "architecture": {
+    "input_modalities": [
+     "text",
+     "image",
+     "file"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 450000
+   },
+   "supported_parameters": [
+    "include_reasoning",
+    "logprobs",
+    "max_tokens",
+    "reasoning",
+    "reasoning_effort",
+    "response_format",
+    "seed",
+    "structured_outputs",
+    "temperature",
+    "tool_choice",
+    "tools",
+    "top_logprobs",
+    "top_p"
+   ]
+  },
+  {
+   "id": "meta/muse-glimmer-30b:batch",
+   "canonical_slug": "meta/muse-glimmer-30b-20260810",
+   "name": "Meta: Muse Glimmer 30B (batch)",
+   "created": 1786302394,
+   "context_length": 131072,
+   "architecture": {
+    "input_modalities": [
+     "text",
+     "image"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 16384
+   },
+   "supported_parameters": [
+    "frequency_penalty",
+    "include_reasoning",
+    "logit_bias",
+    "max_tokens",
+    "min_p",
+    "presence_penalty",
+    "reasoning",
+    "reasoning_effort",
+    "repetition_penalty",
+    "response_format",
+    "seed",
+    "stop",
+    "structured_outputs",
+    "temperature",
+    "tool_choice",
+    "tools",
+    "top_k",
+    "top_p"
+   ]
+  },
+  {
+   "id": "deepseek/deepseek-v4-flash-0731:batch",
+   "canonical_slug": "deepseek/deepseek-v4-flash-20260731",
+   "name": "DeepSeek: DeepSeek V4 Flash 0731 (batch)",
+   "created": 1785478908,
+   "context_length": 1048576,
+   "architecture": {
+    "input_modalities": [
+     "text"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 384000
+   },
+   "supported_parameters": [
+    "frequency_penalty",
+    "include_reasoning",
+    "logit_bias",
+    "max_tokens",
+    "min_p",
+    "presence_penalty",
+    "reasoning",
+    "reasoning_effort",
+    "repetition_penalty",
+    "response_format",
+    "seed",
+    "stop",
+    "structured_outputs",
+    "temperature",
+    "tool_choice",
+    "tools",
+    "top_k",
+    "top_p"
+   ]
+  },
+  {
+   "id": "thinkingmachines/inkling-small:batch",
+   "canonical_slug": "thinkingmachines/inkling-small-20260730",
+   "name": "Thinking Machines: Inkling Small (batch)",
+   "created": 1785443117,
+   "context_length": 524288,
+   "architecture": {
+    "input_modalities": [
+     "text",
+     "image",
+     "audio"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 262144
+   },
+   "supported_parameters": [
+    "frequency_penalty",
+    "include_reasoning",
+    "logit_bias",
+    "max_tokens",
+    "min_p",
+    "presence_penalty",
+    "reasoning",
+    "reasoning_effort",
+    "repetition_penalty",
+    "seed",
+    "stop",
+    "temperature",
+    "tool_choice",
+    "tools",
+    "top_k",
+    "top_p"
+   ]
+  },
+  {
+   "id": "anthropic/claude-opus-5:batch",
+   "canonical_slug": "anthropic/claude-opus-5-20260723",
+   "name": "Anthropic: Claude Opus 5 (batch)",
+   "created": 1784912544,
+   "context_length": 1000000,
+   "architecture": {
+    "input_modalities": [
+     "text",
+     "image",
+     "file"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 128000
+   },
+   "supported_parameters": [
+    "include_reasoning",
+    "max_tokens",
+    "reasoning",
+    "reasoning_effort",
+    "response_format",
+    "stop",
+    "structured_outputs",
+    "tool_choice",
+    "tools",
+    "verbosity"
+   ]
+  },
+  {
+   "id": "google/gemini-3.6-flash:batch",
+   "canonical_slug": "google/gemini-3.6-flash-20260721",
+   "name": "Google: Gemini 3.6 Flash (batch)",
+   "created": 1784646733,
+   "context_length": 1048576,
+   "architecture": {
+    "input_modalities": [
+     "text",
+     "image",
+     "video",
+     "file",
+     "audio"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 65536
+   },
+   "supported_parameters": [
+    "include_reasoning",
+    "max_tokens",
+    "reasoning",
+    "reasoning_effort",
+    "response_format",
+    "seed",
+    "stop",
+    "structured_outputs",
+    "tool_choice",
+    "tools"
+   ]
+  },
+  {
+   "id": "google/gemini-3.5-flash-lite:batch",
+   "canonical_slug": "google/gemini-3.5-flash-lite-20260721",
+   "name": "Google: Gemini 3.5 Flash Lite (batch)",
+   "created": 1784646726,
+   "context_length": 1048576,
+   "architecture": {
+    "input_modalities": [
+     "text",
+     "image",
+     "video",
+     "file",
+     "audio"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 65536
+   },
+   "supported_parameters": [
+    "include_reasoning",
+    "max_tokens",
+    "reasoning",
+    "reasoning_effort",
+    "response_format",
+    "seed",
+    "stop",
+    "structured_outputs",
+    "tool_choice",
+    "tools"
+   ]
+  },
+  {
+   "id": "moonshotai/kimi-k3:batch",
+   "canonical_slug": "moonshotai/kimi-k3-20260715",
+   "name": "MoonshotAI: Kimi K3 (batch)",
+   "created": 1784215858,
+   "context_length": 1048576,
+   "architecture": {
+    "input_modalities": [
+     "text",
+     "image",
+     "video"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 16384
+   },
+   "supported_parameters": [
+    "frequency_penalty",
+    "include_reasoning",
+    "logit_bias",
+    "max_tokens",
+    "min_p",
+    "presence_penalty",
+    "reasoning",
+    "reasoning_effort",
+    "repetition_penalty",
+    "response_format",
+    "seed",
+    "stop",
+    "structured_outputs",
+    "temperature",
+    "tool_choice",
+    "tools",
+    "top_k",
+    "top_p"
+   ]
+  },
+  {
+   "id": "openai/gpt-5.6-luna-pro:batch",
+   "canonical_slug": "openai/gpt-5.6-luna-pro-20260709",
+   "name": "OpenAI: GPT-5.6 Luna Pro (batch)",
+   "created": 1783590867,
+   "context_length": 1050000,
+   "architecture": {
+    "input_modalities": [
+     "file",
+     "image",
+     "text"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 128000
+   },
+   "supported_parameters": [
+    "include_reasoning",
+    "max_tokens",
+    "reasoning",
+    "reasoning_effort",
+    "response_format",
+    "seed",
+    "structured_outputs",
+    "tool_choice",
+    "tools",
+    "verbosity"
+   ]
+  },
+  {
+   "id": "openai/gpt-5.6-luna:batch",
+   "canonical_slug": "openai/gpt-5.6-luna-20260709",
+   "name": "OpenAI: GPT-5.6 Luna (batch)",
+   "created": 1783590864,
+   "context_length": 1050000,
+   "architecture": {
+    "input_modalities": [
+     "file",
+     "image",
+     "text"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 128000
+   },
+   "supported_parameters": [
+    "include_reasoning",
+    "max_tokens",
+    "reasoning",
+    "reasoning_effort",
+    "response_format",
+    "seed",
+    "structured_outputs",
+    "tool_choice",
+    "tools",
+    "verbosity"
+   ]
+  },
+  {
+   "id": "openai/gpt-5.6-terra-pro:batch",
+   "canonical_slug": "openai/gpt-5.6-terra-pro-20260709",
+   "name": "OpenAI: GPT-5.6 Terra Pro (batch)",
+   "created": 1783590861,
+   "context_length": 1050000,
+   "architecture": {
+    "input_modalities": [
+     "file",
+     "image",
+     "text"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 128000
+   },
+   "supported_parameters": [
+    "include_reasoning",
+    "max_tokens",
+    "reasoning",
+    "reasoning_effort",
+    "response_format",
+    "seed",
+    "structured_outputs",
+    "tool_choice",
+    "tools",
+    "verbosity"
+   ]
+  },
+  {
+   "id": "openai/gpt-5.6-terra:batch",
+   "canonical_slug": "openai/gpt-5.6-terra-20260709",
+   "name": "OpenAI: GPT-5.6 Terra (batch)",
+   "created": 1783590857,
+   "context_length": 1050000,
+   "architecture": {
+    "input_modalities": [
+     "file",
+     "image",
+     "text"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 128000
+   },
+   "supported_parameters": [
+    "include_reasoning",
+    "max_tokens",
+    "reasoning",
+    "reasoning_effort",
+    "response_format",
+    "seed",
+    "structured_outputs",
+    "tool_choice",
+    "tools",
+    "verbosity"
+   ]
+  },
+  {
+   "id": "openai/gpt-5.6-sol-pro:batch",
+   "canonical_slug": "openai/gpt-5.6-sol-pro-20260709",
+   "name": "OpenAI: GPT-5.6 Sol Pro (batch)",
+   "created": 1783590854,
+   "context_length": 1050000,
+   "architecture": {
+    "input_modalities": [
+     "file",
+     "image",
+     "text"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 128000
+   },
+   "supported_parameters": [
+    "include_reasoning",
+    "max_tokens",
+    "reasoning",
+    "reasoning_effort",
+    "response_format",
+    "seed",
+    "structured_outputs",
+    "tool_choice",
+    "tools",
+    "verbosity"
+   ]
+  },
+  {
+   "id": "openai/gpt-5.6-sol:batch",
+   "canonical_slug": "openai/gpt-5.6-sol-20260709",
+   "name": "OpenAI: GPT-5.6 Sol (batch)",
+   "created": 1783590850,
+   "context_length": 1050000,
+   "architecture": {
+    "input_modalities": [
+     "file",
+     "image",
+     "text"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 128000
+   },
+   "supported_parameters": [
+    "include_reasoning",
+    "max_tokens",
+    "reasoning",
+    "reasoning_effort",
+    "response_format",
+    "seed",
+    "structured_outputs",
+    "tool_choice",
+    "tools",
+    "verbosity"
+   ]
+  },
+  {
+   "id": "anthropic/claude-sonnet-5:batch",
+   "canonical_slug": "anthropic/claude-sonnet-5-20260630",
+   "name": "Anthropic: Claude Sonnet 5 (batch)",
+   "created": 1782843083,
+   "context_length": 1000000,
+   "architecture": {
+    "input_modalities": [
+     "text",
+     "image",
+     "file"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 128000
+   },
+   "supported_parameters": [
+    "include_reasoning",
+    "max_tokens",
+    "reasoning",
+    "reasoning_effort",
+    "response_format",
+    "stop",
+    "structured_outputs",
+    "tool_choice",
+    "tools",
+    "verbosity"
+   ]
+  },
+  {
+   "id": "z-ai/glm-5.2:batch",
+   "canonical_slug": "z-ai/glm-5.2-20260616",
+   "name": "Z.ai: GLM 5.2 (batch)",
+   "created": 1781631930,
+   "context_length": 1048576,
+   "architecture": {
+    "input_modalities": [
+     "text"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 943718
+   },
+   "supported_parameters": [
+    "frequency_penalty",
+    "include_reasoning",
+    "logit_bias",
+    "logprobs",
+    "max_tokens",
+    "min_p",
+    "presence_penalty",
+    "reasoning",
+    "reasoning_effort",
+    "repetition_penalty",
+    "response_format",
+    "seed",
+    "stop",
+    "structured_outputs",
+    "temperature",
+    "tool_choice",
+    "tools",
+    "top_k",
+    "top_logprobs",
+    "top_p"
+   ]
+  },
+  {
+   "id": "anthropic/claude-fable-5:batch",
+   "canonical_slug": "anthropic/claude-5-fable-20260609",
+   "name": "Anthropic: Claude Fable 5 (batch)",
+   "created": 1781007515,
+   "context_length": 1000000,
+   "architecture": {
+    "input_modalities": [
+     "text",
+     "image",
+     "file"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 128000
+   },
+   "supported_parameters": [
+    "include_reasoning",
+    "max_tokens",
+    "reasoning",
+    "reasoning_effort",
+    "response_format",
+    "stop",
+    "structured_outputs",
+    "tool_choice",
+    "tools",
+    "verbosity"
+   ]
+  },
+  {
+   "id": "qwen/qwen3.7-plus:batch",
+   "canonical_slug": "qwen/qwen3.7-plus-20260602",
+   "name": "Qwen: Qwen3.7 Plus (batch)",
+   "created": 1780491783,
+   "context_length": 262144,
+   "architecture": {
+    "input_modalities": [
+     "text",
+     "image"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 131072
+   },
+   "supported_parameters": [
+    "frequency_penalty",
+    "include_reasoning",
+    "logprobs",
+    "max_tokens",
+    "presence_penalty",
+    "reasoning",
+    "response_format",
+    "seed",
+    "stop",
+    "structured_outputs",
+    "temperature",
+    "tool_choice",
+    "tools",
+    "top_k",
+    "top_logprobs",
+    "top_p"
+   ]
+  },
+  {
+   "id": "minimax/minimax-m3:batch",
+   "canonical_slug": "minimax/minimax-m3-20260531",
+   "name": "MiniMax: MiniMax M3 (batch)",
+   "created": 1780245374,
+   "context_length": 524288,
+   "architecture": {
+    "input_modalities": [
+     "text",
+     "image",
+     "video"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 512000
+   },
+   "supported_parameters": [
+    "frequency_penalty",
+    "include_reasoning",
+    "logit_bias",
+    "max_tokens",
+    "min_p",
+    "presence_penalty",
+    "reasoning",
+    "repetition_penalty",
+    "response_format",
+    "seed",
+    "stop",
+    "temperature",
+    "tool_choice",
+    "tools",
+    "top_k",
+    "top_p"
+   ]
+  },
+  {
+   "id": "anthropic/claude-opus-4.8:batch",
+   "canonical_slug": "anthropic/claude-4.8-opus-20260528",
+   "name": "Anthropic: Claude Opus 4.8 (batch)",
+   "created": 1779905091,
+   "context_length": 1000000,
+   "architecture": {
+    "input_modalities": [
+     "text",
+     "image",
+     "file"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 128000
+   },
+   "supported_parameters": [
+    "include_reasoning",
+    "max_tokens",
+    "reasoning",
+    "reasoning_effort",
+    "response_format",
+    "stop",
+    "structured_outputs",
+    "tool_choice",
+    "tools",
+    "verbosity"
+   ]
+  },
+  {
+   "id": "google/gemini-3.5-flash:batch",
+   "canonical_slug": "google/gemini-3.5-flash-20260519",
+   "name": "Google: Gemini 3.5 Flash (batch)",
+   "created": 1779193800,
+   "context_length": 1048576,
+   "architecture": {
+    "input_modalities": [
+     "text",
+     "image",
+     "video",
+     "file",
+     "audio"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 65536
+   },
+   "supported_parameters": [
+    "include_reasoning",
+    "max_tokens",
+    "reasoning",
+    "reasoning_effort",
+    "response_format",
+    "seed",
+    "stop",
+    "structured_outputs",
+    "temperature",
+    "tool_choice",
+    "tools",
+    "top_p"
+   ]
+  },
+  {
+   "id": "google/gemini-3.1-flash-lite",
+   "canonical_slug": "google/gemini-3.1-flash-lite-20260507",
+   "name": "Google: Gemini 3.1 Flash Lite",
+   "created": 1778168828,
+   "context_length": 1048576,
+   "architecture": {
+    "input_modalities": [
+     "text",
+     "image",
+     "video",
+     "file",
+     "audio"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 65536
+   },
+   "supported_parameters": [
+    "include_reasoning",
+    "max_tokens",
+    "reasoning",
+    "reasoning_effort",
+    "response_format",
+    "seed",
+    "stop",
+    "structured_outputs",
+    "temperature",
+    "tool_choice",
+    "tools",
+    "top_p"
+   ]
+  },
+  {
+   "id": "google/gemini-3.1-flash-lite:batch",
+   "canonical_slug": "google/gemini-3.1-flash-lite-20260507",
+   "name": "Google: Gemini 3.1 Flash Lite (batch)",
+   "created": 1778168828,
+   "context_length": 1048576,
+   "architecture": {
+    "input_modalities": [
+     "text",
+     "image",
+     "video",
+     "file",
+     "audio"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 65536
+   },
+   "supported_parameters": [
+    "include_reasoning",
+    "max_tokens",
+    "reasoning",
+    "reasoning_effort",
+    "response_format",
+    "seed",
+    "stop",
+    "structured_outputs",
+    "temperature",
+    "tool_choice",
+    "tools",
+    "top_p"
+   ]
+  },
+  {
+   "id": "x-ai/grok-4.3:batch",
+   "canonical_slug": "x-ai/grok-4.3-20260430",
+   "name": "SpaceXSI: Grok 4.3 (batch)",
+   "created": 1777591821,
+   "context_length": 1000000,
+   "architecture": {
+    "input_modalities": [
+     "text",
+     "image",
+     "file"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 900000
+   },
+   "supported_parameters": [
+    "include_reasoning",
+    "logprobs",
+    "max_tokens",
+    "reasoning",
+    "reasoning_effort",
+    "response_format",
+    "seed",
+    "structured_outputs",
+    "temperature",
+    "tool_choice",
+    "tools",
+    "top_logprobs",
+    "top_p"
+   ]
+  },
+  {
+   "id": "mistralai/mistral-medium-3-5:batch",
+   "canonical_slug": "mistralai/mistral-medium-3.5-20260430",
+   "name": "Mistral: Mistral Medium 3.5 (batch)",
+   "created": 1777570439,
+   "context_length": 262144,
+   "architecture": {
+    "input_modalities": [
+     "text",
+     "image",
+     "file"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 209715
+   },
+   "supported_parameters": [
+    "frequency_penalty",
+    "include_reasoning",
+    "max_tokens",
+    "presence_penalty",
+    "reasoning",
+    "reasoning_effort",
+    "response_format",
+    "seed",
+    "stop",
+    "structured_outputs",
+    "temperature",
+    "tool_choice",
+    "tools",
+    "top_p"
+   ]
+  },
+  {
+   "id": "openai/gpt-5.5-pro:batch",
+   "canonical_slug": "openai/gpt-5.5-pro-20260423",
+   "name": "OpenAI: GPT-5.5 Pro (batch)",
+   "created": 1777051896,
+   "context_length": 1050000,
+   "architecture": {
+    "input_modalities": [
+     "file",
+     "image",
+     "text"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 128000
+   },
+   "supported_parameters": [
+    "include_reasoning",
+    "max_tokens",
+    "reasoning",
+    "reasoning_effort",
+    "response_format",
+    "seed",
+    "structured_outputs",
+    "tool_choice",
+    "tools",
+    "verbosity"
+   ]
+  },
+  {
+   "id": "openai/gpt-5.5:batch",
+   "canonical_slug": "openai/gpt-5.5-20260423",
+   "name": "OpenAI: GPT-5.5 (batch)",
+   "created": 1777051893,
+   "context_length": 1050000,
+   "architecture": {
+    "input_modalities": [
+     "file",
+     "image",
+     "text"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 128000
+   },
+   "supported_parameters": [
+    "include_reasoning",
+    "max_tokens",
+    "reasoning",
+    "reasoning_effort",
+    "response_format",
+    "seed",
+    "structured_outputs",
+    "tool_choice",
+    "tools",
+    "verbosity"
+   ]
+  },
+  {
+   "id": "anthropic/claude-opus-4.7:batch",
+   "canonical_slug": "anthropic/claude-4.7-opus-20260416",
+   "name": "Anthropic: Claude Opus 4.7 (batch)",
+   "created": 1776351100,
+   "context_length": 1000000,
+   "architecture": {
+    "input_modalities": [
+     "text",
+     "image",
+     "file"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 128000
+   },
+   "supported_parameters": [
+    "include_reasoning",
+    "max_tokens",
+    "reasoning",
+    "reasoning_effort",
+    "response_format",
+    "stop",
+    "structured_outputs",
+    "tool_choice",
+    "tools",
+    "verbosity"
+   ]
+  },
+  {
+   "id": "openai/gpt-5.4-nano:batch",
+   "canonical_slug": "openai/gpt-5.4-nano-20260317",
+   "name": "OpenAI: GPT-5.4 Nano (batch)",
+   "created": 1773748187,
+   "context_length": 400000,
+   "architecture": {
+    "input_modalities": [
+     "file",
+     "image",
+     "text"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 128000
+   },
+   "supported_parameters": [
+    "include_reasoning",
+    "max_tokens",
+    "reasoning",
+    "reasoning_effort",
+    "response_format",
+    "seed",
+    "structured_outputs",
+    "tool_choice",
+    "tools",
+    "verbosity"
+   ]
+  },
+  {
+   "id": "openai/gpt-5.4-mini:batch",
+   "canonical_slug": "openai/gpt-5.4-mini-20260317",
+   "name": "OpenAI: GPT-5.4 Mini (batch)",
+   "created": 1773748178,
+   "context_length": 400000,
+   "architecture": {
+    "input_modalities": [
+     "file",
+     "image",
+     "text"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 128000
+   },
+   "supported_parameters": [
+    "include_reasoning",
+    "max_tokens",
+    "reasoning",
+    "reasoning_effort",
+    "response_format",
+    "seed",
+    "structured_outputs",
+    "tool_choice",
+    "tools",
+    "verbosity"
+   ]
+  },
+  {
+   "id": "openai/gpt-5.4-pro:batch",
+   "canonical_slug": "openai/gpt-5.4-pro-20260305",
+   "name": "OpenAI: GPT-5.4 Pro (batch)",
+   "created": 1772734366,
+   "context_length": 1050000,
+   "architecture": {
+    "input_modalities": [
+     "text",
+     "image",
+     "file"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 128000
+   },
+   "supported_parameters": [
+    "include_reasoning",
+    "max_tokens",
+    "reasoning",
+    "reasoning_effort",
+    "response_format",
+    "seed",
+    "structured_outputs",
+    "tool_choice",
+    "tools",
+    "verbosity"
+   ]
+  },
+  {
+   "id": "openai/gpt-5.4:batch",
+   "canonical_slug": "openai/gpt-5.4-20260305",
+   "name": "OpenAI: GPT-5.4 (batch)",
+   "created": 1772734352,
+   "context_length": 1050000,
+   "architecture": {
+    "input_modalities": [
+     "text",
+     "image",
+     "file"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 128000
+   },
+   "supported_parameters": [
+    "include_reasoning",
+    "max_tokens",
+    "reasoning",
+    "reasoning_effort",
+    "response_format",
+    "seed",
+    "structured_outputs",
+    "tool_choice",
+    "tools",
+    "verbosity"
+   ]
+  },
+  {
+   "id": "google/gemini-3.1-pro-preview",
+   "canonical_slug": "google/gemini-3.1-pro-preview-20260219",
+   "name": "Google: Gemini 3.1 Pro Preview",
+   "created": 1771509627,
+   "context_length": 1048576,
+   "architecture": {
+    "input_modalities": [
+     "audio",
+     "file",
+     "image",
+     "text",
+     "video"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 65536
+   },
+   "supported_parameters": [
+    "include_reasoning",
+    "max_tokens",
+    "reasoning",
+    "reasoning_effort",
+    "response_format",
+    "seed",
+    "stop",
+    "structured_outputs",
+    "temperature",
+    "tool_choice",
+    "tools",
+    "top_p"
+   ]
+  },
+  {
+   "id": "google/gemini-3.1-pro-preview:batch",
+   "canonical_slug": "google/gemini-3.1-pro-preview-20260219",
+   "name": "Google: Gemini 3.1 Pro Preview (batch)",
+   "created": 1771509627,
+   "context_length": 1048576,
+   "architecture": {
+    "input_modalities": [
+     "audio",
+     "file",
+     "image",
+     "text",
+     "video"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 65536
+   },
+   "supported_parameters": [
+    "include_reasoning",
+    "max_tokens",
+    "reasoning",
+    "reasoning_effort",
+    "response_format",
+    "seed",
+    "stop",
+    "structured_outputs",
+    "temperature",
+    "tool_choice",
+    "tools",
+    "top_p"
+   ]
+  },
+  {
+   "id": "anthropic/claude-sonnet-4.6:batch",
+   "canonical_slug": "anthropic/claude-4.6-sonnet-20260217",
+   "name": "Anthropic: Claude Sonnet 4.6 (batch)",
+   "created": 1771342990,
+   "context_length": 1000000,
+   "architecture": {
+    "input_modalities": [
+     "text",
+     "image",
+     "file"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 128000
+   },
+   "supported_parameters": [
+    "include_reasoning",
+    "max_tokens",
+    "reasoning",
+    "reasoning_effort",
+    "response_format",
+    "stop",
+    "structured_outputs",
+    "temperature",
+    "tool_choice",
+    "tools",
+    "top_p",
+    "verbosity"
+   ]
+  },
+  {
+   "id": "anthropic/claude-opus-4.6:batch",
+   "canonical_slug": "anthropic/claude-4.6-opus-20260205",
+   "name": "Anthropic: Claude Opus 4.6 (batch)",
+   "created": 1770219050,
+   "context_length": 1000000,
+   "architecture": {
+    "input_modalities": [
+     "text",
+     "image",
+     "file"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 128000
+   },
+   "supported_parameters": [
+    "include_reasoning",
+    "max_tokens",
+    "reasoning",
+    "reasoning_effort",
+    "response_format",
+    "stop",
+    "structured_outputs",
+    "temperature",
+    "tool_choice",
+    "tools",
+    "top_p",
+    "verbosity"
+   ]
+  },
+  {
+   "id": "google/gemini-3-flash-preview:batch",
+   "canonical_slug": "google/gemini-3-flash-preview-20251217",
+   "name": "Google: Gemini 3 Flash Preview (batch)",
+   "created": 1765987078,
+   "context_length": 1048576,
+   "architecture": {
+    "input_modalities": [
+     "text",
+     "image",
+     "file",
+     "audio",
+     "video"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 65536
+   },
+   "supported_parameters": [
+    "include_reasoning",
+    "max_tokens",
+    "reasoning",
+    "reasoning_effort",
+    "response_format",
+    "seed",
+    "stop",
+    "structured_outputs",
+    "temperature",
+    "tool_choice",
+    "tools",
+    "top_p"
+   ]
+  },
+  {
+   "id": "openai/gpt-5.2-pro:batch",
+   "canonical_slug": "openai/gpt-5.2-pro-20251211",
+   "name": "OpenAI: GPT-5.2 Pro (batch)",
+   "created": 1765389780,
+   "context_length": 400000,
+   "architecture": {
+    "input_modalities": [
+     "image",
+     "text",
+     "file"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 128000
+   },
+   "supported_parameters": [
+    "include_reasoning",
+    "max_tokens",
+    "reasoning",
+    "reasoning_effort",
+    "response_format",
+    "seed",
+    "structured_outputs",
+    "tool_choice",
+    "tools",
+    "verbosity"
+   ]
+  },
+  {
+   "id": "openai/gpt-5.2:batch",
+   "canonical_slug": "openai/gpt-5.2-20251211",
+   "name": "OpenAI: GPT-5.2 (batch)",
+   "created": 1765389775,
+   "context_length": 400000,
+   "architecture": {
+    "input_modalities": [
+     "file",
+     "image",
+     "text"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 128000
+   },
+   "supported_parameters": [
+    "include_reasoning",
+    "max_tokens",
+    "reasoning",
+    "reasoning_effort",
+    "response_format",
+    "seed",
+    "structured_outputs",
+    "tool_choice",
+    "tools",
+    "verbosity"
+   ]
+  },
+  {
+   "id": "anthropic/claude-opus-4.5:batch",
+   "canonical_slug": "anthropic/claude-4.5-opus-20251124",
+   "name": "Anthropic: Claude Opus 4.5 (batch)",
+   "created": 1764010580,
+   "context_length": 200000,
+   "architecture": {
+    "input_modalities": [
+     "file",
+     "image",
+     "text"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 64000
+   },
+   "supported_parameters": [
+    "include_reasoning",
+    "max_tokens",
+    "reasoning",
+    "response_format",
+    "stop",
+    "structured_outputs",
+    "temperature",
+    "tool_choice",
+    "tools",
+    "verbosity"
+   ]
+  },
+  {
+   "id": "openai/gpt-5.1:batch",
+   "canonical_slug": "openai/gpt-5.1-20251113",
+   "name": "OpenAI: GPT-5.1 (batch)",
+   "created": 1763060305,
+   "context_length": 400000,
+   "architecture": {
+    "input_modalities": [
+     "image",
+     "text",
+     "file"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 128000
+   },
+   "supported_parameters": [
+    "include_reasoning",
+    "max_tokens",
+    "reasoning",
+    "reasoning_effort",
+    "response_format",
+    "seed",
+    "structured_outputs",
+    "tool_choice",
+    "tools",
+    "verbosity"
+   ]
+  },
+  {
+   "id": "anthropic/claude-haiku-4.5:batch",
+   "canonical_slug": "anthropic/claude-4.5-haiku-20251001",
+   "name": "Anthropic: Claude Haiku 4.5 (batch)",
+   "created": 1760547638,
+   "context_length": 200000,
+   "architecture": {
+    "input_modalities": [
+     "text",
+     "image",
+     "file"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 64000
+   },
+   "supported_parameters": [
+    "include_reasoning",
+    "max_tokens",
+    "reasoning",
+    "response_format",
+    "stop",
+    "structured_outputs",
+    "temperature",
+    "tool_choice",
+    "tools",
+    "top_k",
+    "top_p"
+   ]
+  },
+  {
+   "id": "openai/gpt-5-pro:batch",
+   "canonical_slug": "openai/gpt-5-pro-2025-10-06",
+   "name": "OpenAI: GPT-5 Pro (batch)",
+   "created": 1759776663,
+   "context_length": 400000,
+   "architecture": {
+    "input_modalities": [
+     "image",
+     "text",
+     "file"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 128000
+   },
+   "supported_parameters": [
+    "include_reasoning",
+    "max_tokens",
+    "reasoning",
+    "reasoning_effort",
+    "response_format",
+    "seed",
+    "structured_outputs",
+    "tool_choice",
+    "tools",
+    "verbosity"
+   ]
+  },
+  {
+   "id": "anthropic/claude-sonnet-4.5:batch",
+   "canonical_slug": "anthropic/claude-4.5-sonnet-20250929",
+   "name": "Anthropic: Claude Sonnet 4.5 (batch)",
+   "created": 1759161676,
+   "context_length": 1000000,
+   "architecture": {
+    "input_modalities": [
+     "text",
+     "image",
+     "file"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 64000
+   },
+   "supported_parameters": [
+    "include_reasoning",
+    "max_tokens",
+    "reasoning",
+    "response_format",
+    "stop",
+    "structured_outputs",
+    "temperature",
+    "tool_choice",
+    "tools",
+    "top_k",
+    "top_p"
+   ]
+  },
+  {
+   "id": "openai/gpt-5:batch",
+   "canonical_slug": "openai/gpt-5-2025-08-07",
+   "name": "OpenAI: GPT-5 (batch)",
+   "created": 1754587413,
+   "context_length": 400000,
+   "architecture": {
+    "input_modalities": [
+     "text",
+     "image",
+     "file"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 128000
+   },
+   "supported_parameters": [
+    "include_reasoning",
+    "max_tokens",
+    "reasoning",
+    "reasoning_effort",
+    "response_format",
+    "seed",
+    "structured_outputs",
+    "tool_choice",
+    "tools",
+    "verbosity"
+   ]
+  },
+  {
+   "id": "openai/gpt-5-mini:batch",
+   "canonical_slug": "openai/gpt-5-mini-2025-08-07",
+   "name": "OpenAI: GPT-5 Mini (batch)",
+   "created": 1754587407,
+   "context_length": 400000,
+   "architecture": {
+    "input_modalities": [
+     "text",
+     "image",
+     "file"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 128000
+   },
+   "supported_parameters": [
+    "include_reasoning",
+    "max_tokens",
+    "reasoning",
+    "reasoning_effort",
+    "response_format",
+    "seed",
+    "structured_outputs",
+    "tool_choice",
+    "tools",
+    "verbosity"
+   ]
+  },
+  {
+   "id": "openai/gpt-5-nano:batch",
+   "canonical_slug": "openai/gpt-5-nano-2025-08-07",
+   "name": "OpenAI: GPT-5 Nano (batch)",
+   "created": 1754587402,
+   "context_length": 400000,
+   "architecture": {
+    "input_modalities": [
+     "text",
+     "image",
+     "file"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 128000
+   },
+   "supported_parameters": [
+    "include_reasoning",
+    "max_tokens",
+    "reasoning",
+    "reasoning_effort",
+    "response_format",
+    "seed",
+    "structured_outputs",
+    "tool_choice",
+    "tools",
+    "verbosity"
+   ]
+  },
+  {
+   "id": "openai/gpt-oss-120b:batch",
+   "canonical_slug": "openai/gpt-oss-120b",
+   "name": "OpenAI: gpt-oss-120b (batch)",
+   "created": 1754414231,
+   "context_length": 131072,
+   "architecture": {
+    "input_modalities": [
+     "text"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 117964
+   },
+   "supported_parameters": [
+    "frequency_penalty",
+    "include_reasoning",
+    "logit_bias",
+    "max_tokens",
+    "min_p",
+    "presence_penalty",
+    "reasoning",
+    "reasoning_effort",
+    "repetition_penalty",
+    "response_format",
+    "seed",
+    "stop",
+    "structured_outputs",
+    "temperature",
+    "tool_choice",
+    "tools",
+    "top_k",
+    "top_p"
+   ]
+  },
+  {
+   "id": "openai/gpt-oss-20b:batch",
+   "canonical_slug": "openai/gpt-oss-20b",
+   "name": "OpenAI: gpt-oss-20b (batch)",
+   "created": 1754414229,
+   "context_length": 131072,
+   "architecture": {
+    "input_modalities": [
+     "text"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 117964
+   },
+   "supported_parameters": [
+    "frequency_penalty",
+    "include_reasoning",
+    "logit_bias",
+    "max_tokens",
+    "min_p",
+    "presence_penalty",
+    "reasoning",
+    "reasoning_effort",
+    "repetition_penalty",
+    "response_format",
+    "seed",
+    "stop",
+    "structured_outputs",
+    "temperature",
+    "tool_choice",
+    "tools",
+    "top_k",
+    "top_p"
+   ]
+  },
+  {
+   "id": "anthropic/claude-opus-4.1:batch",
+   "canonical_slug": "anthropic/claude-4.1-opus-20250805",
+   "name": "Anthropic: Claude Opus 4.1 (batch)",
+   "created": 1754411591,
+   "context_length": 200000,
+   "architecture": {
+    "input_modalities": [
+     "image",
+     "text",
+     "file"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 32000
+   },
+   "supported_parameters": [
+    "include_reasoning",
+    "max_tokens",
+    "reasoning",
+    "response_format",
+    "stop",
+    "structured_outputs",
+    "temperature",
+    "tool_choice",
+    "tools"
+   ]
+  },
+  {
+   "id": "morph/morph-v3-large:batch",
+   "canonical_slug": "morph/morph-v3-large",
+   "name": "Morph: Morph V3 Large (batch)",
+   "created": 1751910858,
+   "context_length": 262144,
+   "architecture": {
+    "input_modalities": [
+     "text"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 131072
+   },
+   "supported_parameters": [
+    "logprobs",
+    "max_tokens",
+    "response_format",
+    "stop",
+    "structured_outputs",
+    "temperature",
+    "top_logprobs"
+   ]
+  },
+  {
+   "id": "morph/morph-v3-fast:batch",
+   "canonical_slug": "morph/morph-v3-fast",
+   "name": "Morph: Morph V3 Fast (batch)",
+   "created": 1751910002,
+   "context_length": 81920,
+   "architecture": {
+    "input_modalities": [
+     "text"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 38000
+   },
+   "supported_parameters": [
+    "max_tokens",
+    "stop",
+    "temperature"
+   ]
+  },
+  {
+   "id": "openai/o3:batch",
+   "canonical_slug": "openai/o3-2025-04-16",
+   "name": "OpenAI: o3 (batch)",
+   "created": 1744823457,
+   "context_length": 200000,
+   "architecture": {
+    "input_modalities": [
+     "image",
+     "text",
+     "file"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 100000
+   },
+   "supported_parameters": [
+    "include_reasoning",
+    "max_tokens",
+    "reasoning",
+    "response_format",
+    "seed",
+    "structured_outputs",
+    "tool_choice",
+    "tools"
+   ]
+  },
+  {
+   "id": "openai/o4-mini:batch",
+   "canonical_slug": "openai/o4-mini-2025-04-16",
+   "name": "OpenAI: o4 Mini (batch)",
+   "created": 1744820942,
+   "context_length": 200000,
+   "architecture": {
+    "input_modalities": [
+     "image",
+     "text",
+     "file"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 100000
+   },
+   "supported_parameters": [
+    "include_reasoning",
+    "max_tokens",
+    "reasoning",
+    "response_format",
+    "seed",
+    "structured_outputs",
+    "tool_choice",
+    "tools"
+   ]
+  },
+  {
+   "id": "openai/gpt-4.1:batch",
+   "canonical_slug": "openai/gpt-4.1-2025-04-14",
+   "name": "OpenAI: GPT-4.1 (batch)",
+   "created": 1744651385,
+   "context_length": 1047576,
+   "architecture": {
+    "input_modalities": [
+     "image",
+     "text",
+     "file"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 32768
+   },
+   "supported_parameters": [
+    "max_tokens",
+    "response_format",
+    "seed",
+    "structured_outputs",
+    "temperature",
+    "tool_choice",
+    "tools",
+    "top_p"
+   ]
+  },
+  {
+   "id": "openai/gpt-4.1-mini:batch",
+   "canonical_slug": "openai/gpt-4.1-mini-2025-04-14",
+   "name": "OpenAI: GPT-4.1 Mini (batch)",
+   "created": 1744651381,
+   "context_length": 1047576,
+   "architecture": {
+    "input_modalities": [
+     "image",
+     "text",
+     "file"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 32768
+   },
+   "supported_parameters": [
+    "max_tokens",
+    "response_format",
+    "seed",
+    "structured_outputs",
+    "temperature",
+    "tool_choice",
+    "tools",
+    "top_p"
+   ]
+  },
+  {
+   "id": "openai/gpt-4.1-nano:batch",
+   "canonical_slug": "openai/gpt-4.1-nano-2025-04-14",
+   "name": "OpenAI: GPT-4.1 Nano (batch)",
+   "created": 1744651369,
+   "context_length": 1047576,
+   "architecture": {
+    "input_modalities": [
+     "image",
+     "text",
+     "file"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 32768
+   },
+   "supported_parameters": [
+    "max_tokens",
+    "response_format",
+    "seed",
+    "structured_outputs",
+    "temperature",
+    "tool_choice",
+    "tools",
+    "top_p"
+   ]
+  },
+  {
+   "id": "openai/o3-mini:batch",
+   "canonical_slug": "openai/o3-mini-2025-01-31",
+   "name": "OpenAI: o3 Mini (batch)",
+   "created": 1738351721,
+   "context_length": 200000,
+   "architecture": {
+    "input_modalities": [
+     "text",
+     "file"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 100000
+   },
+   "supported_parameters": [
+    "include_reasoning",
+    "max_tokens",
+    "reasoning",
+    "response_format",
+    "seed",
+    "structured_outputs",
+    "tool_choice",
+    "tools"
+   ]
+  },
+  {
+   "id": "openai/gpt-4o-mini:batch",
+   "canonical_slug": "openai/gpt-4o-mini",
+   "name": "OpenAI: GPT-4o-mini (batch)",
+   "created": 1721260800,
+   "context_length": 128000,
+   "architecture": {
+    "input_modalities": [
+     "text",
+     "image",
+     "file"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 16384
+   },
+   "supported_parameters": [
+    "frequency_penalty",
+    "logit_bias",
+    "logprobs",
+    "max_tokens",
+    "prediction",
+    "presence_penalty",
+    "response_format",
+    "seed",
+    "stop",
+    "structured_outputs",
+    "temperature",
+    "tool_choice",
+    "tools",
+    "top_logprobs",
+    "top_p",
+    "web_search_options"
+   ]
+  },
+  {
+   "id": "openai/gpt-4o:batch",
+   "canonical_slug": "openai/gpt-4o",
+   "name": "OpenAI: GPT-4o (batch)",
+   "created": 1715558400,
+   "context_length": 128000,
+   "architecture": {
+    "input_modalities": [
+     "text",
+     "image",
+     "file"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 16384
+   },
+   "supported_parameters": [
+    "frequency_penalty",
+    "logit_bias",
+    "logprobs",
+    "max_tokens",
+    "prediction",
+    "presence_penalty",
+    "response_format",
+    "seed",
+    "stop",
+    "structured_outputs",
+    "temperature",
+    "tool_choice",
+    "tools",
+    "top_logprobs",
+    "top_p",
+    "web_search_options"
+   ]
+  },
+  {
+   "id": "openai/gpt-4-turbo:batch",
+   "canonical_slug": "openai/gpt-4-turbo",
+   "name": "OpenAI: GPT-4 Turbo (batch)",
+   "created": 1712620800,
+   "context_length": 128000,
+   "architecture": {
+    "input_modalities": [
+     "text",
+     "image"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "top_provider": {
+    "max_completion_tokens": 4096
+   },
+   "supported_parameters": [
+    "frequency_penalty",
+    "logit_bias",
+    "logprobs",
+    "max_tokens",
+    "presence_penalty",
+    "response_format",
+    "seed",
+    "stop",
+    "structured_outputs",
+    "temperature",
+    "tool_choice",
+    "tools",
+    "top_logprobs",
+    "top_p"
+   ]
+  }
+ ],
+ "total_count": 97
+}

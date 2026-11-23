@@ -105,12 +105,13 @@ if [[ -n "$MYPY" ]]; then
     echo "🔍 Running mypy on strict allowlist files..."
     $MYPY \
         utils/circuit_breaker.py utils/fs_snapshot.py utils/tool_execution_context.py utils/token_utils.py \
-        providers/shared/provider_type.py providers/shared/model_response.py \
+        providers/shared/provider_type.py providers/shared/model_response.py providers/shared/batch.py providers/shared/batch_catalog.py providers/shared/batch_resolution.py providers/shared/published_limits.py providers/openrouter_batch_wire.py \
+        utils/batch_store.py utils/batch_coordinator.py utils/batch_execution.py utils/consensus_batch.py tools/shared/batch_support.py \
         utils/file_types.py utils/security_config.py utils/conversation_memory.py \
         utils/env.py utils/model_resolution.py utils/request_helpers.py \
         utils/image_utils.py utils/context_reconstructor.py utils/file_utils.py \
         tools/registry.py \
-        scripts/smoke_test_wheel.py scripts/build_mockups.py \
+        scripts/smoke_test_wheel.py scripts/build_mockups.py scripts/refresh_openrouter_batch_catalog.py \
         clink/agents/base.py clink/agents/opencode.py clink/parsers/opencode.py \
         clink/agents/aider.py clink/parsers/aider.py \
         clink/agents/crush.py clink/parsers/crush.py \

@@ -610,6 +610,8 @@ class OpenAICompatibleProvider(ModelProvider):
             logging.debug(f"Falling back to generic capabilities for {model_name}: {exc}")
             capabilities = None
 
+        max_output_tokens = self._bound_output_tokens(capabilities, max_output_tokens, model_name)
+
         # Get effective temperature for this model from capabilities when available
         if capabilities:
             effective_temperature = capabilities.get_effective_temperature(temperature)
@@ -802,6 +804,8 @@ class OpenAICompatibleProvider(ModelProvider):
         except Exception as exc:
             logging.debug(f"Falling back to generic capabilities for {model_name}: {exc}")
             capabilities = None
+
+        max_output_tokens = self._bound_output_tokens(capabilities, max_output_tokens, model_name)
 
         if capabilities:
             effective_temperature = capabilities.get_effective_temperature(temperature)

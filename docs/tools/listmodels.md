@@ -18,6 +18,7 @@ The `listmodels` tool shows which providers are configured, available models, th
 - **Configuration status**: Indicates which providers are available based on API keys
 - **Context window information**: Helps you choose models based on your content size needs
 - **Capability overview**: Understanding which models support extended thinking, vision, etc.
+- **Batch tag**: Models that can run through OpenRouter's asynchronous Batch API at reduced pricing (`execution_mode="batch"`, see the [batch guide](batch.md)) are tagged `batch`; an entry whose aliases float under batch also shows what they resolve to (`batch: opus, claude-opus → anthropic/claude-opus-5.5`), read from the batch catalog already loaded, without a network call
 
 ## Output Information
 

@@ -91,7 +91,7 @@ security remediation plan using planner
 - `compliance_requirements`: List of compliance frameworks to assess against (e.g., ["PCI DSS", "SOC2"])
 - `audit_focus`: comprehensive|authentication|data_protection|infrastructure|api_security (default: comprehensive)
 - `severity_filter`: critical|high|medium|low|all (default: all)
-- `temperature`: Temperature for analytical consistency (0-1, default 0.2)
+- `temperature`: Temperature for analytical consistency (default 0.2). Accepted from 0 to 2; the selected model's published limit then applies (most models 0-1, OpenAI, Google and xAI up to 2) and a higher value is reduced to the model's maximum.
 - `thinking_mode`: minimal|low|medium|high|max (default: medium, Gemini only)
 - `use_assistant_model`: Whether to use expert security analysis phase (default: true)
 - `continuation_id`: Continue previous security audit discussions

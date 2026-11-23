@@ -6,7 +6,10 @@ This script is designed to run in CI (weekly cron) or locally. It:
 2. Filters to chat-mode models for each supported provider
 3. Merges with existing conf/*.json — updating capacity fields for known models,
    adding new models with inferred defaults, never deleting or overwriting curated fields
-4. Writes updated JSON and prints a diff summary
+4. Rewrites conf/litellm_published_limits.json, the offline extract of the published per-model
+   limits (output cap, sampling flag) that providers/shared/published_limits.py checks every
+   model against at runtime; nothing is fetched at request time
+5. Writes updated JSON and prints a diff summary
 
 Exit codes:
     0 — changes written
@@ -42,6 +45,7 @@ from providers.litellm_adapter import (  # noqa: E402
     infer_thinking_support,
 )
 from providers.shared.provider_type import ProviderType  # noqa: E402
+from providers.shared.published_limits import EXTRACT_FILENAME, build_extract  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -273,6 +277,44 @@ def merge_provider(
 
 
 # ---------------------------------------------------------------------------
+# Published-limits extract
+# ---------------------------------------------------------------------------
+def format_extract(document: dict) -> str:
+    """The extract as text: one entry per line (sorted), so a refresh diff reads line by line."""
+    head = {key: document[key] for key in ("format", "source", "fetched_at")}
+    lines = ["{"]
+    for key, value in head.items():
+        lines.append(f"  {json.dumps(key)}: {json.dumps(value)},")
+    lines.append('  "entries": {')
+    items = list(document["entries"].items())
+    for index, (key, record) in enumerate(items):
+        comma = "," if index < len(items) - 1 else ""
+        lines.append(f"    {json.dumps(key)}: {json.dumps(record, separators=(', ', ': '))}{comma}")
+    lines.append("  }")
+    lines.append("}")
+    return "\n".join(lines) + "\n"
+
+
+def refresh_published_limits(catalog: dict, *, fetched_at: str | None = None, path: Path | None = None) -> bool:
+    """Rewrite the published-limits extract from ``catalog``; True when its entries changed.
+
+    ``fetched_at`` is only rewritten together with a change to the entries, so an unchanged catalog leaves the file
+    (and the weekly PR) untouched.
+    """
+    path = path or CONF_DIR / EXTRACT_FILENAME
+    stamp = fetched_at or time.strftime("%Y-%m-%d", time.gmtime())
+    document = build_extract(catalog, fetched_at=stamp)
+    try:
+        previous = json.loads(path.read_text(encoding="utf-8")).get("entries")
+    except (OSError, ValueError, AttributeError):
+        previous = None
+    if previous == document["entries"]:
+        return False
+    path.write_text(format_extract(document), encoding="utf-8")
+    return True
+
+
+# ---------------------------------------------------------------------------
 # Diff summary
 # ---------------------------------------------------------------------------
 def generate_summary(results: list[MergeResult]) -> str:
@@ -378,7 +420,23 @@ def main() -> int:
         Path(args.output_summary).write_text(summary)
         print(f"Summary written to {args.output_summary}")
 
-    if not updated_files:
+    # The published-limits extract is refreshed from the same catalog (dry-run reports, never writes).
+    extract_path = CONF_DIR / EXTRACT_FILENAME
+    if args.dry_run:
+        extract_changed = (
+            json.loads(extract_path.read_text(encoding="utf-8")).get("entries")
+            != build_extract(catalog, fetched_at="")["entries"]
+            if extract_path.exists()
+            else True
+        )
+        if extract_changed:
+            print(f"[DRY RUN] Would update conf/{EXTRACT_FILENAME}")
+    else:
+        extract_changed = refresh_published_limits(catalog)
+        if extract_changed:
+            print(f"  Wrote {EXTRACT_FILENAME}")
+
+    if not updated_files and not extract_changed:
         print("\nNo changes detected.")
         if not args.output_summary:
             print(summary)
@@ -399,7 +457,7 @@ def main() -> int:
             f.write("\n")
         print(f"  Wrote {conf_file}")
 
-    print(f"\n{len(updated_files)} file(s) updated.")
+    print(f"\n{len(updated_files) + int(extract_changed)} file(s) updated.")
     if not args.output_summary:
         print("\n" + summary)
     return 0

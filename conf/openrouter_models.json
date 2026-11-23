@@ -20,7 +20,9 @@
       "default_reasoning_effort": "Default reasoning effort level for models that support it (e.g., 'low', 'medium', 'high'). Omit if not applicable.",
       "description": "Human-readable description of the model",
       "intelligence_score": "1-20 human rating used as the primary signal for auto-mode model ordering",
-      "allow_code_generation": "Whether this model can generate and suggest fully working code - complete with functions, files, and detailed implementation instructions - for your AI tool to use right away. Only set this to 'true' for a model more capable than the AI model / CLI you're currently using."
+      "allow_code_generation": "Whether this model can generate and suggest fully working code - complete with functions, files, and detailed implementation instructions - for your AI tool to use right away. Only set this to 'true' for a model more capable than the AI model / CLI you're currently using.",
+      "supports_batch": "Whether the model can be executed through OpenRouter's asynchronous batch API at reduced pricing. Derived from the OpenRouter catalog: true when the model has a '<model_name>:batch' listing. The batch API takes the normal model_name (never the :batch spelling). Defaults to false when omitted. It is the offline fallback: while the live batch catalog (or the committed snapshot conf/openrouter_batch_catalog.json) is available, a slug that OpenRouter lists as ':batch' is batch-eligible whether or not it appears in this file.",
+      "batch_family": "Optional. Names the aliases of this entry that resolve DYNAMICALLY under execution_mode='batch' to the latest model in their family that OpenRouter lists as '<slug>:batch', instead of this entry's pinned model_name. 'aliases' lists exactly which aliases float (version-pinned aliases such as opus4.5 and full slugs never do); 'pattern' is an anchored regular expression that must capture a group named 'version' (an optional group named 'preview' marks preview releases) and includes the tier, so 'flash' cannot match '-flash-lite'; 'order' optionally ranks slugs explicitly (best first) and beats numeric order, the only way a codename slug joins a family; 'label' names the family in error text. Validated when the registry loads. Synchronous calls ignore it."
     }
   },
   "models": [
@@ -38,6 +40,15 @@
       "supports_function_calling": false,
       "supports_images": true,
       "max_image_size_mb": 5.0,
+      "supports_batch": true,
+      "batch_family": {
+        "aliases": [
+          "opus",
+          "claude-opus"
+        ],
+        "pattern": "^anthropic/claude-opus-(?P<version>\\d+(?:\\.\\d+)*)$",
+        "label": "Claude Opus"
+      },
       "description": "Claude Opus 4.5 - Anthropic's frontier reasoning model for complex software engineering and agentic workflows",
       "intelligence_score": 18
     },
@@ -54,6 +65,14 @@
       "supports_function_calling": false,
       "supports_images": true,
       "max_image_size_mb": 5.0,
+      "supports_batch": true,
+      "batch_family": {
+        "aliases": [
+          "sonnet"
+        ],
+        "pattern": "^anthropic/claude-sonnet-(?P<version>\\d+(?:\\.\\d+)*)$",
+        "label": "Claude Sonnet"
+      },
       "description": "Claude Sonnet 4.5 - High-performance model with exceptional reasoning and efficiency",
       "intelligence_score": 12
     },
@@ -69,6 +88,7 @@
       "supports_function_calling": false,
       "supports_images": true,
       "max_image_size_mb": 5.0,
+      "supports_batch": true,
       "description": "Claude Opus 4.1 - Last generation flagship model with strong coding and reasoning",
       "intelligence_score": 14
     },
@@ -84,6 +104,7 @@
       "supports_function_calling": false,
       "supports_images": true,
       "max_image_size_mb": 5.0,
+      "supports_batch": false,
       "description": "Claude Sonnet 4.1 - Last generation high-performance model with exceptional reasoning and efficiency",
       "intelligence_score": 10
     },
@@ -99,6 +120,14 @@
       "supports_function_calling": false,
       "supports_images": true,
       "max_image_size_mb": 5.0,
+      "supports_batch": false,
+      "batch_family": {
+        "aliases": [
+          "haiku"
+        ],
+        "pattern": "^anthropic/claude-haiku-(?P<version>\\d+(?:\\.\\d+)*)$",
+        "label": "Claude Haiku"
+      },
       "description": "Claude 3 Haiku - Fast and efficient with vision",
       "intelligence_score": 8
     },
@@ -119,6 +148,16 @@
       "supports_images": true,
       "max_image_size_mb": 20.0,
       "allow_code_generation": true,
+      "supports_batch": false,
+      "batch_family": {
+        "aliases": [
+          "gemini",
+          "gemini-pro",
+          "pro"
+        ],
+        "pattern": "^google/gemini-(?P<version>\\d+(?:\\.\\d+)*)-pro(?P<preview>-preview)?$",
+        "label": "Gemini Pro"
+      },
       "description": "Google's Gemini 3.0 Pro via OpenRouter with vision",
       "intelligence_score": 18
     },
@@ -136,6 +175,7 @@
       "supports_images": true,
       "max_image_size_mb": 20.0,
       "allow_code_generation": true,
+      "supports_batch": false,
       "description": "Google's Gemini 2.5 Pro via OpenRouter with vision",
       "intelligence_score": 18
     },
@@ -152,6 +192,15 @@
       "supports_function_calling": true,
       "supports_images": true,
       "max_image_size_mb": 15.0,
+      "supports_batch": false,
+      "batch_family": {
+        "aliases": [
+          "flash",
+          "gemini-flash"
+        ],
+        "pattern": "^google/gemini-(?P<version>\\d+(?:\\.\\d+)*)-flash(?P<preview>-preview)?$",
+        "label": "Gemini Flash"
+      },
       "description": "Google's Gemini 2.5 Flash via OpenRouter with vision",
       "intelligence_score": 10
     },
@@ -168,6 +217,7 @@
       "supports_function_calling": true,
       "supports_images": false,
       "max_image_size_mb": 0.0,
+      "supports_batch": false,
       "description": "Mistral's largest model (text-only)",
       "intelligence_score": 11
     },
@@ -187,6 +237,7 @@
       "supports_function_calling": false,
       "supports_images": false,
       "max_image_size_mb": 0.0,
+      "supports_batch": false,
       "description": "Meta's Llama 3 70B model (text-only)",
       "intelligence_score": 9
     },
@@ -205,6 +256,7 @@
       "supports_function_calling": false,
       "supports_images": false,
       "max_image_size_mb": 0.0,
+      "supports_batch": false,
       "description": "DeepSeek R1 with thinking mode - advanced reasoning capabilities (text-only)",
       "intelligence_score": 15
     },
@@ -222,6 +274,7 @@
       "supports_function_calling": false,
       "supports_images": false,
       "max_image_size_mb": 0.0,
+      "supports_batch": false,
       "description": "Perplexity's online model with web search (text-only)",
       "intelligence_score": 9
     },
@@ -239,6 +292,7 @@
       "max_image_size_mb": 20.0,
       "supports_temperature": false,
       "temperature_constraint": "fixed",
+      "supports_batch": true,
       "description": "OpenAI's o3 model - well-rounded and powerful across domains with vision",
       "intelligence_score": 14
     },
@@ -257,6 +311,7 @@
       "max_image_size_mb": 20.0,
       "supports_temperature": false,
       "temperature_constraint": "fixed",
+      "supports_batch": true,
       "description": "OpenAI's o3-mini model - balanced performance and speed with vision",
       "intelligence_score": 12
     },
@@ -275,6 +330,7 @@
       "max_image_size_mb": 20.0,
       "supports_temperature": false,
       "temperature_constraint": "fixed",
+      "supports_batch": false,
       "description": "OpenAI's o3-mini with high reasoning effort - optimized for complex problems with vision",
       "intelligence_score": 13
     },
@@ -292,6 +348,7 @@
       "max_image_size_mb": 20.0,
       "supports_temperature": false,
       "temperature_constraint": "fixed",
+      "supports_batch": false,
       "description": "OpenAI's o3-pro model - professional-grade reasoning and analysis with vision",
       "intelligence_score": 15
     },
@@ -310,6 +367,7 @@
       "max_image_size_mb": 20.0,
       "supports_temperature": false,
       "temperature_constraint": "fixed",
+      "supports_batch": true,
       "description": "OpenAI's o4-mini model - optimized for shorter contexts with rapid reasoning and vision",
       "intelligence_score": 11
     },
@@ -327,6 +385,14 @@
       "max_image_size_mb": 20.0,
       "supports_temperature": true,
       "temperature_constraint": "range",
+      "supports_batch": true,
+      "batch_family": {
+        "aliases": [
+          "gpt5"
+        ],
+        "pattern": "^openai/gpt-(?P<version>5(?:\\.\\d+)*)$",
+        "label": "GPT-5"
+      },
       "description": "GPT-5 (400K context, 128K output) - Advanced model with reasoning support",
       "intelligence_score": 16
     },
@@ -349,6 +415,7 @@
       "use_openai_response_api": true,
       "default_reasoning_effort": "high",
       "allow_code_generation": true,
+      "supports_batch": true,
       "description": "GPT-5.2 Pro - Advanced reasoning model with highest quality responses (text+image input, text output only)",
       "intelligence_score": 18
     },
@@ -365,6 +432,7 @@
       "supports_function_calling": false,
       "supports_images": false,
       "max_image_size_mb": 0.0,
+      "supports_batch": false,
       "description": "GPT-5-Codex is a specialized version of GPT-5 optimized for software engineering and coding workflows",
       "intelligence_score": 17
     },
@@ -382,6 +450,7 @@
       "max_image_size_mb": 0.0,
       "supports_temperature": true,
       "temperature_constraint": "fixed",
+      "supports_batch": true,
       "description": "GPT-5-mini (400K context, 128K output) - Efficient variant with reasoning support",
       "intelligence_score": 10
     },
@@ -399,6 +468,7 @@
       "max_image_size_mb": 0.0,
       "supports_temperature": true,
       "temperature_constraint": "fixed",
+      "supports_batch": true,
       "description": "GPT-5 nano (400K context, 128K output) - Fastest, cheapest version of GPT-5 for summarization and classification tasks",
       "intelligence_score": 8
     },
@@ -423,6 +493,7 @@
       "temperature_constraint": "fixed",
       "default_reasoning_effort": "medium",
       "allow_code_generation": true,
+      "supports_batch": true,
       "description": "GPT-5.2 (400K context, 128K output) - Flagship reasoning model with configurable thinking effort and vision support",
       "intelligence_score": 18
     },
@@ -447,6 +518,7 @@
       "use_openai_response_api": true,
       "default_reasoning_effort": "high",
       "allow_code_generation": true,
+      "supports_batch": false,
       "description": "GPT-5.1 Codex (400K context, 128K output) - Agentic coding specialization available through the Responses API",
       "intelligence_score": 19
     },
@@ -468,6 +540,7 @@
       "supports_temperature": true,
       "temperature_constraint": "fixed",
       "allow_code_generation": true,
+      "supports_batch": false,
       "description": "GPT-5.1 Codex mini (400K context, 128K output) - Cost-efficient Codex variant with streaming support",
       "intelligence_score": 16
     },
@@ -487,6 +560,14 @@
       "max_image_size_mb": 20.0,
       "supports_temperature": true,
       "temperature_constraint": "range",
+      "supports_batch": false,
+      "batch_family": {
+        "aliases": [
+          "grok"
+        ],
+        "pattern": "^x-ai/grok-(?P<version>\\d+(?:\\.\\d+)*)$",
+        "label": "Grok"
+      },
       "description": "xAI's Grok 4 via OpenRouter with vision and advanced reasoning",
       "intelligence_score": 15
     },
@@ -505,6 +586,7 @@
       "max_image_size_mb": 20.0,
       "supports_temperature": true,
       "temperature_constraint": "range",
+      "supports_batch": false,
       "description": "xAI's Grok 4.1 Fast Reasoning via OpenRouter (2M context) with vision and advanced reasoning",
       "intelligence_score": 15
     }

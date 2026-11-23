@@ -35,7 +35,7 @@ with the best architecture for my project
 - `focus_areas`: Specific aspects to focus on (architecture, performance, security, etc.)
 - `files`: Optional file paths or directories for additional context (absolute paths)
 - `images`: Optional images for visual analysis (absolute paths)
-- `temperature`: Temperature for creative thinking (0-1, default 0.7)
+- `temperature`: Temperature for creative thinking (default 0.7). Accepted from 0 to 2; the selected model's published limit then applies (most models 0-1, OpenAI, Google and xAI up to 2) and a higher value is reduced to the model's maximum.
 - `thinking_mode`: minimal|low|medium|high|max (default: high, Gemini only)
 - `continuation_id`: Continue previous conversations
 

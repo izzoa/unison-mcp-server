@@ -189,6 +189,7 @@ class DIALModelProvider(RegistryBackedProviderMixin, OpenAICompatibleProvider):
         # Validate parameters and fetch capabilities
         self.validate_parameters(model_name, temperature)
         capabilities = self.get_capabilities(model_name)
+        max_output_tokens = self._bound_output_tokens(capabilities, max_output_tokens, model_name)
 
         # Prepare messages
         messages = []

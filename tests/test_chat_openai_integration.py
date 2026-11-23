@@ -14,6 +14,29 @@ from providers.shared import ProviderType
 from tests.transport_helpers import inject_transport
 from tools.chat import ChatTool
 
+
+@pytest.fixture(autouse=True, scope="module")
+def _restore_the_default_provider_registry():
+    """This file replaces the process-wide default provider registry and the model restriction service; put back
+    what it found (D14).
+
+    Without this the last test's single-provider registry (and the ``*_ALLOWED_MODELS`` service built beside it)
+    stays installed for whatever file runs next, which made ``tests/test_listmodels.py`` order-dependent.
+    """
+
+    from providers import registry as registry_module
+    from utils import model_restrictions
+
+    saved_registry = registry_module._default_registry
+    saved_restrictions = model_restrictions._restriction_service
+    # The tests below set ``*_ALLOWED_MODELS`` and build the process-wide restriction service from them; a service
+    # left behind would read as "policy restricted" in whatever file runs next.
+    model_restrictions._restriction_service = None
+    yield
+    registry_module._default_registry = saved_registry
+    model_restrictions._restriction_service = saved_restrictions
+
+
 # Directory for recorded HTTP interactions
 CASSETTE_DIR = Path(__file__).parent / "openai_cassettes"
 CASSETTE_DIR.mkdir(exist_ok=True)

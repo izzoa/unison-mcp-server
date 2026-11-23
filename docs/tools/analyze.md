@@ -67,7 +67,7 @@ This workflow ensures methodical analysis before expert insights, resulting in d
 - `model`: auto|pro|flash|flash-2.0|flashlite|o3|o3-mini|o4-mini|gpt4.1|gpt5.2|gpt5.1-codex|gpt5.1-codex-mini|gpt5|gpt5-mini|gpt5-nano|opus|sonnet|haiku|fable (default: server default)
 - `analysis_type`: architecture|performance|security|quality|general (default: general)
 - `output_format`: summary|detailed|actionable (default: detailed)
-- `temperature`: Temperature for analysis (0-1, default 0.2)
+- `temperature`: Temperature for analysis (default 0.2). Accepted from 0 to 2; the selected model's published limit then applies (most models 0-1, OpenAI, Google and xAI up to 2) and a higher value is reduced to the model's maximum.
 - `thinking_mode`: minimal|low|medium|high|max (default: medium, Gemini only)
 - `use_assistant_model`: Whether to use expert analysis phase (default: true, set to false to use Claude only)
 - `continuation_id`: Continue previous analysis sessions

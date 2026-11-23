@@ -26,6 +26,7 @@ from config import TEMPERATURE_BALANCED
 from tools.clink_jobs import ClinkJob, get_clink_job_manager
 from tools.models import ToolModelCategory, ToolOutput
 from tools.shared.base_models import COMMON_FIELD_DESCRIPTIONS
+from tools.shared.batch_support import execution_mode_rejection
 from tools.shared.exceptions import ToolExecutionError
 from tools.simple.base import SchemaBuilder, SimpleTool
 from utils.env import get_env
@@ -52,7 +53,18 @@ _WORKDIR_WAIT_SECONDS = 2.5
 logger = logging.getLogger(__name__)
 
 MAX_RESPONSE_CHARS = 20_000
+
 SUMMARY_PATTERN = re.compile(r"<SUMMARY>(.*?)</SUMMARY>", re.IGNORECASE | re.DOTALL)
+
+# Stated in both the Pydantic field description and the published JSON schema for ``model``: the string
+# is the external CLI's business, and Unison's own batch execution never applies to a subprocess.
+_MODEL_FORWARDING_NOTE = (
+    "The value is forwarded to the external CLI verbatim, exactly as given (including any colon-delimited "
+    "suffix); Unison does not parse or rewrite it. Server-side batch execution does not apply to clink "
+    "(there is no execution_mode here and Unison never submits a provider batch for a CLI call); whether a "
+    "model string yields batch pricing is up to the CLI and its provider. A 'supported_models' allowlist "
+    "matches exactly, so a suffixed value does not match an unsuffixed entry."
+)
 
 
 def _json_safe(text: str) -> str:
@@ -170,7 +182,7 @@ class CLinkRequest(BaseModel):
             "set by its manifest. Validation is best-effort: if the selected CLI defines a "
             "'supported_models' allowlist in its manifest, the value is checked against it; "
             "otherwise invalid model strings surface as CLI-level errors (opencode's own error "
-            "type and message lead the error text)."
+            "type and message lead the error text). " + _MODEL_FORWARDING_NOTE
         ),
     )
     working_dir: str | None = Field(
@@ -366,7 +378,7 @@ class CLinkTool(SimpleTool):
                     "accept their own forms (e.g. 'sonnet' for claude). Omit to use the CLI's manifest "
                     "default. Validation is best-effort — invalid models surface as CLI-level errors "
                     "(opencode's own error type and message lead the text) unless the manifest declares a "
-                    "'supported_models' allowlist."
+                    "'supported_models' allowlist. " + _MODEL_FORWARDING_NOTE
                 ),
             },
             "working_dir": {
@@ -419,6 +431,11 @@ class CLinkTool(SimpleTool):
         return a job payload whose job_id continues the wait on the next call.
         ``CLINK_EXECUTION_MODE=blocking`` restores the pure blocking behavior.
         """
+        # Server-side batch execution cannot apply to a CLI bridge; refuse it rather than ignore it.
+        batch_rejection = execution_mode_rejection(self.get_name(), arguments, accepts_execution_mode=False)
+        if batch_rejection:
+            self._raise_tool_error(batch_rejection)
+
         job_id = str(arguments.get("job_id") or "").strip()
         if job_id:
             return await self._continue_job(job_id, arguments)

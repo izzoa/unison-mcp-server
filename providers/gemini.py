@@ -149,6 +149,7 @@ class GeminiModelProvider(RegistryBackedProviderMixin, ModelProvider):
         # Validate parameters and fetch capabilities
         self.validate_parameters(model_name, temperature)
         capabilities = self.get_capabilities(model_name)
+        max_output_tokens = self._bound_output_tokens(capabilities, max_output_tokens, model_name)
         capability_map = self.get_all_model_capabilities()
 
         resolved_model_name = self._resolve_model_name(model_name)
@@ -336,6 +337,7 @@ class GeminiModelProvider(RegistryBackedProviderMixin, ModelProvider):
         """
         self.validate_parameters(model_name, temperature)
         capabilities = self.get_capabilities(model_name)
+        max_output_tokens = self._bound_output_tokens(capabilities, max_output_tokens, model_name)
         capability_map = self.get_all_model_capabilities()
         resolved_model_name = self._resolve_model_name(model_name)
 

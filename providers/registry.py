@@ -174,7 +174,30 @@ class ModelProviderRegistry:
 
         return provider
 
-    def get_provider_for_model(self, model_name: str) -> ModelProvider | None:
+    @staticmethod
+    def provider_can_batch(provider: ModelProvider, model_name: str) -> bool:
+        """True when ``provider`` serves ``model_name`` AND reports batch support for it.
+
+        The provider's own :meth:`~providers.base.ModelProvider.can_batch_model` decides, so the answer
+        matches what its ``submit_batch`` would accept (a variant identifier such as ``:free`` inherits
+        its base model's ``supports_batch`` flag but is refused at submit). Providers whose batch
+        adapter is not implemented report no support, so they never claim a batch they cannot run. An
+        object without that method falls back to the model's ``supports_batch`` capability.
+        """
+
+        checker = getattr(type(provider), "can_batch_model", None)
+        if callable(checker):
+            try:
+                return bool(checker(provider, model_name))
+            except Exception:
+                return False
+        try:
+            capabilities = provider.get_capabilities(model_name)
+        except Exception:
+            return False
+        return bool(getattr(capabilities, "supports_batch", False))
+
+    def get_provider_for_model(self, model_name: str, *, require_batch: bool = False) -> ModelProvider | None:
         """Get provider instance for a specific model name.
 
         Provider priority order:
@@ -184,9 +207,15 @@ class ModelProviderRegistry:
 
         Args:
             model_name: Name of the model (e.g., "gemini-2.5-flash", "gpt5")
+            require_batch: Batch execution was requested. Only a provider that can batch the
+                model is considered, still in the priority order above, so an alias that a native
+                provider (no batch adapter) and OpenRouter both serve resolves to OpenRouter
+                instead of failing on the native one. ``False`` (the default, every synchronous
+                call) leaves selection exactly as it was.
 
         Returns:
-            ModelProvider instance that supports this model
+            ModelProvider instance that supports this model (and can batch it when
+            ``require_batch``), or ``None``
         """
         logging.debug(f"get_provider_for_model called with model_name='{model_name}'")
 
@@ -198,6 +227,15 @@ class ModelProviderRegistry:
                 logging.debug(f"Found {provider_type} in registry")
                 # Get or create provider instance
                 provider = self.get_provider(provider_type)
+                if provider and require_batch:
+                    # The provider's batch admission is the whole question here: it resolves the name the
+                    # way ``submit_batch`` will (a family alias to the latest batch-listed model, subject to
+                    # restrictions), which ``validate_model_name`` on the unresolved alias cannot answer.
+                    if self.provider_can_batch(provider, model_name):
+                        logging.debug(f"{provider_type} can batch model {model_name}")
+                        return provider
+                    logging.debug(f"{provider_type} cannot batch model {model_name}")
+                    continue
                 if provider and provider.validate_model_name(model_name):
                     logging.debug(f"{provider_type} validates model {model_name}")
                     return provider
@@ -207,6 +245,27 @@ class ModelProviderRegistry:
                 logging.debug(f"{provider_type} not found in registry")
 
         logging.debug(f"No provider found for model {model_name}")
+        return None
+
+    def explain_batch_refusal(self, model_name: str) -> str | None:
+        """The first specific reason a configured provider gives for refusing ``model_name`` under batch.
+
+        ``None`` when no provider has one (the generic "no provider can batch it" then applies).
+        """
+
+        for provider_type in self.PROVIDER_PRIORITY_ORDER:
+            if provider_type not in self._providers:
+                continue
+            provider = self.get_provider(provider_type)
+            explain = getattr(provider, "explain_batch_refusal", None)
+            if not callable(explain):
+                continue
+            try:
+                reason = explain(model_name)
+            except Exception:
+                continue
+            if isinstance(reason, str) and reason:
+                return reason
         return None
 
     def get_available_providers(self) -> list[ProviderType]:

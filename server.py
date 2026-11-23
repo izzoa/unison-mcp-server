@@ -10,6 +10,7 @@ managed by ``tools.registry.ToolRegistry``.
 import asyncio
 import logging
 import os
+import threading
 from pathlib import Path
 
 from mcp.server import Server
@@ -95,6 +96,63 @@ async def reconstruct_thread_context(arguments):
 from tools.registry import apply_tool_filter, parse_disabled_tools_env, validate_disabled_tools  # noqa: E402, F401
 
 
+def _start_batch_reconciliation() -> None:
+    """Reconcile unresolved batch submissions in the background; never fatal, never blocking.
+
+    A batch the server submitted just before a crash may exist at the provider without a
+    local record. This resolves such intent (adopt, close out, or flag for an operator) and
+    never resubmits. It does nothing if no batch store exists yet.
+    """
+
+    def _run() -> None:
+        try:
+            from utils.batch_coordinator import reconcile_at_startup
+
+            reconcile_at_startup()
+        except Exception:
+            logger.exception("Batch reconciliation at startup failed")
+
+    try:
+        threading.Thread(target=_run, name="batch-reconcile", daemon=True).start()
+    except Exception:
+        logger.exception("Could not start batch reconciliation")
+
+
+# What the MCP client is told at the handshake about asking for batch execution in natural language.
+# Three statements, each pinned by a test: the request maps onto ``execution_mode`` (never onto the model
+# string), a model the user named is passed through exactly, and the CLI bridge is a different thing.
+BATCH_INSTRUCTIONS = (
+    "When the user asks for batch execution (e.g. 'use unison consensus with gemini and opus batch models', "
+    "'run this chat as a batch', 'use batch pricing'), set `execution_mode` to \"batch\" on the tool call, or on "
+    "each consensus `models` entry the user wants batched; the `execution_mode` field is the only way to request batch. "
+    "Batch costs less and takes longer, so the response may be status 'running' with a `batch_handle`: resume by "
+    "calling the same tool with only that `batch_handle`. If the server says a model cannot be batched, tell the "
+    "user instead of retrying without `execution_mode`, because that runs at full price. "
+    "Keep each model exactly as the user named it, and never add, remove or change a suffix such as ':batch' "
+    "on a model name to request batch. "
+    "Batch execution applies to Unison's provider-backed tools (`chat`, `consensus`). CLI-bridge tools "
+    "(`clink`) do not support `execution_mode`: they forward the model string you send to an external CLI "
+    "verbatim (e.g. 'clink with opencode using model openrouter/openai/gpt-6-astra-pro:batch' sends that exact "
+    "string and sets no `execution_mode`)."
+)
+
+
+def build_handshake_instructions(*, is_auto_mode: bool, default_model: str) -> str:
+    """The MCP handshake instructions: how to pick a model, then how to map a batch request."""
+
+    if is_auto_mode:
+        model_instructions = (
+            "When the user names a specific model (e.g. 'use chat with gpt5'), send that exact model in the tool call. "
+            "When no model is mentioned, first use the `listmodels` tool from Unison to obtain available models to choose the best one from."
+        )
+    else:
+        model_instructions = (
+            "When the user names a specific model (e.g. 'use chat with gpt5'), send that exact model in the tool call. "
+            f"When no model is mentioned, default to '{default_model}'."
+        )
+    return f"{model_instructions} {BATCH_INSTRUCTIONS}"
+
+
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
@@ -111,6 +169,7 @@ async def main():
     set_default_registry(registry)
 
     configure_providers(registry)
+    _start_batch_reconciliation()
 
     logger.info("Unison MCP Server starting up...")
     logger.info("Log level: %s", log_level)
@@ -130,16 +189,7 @@ async def main():
     logger.info("Server ready - waiting for tool requests...")
 
     # Prepare dynamic instructions for the MCP client based on model mode
-    if IS_AUTO_MODE:
-        handshake_instructions = (
-            "When the user names a specific model (e.g. 'use chat with gpt5'), send that exact model in the tool call. "
-            "When no model is mentioned, first use the `listmodels` tool from Unison to obtain available models to choose the best one from."
-        )
-    else:
-        handshake_instructions = (
-            "When the user names a specific model (e.g. 'use chat with gpt5'), send that exact model in the tool call. "
-            f"When no model is mentioned, default to '{DEFAULT_MODEL}'."
-        )
+    handshake_instructions = build_handshake_instructions(is_auto_mode=IS_AUTO_MODE, default_model=DEFAULT_MODEL)
 
     try:
         async with stdio_server() as (read_stream, write_stream):

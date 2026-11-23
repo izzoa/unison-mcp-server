@@ -233,15 +233,17 @@ class ChatSimpleValidationTest(ConversationBaseTest):
                 self.logger.error("    ❌ Failed with temperature 0.0")
                 return False
 
-            # Test 3: Check that invalid temperatures are rejected by validation
-            # This should result in an error response from the tool, not a crash
+            # Test 3: Check that temperatures above the widest range any model accepts (2.0) are rejected by
+            # validation. (Until D13 the bound was 1.0; 1.5 is now accepted and clamped per model, and Gemini
+            # models take it as given.) The bound is the tool's own (Pydantic `le=2.0`, before any model is consulted), so this
+            # should result in an error response from the tool, not a crash. NOT re-run after the widening (Gemini billing)
             try:
                 response3, _ = self.call_mcp_tool_direct(
                     "chat",
                     {
                         "prompt": "Please use low thinking mode. Test with invalid temperature",
                         "model": "flash",
-                        "temperature": 1.5,  # Too high - should be validated
+                        "temperature": 2.5,  # Above the widest range - should be validated
                         "thinking_mode": "low",
                     },
                 )

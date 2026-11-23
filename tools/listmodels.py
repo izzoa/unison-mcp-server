@@ -22,6 +22,26 @@ from utils.env import get_custom_api_url, get_env
 logger = logging.getLogger(__name__)
 
 
+def _batch_alias_note(provider: Any, config: Any) -> str | None:
+    """``"batch: opus, claude-opus -> anthropic/claude-opus-5.5"`` for an entry whose aliases float under batch.
+
+    Built from the batch catalog already loaded (the live one if held, else the committed snapshot): listing
+    models never makes a network call. ``None`` when the entry has no family rule or nothing can be picked.
+    """
+
+    rule = getattr(config, "batch_family", None)
+    preview = getattr(provider, "batch_family_preview", None)
+    if rule is None or not callable(preview) or not getattr(rule, "aliases", None):
+        return None
+    try:
+        slug = preview(rule.aliases[0])
+    except Exception:
+        return None
+    if not isinstance(slug, str) or not slug:
+        return None
+    return f"batch: {', '.join(rule.aliases)} \u2192 {slug}"
+
+
 class ListModelsTool(BaseTool):
     """
     Tool for listing all available AI models organized by provider.
@@ -265,6 +285,11 @@ class ListModelsTool(BaseTool):
                                 suffix_parts = [f"{context_str} context"]
                                 if caps.supports_extended_thinking:
                                     suffix_parts.append("thinking")
+                                if getattr(caps, "supports_batch", False):
+                                    suffix_parts.append("batch")
+                                family_note = _batch_alias_note(provider, caps)
+                                if family_note:
+                                    suffix_parts.append(family_note)
                                 suffix = ", ".join(suffix_parts)
 
                                 arrow = ""
@@ -307,6 +332,11 @@ class ListModelsTool(BaseTool):
                                     suffix_parts = [f"{context_str} context"]
                                     if getattr(config, "supports_extended_thinking", False):
                                         suffix_parts.append("thinking")
+                                    if getattr(config, "supports_batch", False):
+                                        suffix_parts.append("batch")
+                                    family_note = _batch_alias_note(provider, config)
+                                    if family_note:
+                                        suffix_parts.append(family_note)
                                     suffix = ", ".join(suffix_parts)
 
                                     arrow = ""
@@ -316,6 +346,19 @@ class ListModelsTool(BaseTool):
                                     output_lines.append(f"- `{alias}`{arrow} (score {rank}, {suffix})")
                                 else:
                                     output_lines.append(f"- `{alias}` (score {rank})")
+
+                        if any(
+                            getattr(cfg, "supports_batch", False) or getattr(cfg, "batch_family", None)
+                            for entries in providers_models.values()
+                            for _, _, cfg in entries
+                        ):
+                            output_lines.append(
+                                "\n*`batch` = can run through OpenRouter's asynchronous batch API at reduced pricing. "
+                                "Under `execution_mode: batch` a family alias (`batch: opus, ... \u2192 model`) resolves to the "
+                                "latest model of its family that OpenRouter lists as `<slug>:batch`, and any model "
+                                "OpenRouter lists that way can be batched by its full slug, whether or not it is shown "
+                                "here.*"
+                            )
                 else:
                     output_lines.append("**Error**: Could not load OpenRouter provider")
 

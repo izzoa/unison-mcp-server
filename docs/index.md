@@ -10,6 +10,7 @@ _Formerly known as PAL MCP (and before that, Zen MCP). See the short [name chang
 | [Model Ranking](model_ranking.md) | How intelligence scores translate into auto-mode ordering. |
 | [Custom Models](custom_models.md) | Configure OpenRouter/custom models and aliases. |
 | [Adding Tools](adding_tools.md) | Create new tools using the shared base classes. |
+| [Batch Execution](tools/batch.md) | Half-price `chat` and `consensus` runs via OpenRouter's Batch API: `execution_mode`, resuming by handle, cancel semantics, the batch store. |
 | [Advanced Usage](advanced-usage.md) | Auto-mode tricks, workflow tools, and collaboration tips. |
 | [Configuration](configuration.md) | .env options, restriction policies, logging levels. |
 | [Testing](testing.md) | Test strategy, command cheats, and coverage notes. |

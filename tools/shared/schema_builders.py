@@ -8,7 +8,7 @@ to maintain proper separation of concerns.
 
 from typing import Any
 
-from .base_models import COMMON_FIELD_DESCRIPTIONS
+from .base_models import COMMON_FIELD_DESCRIPTIONS, MAX_TEMPERATURE
 
 
 class SchemaBuilder:
@@ -25,7 +25,7 @@ class SchemaBuilder:
             "type": "number",
             "description": COMMON_FIELD_DESCRIPTIONS["temperature"],
             "minimum": 0.0,
-            "maximum": 1.0,
+            "maximum": MAX_TEMPERATURE,
         },
         "thinking_mode": {
             "type": "string",

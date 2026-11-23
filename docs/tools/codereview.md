@@ -84,7 +84,7 @@ The above prompt will simultaneously run two separate `codereview` tools with tw
 - `focus_on`: Specific aspects to focus on (e.g., "security vulnerabilities", "performance bottlenecks")
 - `standards`: Coding standards to enforce (e.g., "PEP8", "ESLint", "Google Style Guide")
 - `severity_filter`: critical|high|medium|low|all (default: all)
-- `temperature`: Temperature for consistency (0-1, default 0.2)
+- `temperature`: Temperature for consistency (default 0.2). Accepted from 0 to 2; the selected model's published limit then applies (most models 0-1, OpenAI, Google and xAI up to 2) and a higher value is reduced to the model's maximum.
 - `thinking_mode`: minimal|low|medium|high|max (default: medium, Gemini only)
 - `use_assistant_model`: Whether to use expert analysis phase (default: true, set to false to use Claude only)
 - `continuation_id`: Continue previous review discussions

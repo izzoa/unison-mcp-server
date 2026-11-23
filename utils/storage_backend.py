@@ -40,6 +40,16 @@ class StorageBackend(Protocol):
 
     def shutdown(self) -> None: ...
 
+    @property
+    def is_durable(self) -> bool:
+        """True only when stored values survive a restart of this process.
+
+        Read this from the *live* backend object. The ``STORAGE_BACKEND`` setting is not
+        evidence of durability: ``create_storage_backend`` falls back to memory when the
+        SQLite backend fails to initialise.
+        """
+        ...
+
 
 class InMemoryStorage:
     """Thread-safe in-memory storage for conversation threads"""
@@ -61,6 +71,11 @@ class InMemoryStorage:
         logger.info(
             f"In-memory storage initialized with {timeout_hours}h timeout, cleanup every {self._cleanup_interval//60}m"
         )
+
+    @property
+    def is_durable(self) -> bool:
+        """Always False: values live in this process's memory only."""
+        return False
 
     def set_with_ttl(self, key: str, ttl_seconds: int, value: str) -> None:
         """Store value with expiration time"""
@@ -123,6 +138,9 @@ def create_storage_backend() -> StorageBackend:
         * ``SQLiteStorageBackend`` when ``STORAGE_BACKEND=sqlite``
         * ``InMemoryStorage`` when unset, empty, or ``memory``
         * ``InMemoryStorage`` (with a warning) for unrecognised values
+
+    The returned backend's ``is_durable`` is the truth about persistence: it is ``False``
+    when SQLite was requested but failed to initialise and memory was substituted.
     """
     backend_type = (get_env("STORAGE_BACKEND", "memory") or "memory").strip().lower()
 

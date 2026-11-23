@@ -337,6 +337,14 @@ Clink configurations live in `conf/cli_clients/`. We ship presets for the suppor
 
 Each preset points to role-specific prompts in `systemprompts/clink/`. Duplicate those files to add more roles or adjust CLI flags.
 
+### Model strings, batch pricing and the `supported_models` allowlist
+
+The `model` argument is forwarded to the external CLI **verbatim**, including any colon-delimited suffix: a clink call with `cli_name="opencode"` and `model="openrouter/openai/gpt-6-astra-pro:batch"` runs `opencode run ... -m openrouter/openai/gpt-6-astra-pro:batch`. Unison does not parse, split or rewrite the string, and makes no claim about whether it yields batch pricing; that is up to the CLI and its provider. A suffix the CLI does not recognise surfaces as a CLI-level error in the response, not as a Unison-side rejection, unless the manifest declares a non-empty `supported_models` allowlist, in which case the value must match it exactly (see below).
+
+**Server-side batch execution does not apply to clink.** The `execution_mode` field that `chat` and `consensus` accept (see [Chat](chat.md) and [Consensus](consensus.md)) is rejected on clink with an error saying so, because Unison spawns a subprocess and never sees the request the CLI sends, so it cannot submit a provider batch on its behalf.
+
+**The allowlist matches exactly.** When a manifest declares a non-empty `supported_models`, a `model` value is accepted only if it equals a listed entry character for character. A value that differs only by a suffix does not match: with `"supported_models": ["openrouter/openai/gpt-6-astra-pro"]`, the value `openrouter/openai/gpt-6-astra-pro:batch` is rejected before the CLI starts. List the suffixed form explicitly to permit it. See `conf/cli_clients/README.md`.
+
 ### opencode v2
 
 clink runs the first `opencode` on the Unison server's `PATH` and probes its version once per binary (cached by path, mtime and size, so an upgrade is picked up). The result is logged once, e.g. `opencode at /Users/you/.opencode/bin/opencode is v2.2.0` in `logs/mcp_server.log`; to check by hand, run `which opencode && opencode --version` in the environment that launches Unison. opencode 0.x/1.x are unchanged: their command line is exactly what the manifest says. Only an executable named `opencode` is probed: a wrapper such as `npx` or `bunx` answers `--version` with its own version, so it is treated as an unknown version and keeps the plain command line, as does a v2 beta/dev build that reports `0.0.0-…`. Everything below applies to **v2** only, except cancellation (below).
