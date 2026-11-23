@@ -62,7 +62,7 @@ class OpenRouterModelsTest(BaseSimulatorTest):
                 self.logger.info(f"  ✅ Got continuation_id: {continuation_id}")
 
             # Test 2: Pro alias mapping to OpenRouter
-            self.logger.info("  2: Testing 'pro' alias (should map to google/gemini-2.5-pro)")
+            self.logger.info("  2: Testing 'pro' alias (should map to google/gemini-3-pro-preview)")
 
             response2, _ = self.call_mcp_tool(
                 "chat",
@@ -178,19 +178,16 @@ class OpenRouterModelsTest(BaseSimulatorTest):
             openrouter_logs = [line for line in logs.split("\n") if "openrouter" in line.lower()]
             openrouter_api_logs = [line for line in logs.split("\n") if "openrouter.ai/api/v1" in line]
 
-            # Check for specific model mappings
+            # Check for specific model mappings. The only alias-resolution log is the DEBUG line
+            # "Resolved model alias '<alias>' to '<slug>'" (providers/openrouter.py), so this needs LOG_LEVEL=DEBUG.
             flash_mapping_logs = [
-                line
-                for line in logs.split("\n")
-                if ("flash" in line and "google/gemini-flash" in line)
-                or ("Resolved model" in line and "google/gemini-flash" in line)
+                line for line in logs.split("\n") if "Resolved model alias 'flash' to 'google/gemini-2.5-flash'" in line
             ]
 
             pro_mapping_logs = [
                 line
                 for line in logs.split("\n")
-                if ("pro" in line and "google/gemini-pro" in line)
-                or ("Resolved model" in line and "google/gemini-pro" in line)
+                if "Resolved model alias 'pro' to 'google/gemini-3-pro-preview'" in line
             ]
 
             # Log findings

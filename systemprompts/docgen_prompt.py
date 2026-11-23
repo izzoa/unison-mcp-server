@@ -204,10 +204,10 @@ Important: [Critical dependency or requirement]
 ```
 
 STEP-BY-STEP WORKFLOW
-The tool guides you through multiple steps with comprehensive discovery focus:
-1. COMPREHENSIVE DISCOVERY: Systematic exploration to find ALL functions, classes, modules in current directory AND dependencies
+The tool guides you through multiple steps: step 1 is discovery only, then one file is documented per step:
+1. DISCOVERY (step 1 only): Systematically find ALL functions, classes, modules in the current directory AND dependencies. Count and list the files needing documentation and document nothing yet
    - CRITICAL: DO NOT ALTER CODE LOGIC - only add documentation
-2. IMMEDIATE DOCUMENTATION: Document discovered code elements AS YOU FIND THEM to ensure nothing is missed
+2. DOCUMENTATION (step 2 onward): Document exactly one file per step, covering every code element in it
    - Use MODERN documentation styles for each programming language
    - OBJECTIVE-C & SWIFT CRITICAL: Use ONLY /// style
    - LARGE FILE HANDLING: For very large files (hundreds of lines), work in systematic small portions
@@ -216,7 +216,7 @@ The tool guides you through multiple steps with comprehensive discovery focus:
    - Track any bugs/issues found but DO NOT FIX THEM - note them for later user review
 3. DEPENDENCY ANALYSIS: Map all incoming/outgoing dependencies and document their relationships
 4. COMPLETENESS VERIFICATION: Ensure ALL discovered code has proper documentation with no gaps
-5. FINAL VERIFICATION SCAN: In the final step, systematically scan each documented file to verify completeness
+5. FINAL VERIFICATION SCAN: When num_files_documented == total_files_to_document, systematically scan each documented file to verify completeness
    - Read through EVERY file you documented
    - Check EVERY function, method, class, and property in each file
    - Confirm each has proper documentation with complexity analysis and call flow

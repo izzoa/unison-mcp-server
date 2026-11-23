@@ -6,7 +6,7 @@ The `testgen` tool creates comprehensive test suites by analyzing your code path
 
 ## Thinking Mode
 
-**Default is `medium` (8,192 tokens) for extended thinking models.** Use `high` for complex systems with many interactions or `max` for critical systems requiring exhaustive test coverage.
+**Applies to the expert test-generation call; default is `high` (for extended thinking models).** Use `max` for critical systems requiring exhaustive test coverage, or `medium`/`low` to save tokens on simple units.
 
 ## How the Workflow Works
 
@@ -44,10 +44,7 @@ Test generation excels with extended reasoning models like Gemini Pro or O3, whi
 
 - **Multi-agent workflow** analyzing code paths and identifying realistic failure modes
 - **Generates framework-specific tests** following project conventions
-- **Supports test pattern following** when examples are provided
-- **Dynamic token allocation** (25% for test examples, 75% for main code)
-- **Prioritizes smallest test files** for pattern detection
-- **Can reference existing test files**: `"Generate tests following patterns from tests/unit/"`
+- **Pattern following**: put existing test files in `relevant_files` and say in `step`/`findings` that they are the style reference: `"Generate tests following patterns from tests/unit/"`
 - **Specific code coverage** - target specific functions/classes rather than testing everything
 - **Image support**: Test UI components, analyze visual requirements: `"Generate tests for this login form using the UI mockup screenshot"`
 - **Edge case identification**: Systematic discovery of boundary conditions and error states
@@ -57,7 +54,7 @@ Test generation excels with extended reasoning models like Gemini Pro or O3, whi
 ## Tool Parameters
 
 **Workflow Investigation Parameters (used during step-by-step process):**
-- `step`: Current investigation step description (required for each step)
+- `step`: Current investigation step description (required for each step). In step 1 it carries what to test, the testing objectives, and the scope/focus areas
 - `step_number`: Current step number in test generation sequence (required)
 - `total_steps`: Estimated total investigation steps (adjustable)
 - `next_step_required`: Whether another investigation step is needed
@@ -68,10 +65,8 @@ Test generation excels with extended reasoning models like Gemini Pro or O3, whi
 - `confidence`: Confidence level in test plan completeness (exploring/low/medium/high/certain)
 
 **Initial Configuration (used in step 1):**
-- `prompt`: Description of what to test, testing objectives, and specific scope/focus areas (required)
-- `model`: auto|pro|flash|flash-2.0|flashlite|o3|o3-mini|o4-mini|gpt4.1|gpt5.2|gpt5.1-codex|gpt5.1-codex-mini|gpt5|gpt5-mini|gpt5-nano|opus|sonnet|haiku|fable (default: server default)
-- `test_examples`: Optional existing test files or directories to use as style/pattern reference (absolute paths)
-- `thinking_mode`: minimal|low|medium|high|max (default: medium, Gemini only)
+- `model`: auto|pro|flash|flash3|flashlite|o3|o3-mini|o4-mini|gpt4.1|gpt5.2|gpt5.1-codex|gpt5.1-codex-mini|gpt5|gpt5-mini|gpt5-nano|opus|sonnet|haiku|fable (default: server default)
+- `thinking_mode`: minimal|low|medium|high|max (default: high; honored by Gemini and Anthropic models, ignored by providers without a thinking control)
 - `use_assistant_model`: Whether to use expert test generation phase (default: true, set to false to use Claude only)
 
 ## Usage Examples

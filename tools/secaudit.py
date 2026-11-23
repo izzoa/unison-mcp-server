@@ -387,6 +387,11 @@ class SecauditTool(WorkflowTool):
                 "items": {"type": "string"},
                 "description": SECAUDIT_WORKFLOW_FIELD_DESCRIPTIONS["relevant_files"],
             },
+            "relevant_context": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": SECAUDIT_WORKFLOW_FIELD_DESCRIPTIONS["relevant_context"],
+            },
             "confidence": {
                 "type": "string",
                 "enum": ["exploring", "low", "medium", "high", "very_high", "almost_certain", "certain"],
@@ -438,6 +443,8 @@ class SecauditTool(WorkflowTool):
             model_field_schema=self.get_model_field_schema(),
             auto_mode=self.is_effective_auto_mode(),
             tool_name=self.get_name(),
+            # Never read: prepare_step_data records `findings` as the hypothesis. The request model keeps the field.
+            excluded_workflow_fields=["hypothesis"],
         )
 
     # Hook method overrides for security audit-specific behavior

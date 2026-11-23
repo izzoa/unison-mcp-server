@@ -23,7 +23,7 @@ from utils.env import get_env
 logger = logging.getLogger(__name__)
 
 # Configuration constants
-# Get max conversation turns from environment, default to 20 turns (10 exchanges)
+# Get max conversation turns from environment, default to 50 turns (25 exchanges)
 try:
     max_turns_raw = (get_env("MAX_CONVERSATION_TURNS", "50") or "50").strip()
     MAX_CONVERSATION_TURNS = int(max_turns_raw)

@@ -371,3 +371,13 @@ async def test_clink_tool_truncates_without_summary(monkeypatch):
     assert metadata.get("output_truncated") is True
     assert metadata.get("events_removed_for_normal") is True
     assert metadata.get("output_original_length") == len(long_text)
+
+
+def test_clink_is_not_published_read_only():
+    """The CLI clink spawns can edit files, so the MCP annotation must not promise read-only behavior."""
+    from mcp.types import ToolAnnotations
+
+    tool = CLinkTool()
+    assert tool.get_annotations() == {"readOnlyHint": False}
+    # The listing path builds ToolAnnotations from it: a falsy hint must survive (it is not dropped as "empty")
+    assert ToolAnnotations(**tool.get_annotations()).read_only_hint is False

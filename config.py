@@ -47,9 +47,10 @@ IS_AUTO_MODE = DEFAULT_MODEL.lower() == "auto"
 # in most cases. Lowering it can affect the models 'reasoning' abilities.
 # Newer models / inference stacks are able to handle their randomness better.
 
-# Temperature controls the randomness/creativity of model responses
-# Lower values (0.0-0.3) produce more deterministic, focused responses
-# Higher values (0.7-1.0) produce more creative, varied responses
+# Temperature controls the randomness/creativity of model responses.
+# All three presets below are currently 1.0 (Gemini 3.x guidance); the names mark intent only and let a tool
+# diverge later. Lower values (0.0-0.3) are more deterministic, higher values (0.7-1.0) more varied, but many
+# models only accept 1.0 and override anything else.
 
 # TEMPERATURE_ANALYTICAL: Used for tasks requiring precision and consistency
 # Ideal for code review, debugging, and error analysis where accuracy is critical
@@ -68,13 +69,9 @@ TEMPERATURE_CREATIVE = 1.0  # For architecture, deep thinking
 # Higher modes use more computational budget but provide deeper analysis
 DEFAULT_THINKING_MODE_THINKDEEP = get_env("DEFAULT_THINKING_MODE_THINKDEEP", "high") or "high"
 
-# Consensus Tool Defaults
-# Consensus timeout and rate limiting settings
-DEFAULT_CONSENSUS_TIMEOUT = 120.0  # 2 minutes per model
-DEFAULT_CONSENSUS_MAX_INSTANCES_PER_COMBINATION = 2
-
-# NOTE: Consensus tool now uses sequential processing for MCP compatibility
-# Concurrent processing was removed to avoid async pattern violations
+# NOTE: The consensus tool consults all models concurrently (asyncio.gather in
+# tools/consensus.py::_consult_models_concurrently). Each model has its own timeout and one
+# failure does not cancel the others; the 120s timeout is set there, not in this module.
 
 # MCP Protocol Transport Limits
 #

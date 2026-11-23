@@ -1,8 +1,8 @@
 # Version Tool - Server Information
 
-**Get server version, configuration details, and list of available tools**
+**Get the server version, update status, model-selection mode, configured providers and available-model count**
 
-The `version` tool provides information about the Unison MCP Server version, configuration details, and system capabilities. This is useful for debugging, understanding server capabilities, and verifying your installation.
+The `version` tool reports which Unison MCP Server version is running, whether a newer one exists on GitHub, how models are selected and which providers are configured. It is useful for debugging and for verifying your installation. It does not list tools or models: use `listmodels` for models, and your MCP client's tool list (MCP `tools/list`) for the tool inventory.
 
 ## Usage
 
@@ -12,116 +12,84 @@ The `version` tool provides information about the Unison MCP Server version, con
 
 ## Key Features
 
-- **Server version information**: Current version and build details
-- **Configuration overview**: Active settings and capabilities
-- **Tool inventory**: Complete list of available tools and their status
-- **System health**: Basic server status and connectivity verification
+- **Server version information**: Current version, last-updated date and author
+- **Update status**: Compares your version with the latest published one (this makes a network call to GitHub with a 10 second timeout; offline it reports "Could not check for updates")
+- **Configuration overview**: Model-selection mode and default model, connected client and installation path
+- **Provider status**: One line per provider saying whether it is configured, plus the available-model count
 - **Debug information**: Helpful details for troubleshooting
 
 ## Output Information
 
-The tool provides:
+The tool returns markdown with these sections:
 
-**Version Details:**
-- Server version number
-- Build timestamp and commit information
-- MCP protocol version compatibility
-- Python runtime version
+- **Server Information**: version, last updated, author, model selection (auto mode or the default model), connected client, installation path
+- **Quick Summary** and **Agent Reporting Guidance**: version and model-selection bullets the agent is told to relay as is
+- **Update Status**: latest GitHub version, and whether you are up to date, behind (with the `git pull` commands) or ahead (a development build)
+- **Configuration**: each provider as ✅ Configured or ❌ Not configured, and the **Available Models** count
 
-**Configuration Summary:**
-- Active providers and their status
-- Default model configuration
-- Feature flags and settings
-- Environment configuration overview
-
-**Tool Availability:**
-- Complete list of available tools
-- Tool version information
-- Capability status for each tool
-
-**System Information:**
-- Server uptime and status
-- Memory and resource usage (if available)
-- Conversation memory status
-- Server process information
+The response metadata also carries `python_version` and `platform`.
 
 ## Example Output
 
 ```
-🔧 Unison MCP Server Information
+# Unison MCP Server Version
 
-📋 Version: 2.15.0
-🏗️ Build: 2024-01-15T10:30:00Z (commit: abc123f)
-🔌 MCP Protocol: 1.0.0
-🐍 Python Runtime: 3.11.7
+## Server Information
+**Current Version**: 14.7.0
+**Last Updated**: 2026-08-16
+**Author**: Fahad Gilani
+**Model Selection**: Auto model selection mode (call `listmodels` to inspect options)
+**Installation Path**: `/path/to/unison-mcp-server`
 
-⚙️ Configuration:
-• Default Model: auto
-• Providers: Google ✅, OpenAI ✅, Custom ✅
-• Conversation Memory: Active ✅
-• Web Search: Enabled
+## Quick Summary — relay everything below
+- Version `14.7.0` (updated 2026-08-16)
+- Auto model selection (use `listmodels` for options)
+- Run `listmodels` for the complete model catalog and capabilities
 
-🛠️ Available Tools (12):
-• chat - General development chat & collaborative thinking
-• thinkdeep - Extended reasoning partner  
-• consensus - Multi-model perspective gathering
-• codereview - Professional code review
-• precommit - Pre-commit validation
-• debug - Expert debugging assistant
-• analyze - Smart file analysis
-• refactor - Intelligent code refactoring
-• tracer - Static code analysis prompt generator
-• testgen - Comprehensive test generation
-• listmodels - List available models
-• version - Server information
+## Update Status
+**Latest Version (GitHub)**: 14.7.0
+✅ **UP TO DATE**
+You are running the latest version.
 
-🔍 System Status:
-• Server Uptime: 2h 35m
-• Memory Storage: Active
-• Server Process: Running
+## Configuration
+**Providers**:
+- **Google**: ✅ Configured
+- **OpenAI**: ✅ Configured
+- **OpenRouter**: ❌ Not configured
+
+**Available Models**: 24
 ```
 
 ## When to Use Version Tool
 
 - **Troubleshooting**: When experiencing issues with the server or tools
-- **Configuration verification**: To confirm your setup is correct
+- **Configuration verification**: To confirm which providers are configured and how models are selected
 - **Support requests**: To provide system information when asking for help
 - **Update checking**: To verify you're running the latest version
-- **Capability discovery**: To understand what features are available
 
 ## Debug Information
 
 The version tool can help diagnose common issues:
 
 **Connection Problems:**
-- Verify server is running and responsive
-- Check MCP protocol compatibility
-- Confirm tool availability
+- Confirms the server is running and responsive
 
 **Configuration Issues:**
-- Validate provider setup
-- Check API key configuration status
-- Verify feature enablement
-
-**Performance Troubleshooting:**
-- Server uptime and stability
-- Resource usage patterns
-- Memory storage health
+- Shows which providers have API keys configured
+- Shows the model-selection mode and default model
 
 ## Tool Parameters
 
-This tool requires no parameters - it provides comprehensive server information automatically.
+This tool requires no parameters.
 
 ## Best Practices
 
 - **Include in bug reports**: Always include version output when reporting issues
 - **Check after updates**: Verify version information after server updates
-- **Monitor system health**: Use periodically to check server status
-- **Validate configuration**: Confirm settings match your expectations
+- **Validate configuration**: Confirm providers and model selection match your expectations
 
 ## When to Use Version vs Other Tools
 
-- **Use `version`** for: Server diagnostics, configuration verification, troubleshooting
+- **Use `version`** for: Server diagnostics, configuration verification, update checks
 - **Use `listmodels`** for: Model availability and capability information
 - **Use other tools** for: Actual development and analysis tasks
-- **Use with support**: Essential information for getting help with issues

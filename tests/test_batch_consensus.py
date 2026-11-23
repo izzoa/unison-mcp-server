@@ -363,6 +363,11 @@ class TestSynthesisFromTheDurableRecord:
         assert [r["verdict"] for r in body["accumulated_responses"]] == ["verdict:consensus-0", "verdict:consensus-1"]
         assert body["complete_consensus"]["initial_prompt"] == PROPOSAL
         assert "continuation_offer" in body
+        # the batch path shares the step-1 customisation: the workflow status agrees with the status, and the
+        # metadata is the finished-consultation shape
+        assert body["consensus_workflow_status"] == "consensus_workflow_complete"
+        assert body["metadata"]["consensus_complete"] is True and body["metadata"]["total_models"] == 2
+        assert "consultation_step" not in body["metadata"] and "models_to_consult" not in body["metadata"]
 
     @pytest.mark.asyncio
     async def test_the_batched_response_has_the_structure_of_a_synchronous_one(self, boot, service, monkeypatch):
@@ -706,6 +711,7 @@ class TestErrorIsolation:
 
         assert body["status"] == "all_providers_unavailable"
         assert [r["status"] for r in body["accumulated_responses"]] == ["error", "error"]
+        assert body["consensus_workflow_status"] == "all_providers_unavailable"
         assert body["consensus_complete"] is True
 
     @pytest.mark.asyncio

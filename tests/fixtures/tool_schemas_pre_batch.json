@@ -44,7 +44,7 @@
     "items": {
      "type": "string"
     },
-    "description": "Methods/functions identified as involved in the issue"
+    "description": "List methods/functions central to analysis findings, in 'ClassName.methodName' or 'functionName' format. Prioritize those demonstrating key patterns, architectural decisions, or improvement opportunities."
    },
    "issues_found": {
     "type": "array",
@@ -60,7 +60,7 @@
    },
    "temperature": {
     "type": "number",
-    "description": "Sampling temperature, 0 = deterministic. Accepted from 0 to 2: the selected model's published limit then applies (most models 0-1; OpenAI, Google and xAI up to 2) and a higher value is reduced to the model's maximum.",
+    "description": "Sampling temperature, accepted from 0 to 2. The selected model's own published rule then applies and a non-conforming value is corrected with a warning: Gemini, xAI and some OpenAI models take 0-2, older Claude models 0-1, and many models (the GPT-5 and o-series, newer Claude models, some Grok models) accept only temperature 1 or none, so the value is replaced by 1.0 or not sent and a lower value does not make them deterministic.",
     "minimum": 0.0,
     "maximum": 2.0
    },
@@ -73,7 +73,7 @@
      "high",
      "max"
     ],
-    "description": "Reasoning depth: minimal, low, medium, high, or max."
+    "description": "Reasoning depth: minimal, low, medium, high, or max. Honoured by native Gemini and Anthropic models that support extended thinking; other providers ignore it."
    },
    "continuation_id": {
     "type": "string",
@@ -88,19 +88,6 @@
    },
    "model": {
     "__env_dependent__": true
-   },
-   "confidence": {
-    "type": "string",
-    "enum": [
-     "exploring",
-     "low",
-     "medium",
-     "high",
-     "very_high",
-     "almost_certain",
-     "certain"
-    ],
-    "description": "Your confidence in the analysis: exploring, low, medium, high, very_high, almost_certain, or certain. 'certain' indicates the analysis is complete and ready for validation."
    },
    "analysis_type": {
     "type": "string",
@@ -192,7 +179,7 @@
     "items": {
      "type": "string"
     },
-    "description": "Methods/functions identified as involved in the issue"
+    "description": "Functions or methods central to findings (e.g. 'Class.method' or 'function_name')."
    },
    "issues_found": {
     "type": "array",
@@ -201,23 +188,6 @@
     },
     "description": "Issues with severity (critical/high/medium/low) and descriptions."
    },
-   "confidence": {
-    "type": "string",
-    "enum": [
-     "exploring",
-     "low",
-     "medium",
-     "high",
-     "very_high",
-     "almost_certain",
-     "certain"
-    ],
-    "description": "Confidence level: exploring (just starting), low (early investigation), medium (some evidence), high (strong evidence), very_high (comprehensive understanding), almost_certain (near complete confidence), certain (100% confidence locally - no external validation needed)"
-   },
-   "hypothesis": {
-    "type": "string",
-    "description": "Current theory about issue/goal based on work"
-   },
    "use_assistant_model": {
     "type": "boolean",
     "default": true,
@@ -225,7 +195,7 @@
    },
    "temperature": {
     "type": "number",
-    "description": "Sampling temperature, 0 = deterministic. Accepted from 0 to 2: the selected model's published limit then applies (most models 0-1; OpenAI, Google and xAI up to 2) and a higher value is reduced to the model's maximum.",
+    "description": "Sampling temperature, accepted from 0 to 2. The selected model's own published rule then applies and a non-conforming value is corrected with a warning: Gemini, xAI and some OpenAI models take 0-2, older Claude models 0-1, and many models (the GPT-5 and o-series, newer Claude models, some Grok models) accept only temperature 1 or none, so the value is replaced by 1.0 or not sent and a lower value does not make them deterministic.",
     "minimum": 0.0,
     "maximum": 2.0
    },
@@ -238,7 +208,7 @@
      "high",
      "max"
     ],
-    "description": "Reasoning depth: minimal, low, medium, high, or max."
+    "description": "Reasoning depth: minimal, low, medium, high, or max. Honoured by native Gemini and Anthropic models that support extended thinking; other providers ignore it."
    },
    "continuation_id": {
     "type": "string",
@@ -350,14 +320,7 @@
     "items": {
      "type": "string"
     },
-    "description": "Methods/functions identified as involved in the issue"
-   },
-   "issues_found": {
-    "type": "array",
-    "items": {
-     "type": "object"
-    },
-    "description": "Issues identified with severity levels during work"
+    "description": "Methods/functions central to issue: 'Class.method' or 'function'. Focus on inputs/branching/state."
    },
    "confidence": {
     "type": "string",
@@ -383,7 +346,7 @@
    },
    "temperature": {
     "type": "number",
-    "description": "Sampling temperature, 0 = deterministic. Accepted from 0 to 2: the selected model's published limit then applies (most models 0-1; OpenAI, Google and xAI up to 2) and a higher value is reduced to the model's maximum.",
+    "description": "Sampling temperature, accepted from 0 to 2. The selected model's own published rule then applies and a non-conforming value is corrected with a warning: Gemini, xAI and some OpenAI models take 0-2, older Claude models 0-1, and many models (the GPT-5 and o-series, newer Claude models, some Grok models) accept only temperature 1 or none, so the value is replaced by 1.0 or not sent and a lower value does not make them deterministic.",
     "minimum": 0.0,
     "maximum": 2.0
    },
@@ -396,7 +359,7 @@
      "high",
      "max"
     ],
-    "description": "Reasoning depth: minimal, low, medium, high, or max."
+    "description": "Reasoning depth: minimal, low, medium, high, or max. Honoured by native Gemini and Anthropic models that support extended thinking; other providers ignore it."
    },
    "continuation_id": {
     "type": "string",
@@ -462,18 +425,6 @@
      "type": "string"
     },
     "description": "Methods/functions identified as involved in the issue"
-   },
-   "issues_found": {
-    "type": "array",
-    "items": {
-     "type": "object"
-    },
-    "description": "Issues identified with severity levels during work"
-   },
-   "use_assistant_model": {
-    "type": "boolean",
-    "default": true,
-    "description": "Use assistant model for expert analysis after workflow steps. False skips expert analysis, relies solely on your personal investigation. Defaults to True for comprehensive validation."
    },
    "continuation_id": {
     "type": "string",
@@ -562,17 +513,9 @@
     "type": "boolean",
     "description": "Whether another work step is needed. When false, aim to reduce total_steps to match step_number to avoid mismatch."
    },
-   "use_assistant_model": {
-    "type": "boolean",
-    "default": true,
-    "description": "Use assistant model for expert analysis after workflow steps. False skips expert analysis, relies solely on your personal investigation. Defaults to True for comprehensive validation."
-   },
    "continuation_id": {
     "type": "string",
     "description": "Unique thread continuation ID for multi-turn conversations. Works across different tools. ALWAYS reuse the last continuation_id you were given\u2014this preserves full conversation context, files, and findings so the agent can resume seamlessly."
-   },
-   "model": {
-    "__env_dependent__": true
    },
    "is_step_revision": {
     "type": "boolean",
@@ -625,12 +568,12 @@
    },
    "total_steps": {
     "type": "integer",
-    "minimum": 3,
-    "description": "Planned number of validation steps. External validation: use at most three (analysis \u2192 follow-ups \u2192 summary). Internal validation: a single step. Honour these limits when resuming via continuation_id."
+    "minimum": 1,
+    "description": "Planned number of validation steps. External validation: three steps are recommended (analysis \u2192 follow-ups \u2192 summary). Internal validation: a single step is enough. The same guidance applies when resuming via continuation_id."
    },
    "next_step_required": {
     "type": "boolean",
-    "description": "True to continue with another step, False when validation is complete. CRITICAL: If total_steps>=3 or when `precommit_type = external`, set to True until the final step. When continuation_id is provided: Follow the same validation rules based on precommit_type."
+    "description": "True to continue with another step, False when validation is complete. Guidance: if total_steps>=3 or when `precommit_type = external`, keep this True until the final step; the tool replies with corrective guidance if you stop early. When continuation_id is provided: Follow the same validation rules based on precommit_type."
    },
    "findings": {
     "type": "string",
@@ -655,7 +598,7 @@
     "items": {
      "type": "string"
     },
-    "description": "Methods/functions identified as involved in the issue"
+    "description": "Key functions/methods touched by the change (e.g. 'Class.method', 'function_name')."
    },
    "issues_found": {
     "type": "array",
@@ -664,23 +607,6 @@
     },
     "description": "List issues with severity (critical/high/medium/low) plus descriptions (bugs, security, performance, coverage)."
    },
-   "confidence": {
-    "type": "string",
-    "enum": [
-     "exploring",
-     "low",
-     "medium",
-     "high",
-     "very_high",
-     "almost_certain",
-     "certain"
-    ],
-    "description": "Confidence level: exploring (just starting), low (early investigation), medium (some evidence), high (strong evidence), very_high (comprehensive understanding), almost_certain (near complete confidence), certain (100% confidence locally - no external validation needed)"
-   },
-   "hypothesis": {
-    "type": "string",
-    "description": "Current theory about issue/goal based on work"
-   },
    "use_assistant_model": {
     "type": "boolean",
     "default": true,
@@ -688,7 +614,7 @@
    },
    "temperature": {
     "type": "number",
-    "description": "Sampling temperature, 0 = deterministic. Accepted from 0 to 2: the selected model's published limit then applies (most models 0-1; OpenAI, Google and xAI up to 2) and a higher value is reduced to the model's maximum.",
+    "description": "Sampling temperature, accepted from 0 to 2. The selected model's own published rule then applies and a non-conforming value is corrected with a warning: Gemini, xAI and some OpenAI models take 0-2, older Claude models 0-1, and many models (the GPT-5 and o-series, newer Claude models, some Grok models) accept only temperature 1 or none, so the value is replaced by 1.0 or not sent and a lower value does not make them deterministic.",
     "minimum": 0.0,
     "maximum": 2.0
    },
@@ -701,7 +627,7 @@
      "high",
      "max"
     ],
-    "description": "Reasoning depth: minimal, low, medium, high, or max."
+    "description": "Reasoning depth: minimal, low, medium, high, or max. Honoured by native Gemini and Anthropic models that support extended thinking; other providers ignore it."
    },
    "continuation_id": {
     "type": "string",
@@ -743,10 +669,6 @@
     "type": "boolean",
     "default": true,
     "description": "Whether to inspect unstaged changes (ignored when `compare_to` is set)."
-   },
-   "focus_on": {
-    "type": "string",
-    "description": "Optional emphasis areas such as security, performance, or test coverage."
    },
    "severity_filter": {
     "type": "string",
@@ -816,7 +738,7 @@
     "items": {
      "type": "string"
     },
-    "description": "Methods/functions identified as involved in the issue"
+    "description": "List methods/functions central to refactoring opportunities, in 'ClassName.methodName' or 'functionName' format. Prioritize those with code smells or needing improvement."
    },
    "issues_found": {
     "type": "array",
@@ -836,10 +758,6 @@
     "default": "incomplete",
     "description": "Your confidence in refactoring analysis: exploring (starting), incomplete (significant work remaining), partial (some opportunities found, more analysis needed), complete (comprehensive analysis finished, all major opportunities identified). WARNING: Use 'complete' ONLY when fully analyzed and can provide recommendations without expert help. 'complete' PREVENTS expert validation. Use 'partial' for large files or uncertain analysis."
    },
-   "hypothesis": {
-    "type": "string",
-    "description": "Current theory about issue/goal based on work"
-   },
    "use_assistant_model": {
     "type": "boolean",
     "default": true,
@@ -847,7 +765,7 @@
    },
    "temperature": {
     "type": "number",
-    "description": "Sampling temperature, 0 = deterministic. Accepted from 0 to 2: the selected model's published limit then applies (most models 0-1; OpenAI, Google and xAI up to 2) and a higher value is reduced to the model's maximum.",
+    "description": "Sampling temperature, accepted from 0 to 2. The selected model's own published rule then applies and a non-conforming value is corrected with a warning: Gemini, xAI and some OpenAI models take 0-2, older Claude models 0-1, and many models (the GPT-5 and o-series, newer Claude models, some Grok models) accept only temperature 1 or none, so the value is replaced by 1.0 or not sent and a lower value does not make them deterministic.",
     "minimum": 0.0,
     "maximum": 2.0
    },
@@ -860,7 +778,7 @@
      "high",
      "max"
     ],
-    "description": "Reasoning depth: minimal, low, medium, high, or max."
+    "description": "Reasoning depth: minimal, low, medium, high, or max. Honoured by native Gemini and Anthropic models that support extended thinking; other providers ignore it."
    },
    "continuation_id": {
     "type": "string",
@@ -957,14 +875,7 @@
     "items": {
      "type": "string"
     },
-    "description": "Methods/functions identified as involved in the issue"
-   },
-   "issues_found": {
-    "type": "array",
-    "items": {
-     "type": "object"
-    },
-    "description": "Issues identified with severity levels during work"
+    "description": "Functions/methods needing coverage (e.g. 'Class.method', 'function_name'), with emphasis on critical paths and error-prone code."
    },
    "confidence": {
     "type": "string",
@@ -979,10 +890,6 @@
     ],
     "description": "Indicate your current confidence in the test generation assessment. Use: 'exploring' (starting analysis), 'low' (early investigation), 'medium' (some patterns identified), 'high' (strong understanding), 'very_high' (very strong understanding), 'almost_certain' (nearly complete test plan), 'certain' (100% confidence - test plan is thoroughly complete and all test scenarios are identified with no need for external model validation). Do NOT use 'certain' unless the test generation analysis is comprehensively complete, use 'very_high' or 'almost_certain' instead if not 100% sure. Using 'certain' means you have complete confidence locally and prevents external model validation."
    },
-   "hypothesis": {
-    "type": "string",
-    "description": "Current theory about issue/goal based on work"
-   },
    "use_assistant_model": {
     "type": "boolean",
     "default": true,
@@ -990,7 +897,7 @@
    },
    "temperature": {
     "type": "number",
-    "description": "Sampling temperature, 0 = deterministic. Accepted from 0 to 2: the selected model's published limit then applies (most models 0-1; OpenAI, Google and xAI up to 2) and a higher value is reduced to the model's maximum.",
+    "description": "Sampling temperature, accepted from 0 to 2. The selected model's own published rule then applies and a non-conforming value is corrected with a warning: Gemini, xAI and some OpenAI models take 0-2, older Claude models 0-1, and many models (the GPT-5 and o-series, newer Claude models, some Grok models) accept only temperature 1 or none, so the value is replaced by 1.0 or not sent and a lower value does not make them deterministic.",
     "minimum": 0.0,
     "maximum": 2.0
    },
@@ -1003,7 +910,7 @@
      "high",
      "max"
     ],
-    "description": "Reasoning depth: minimal, low, medium, high, or max."
+    "description": "Reasoning depth: minimal, low, medium, high, or max. Honoured by native Gemini and Anthropic models that support extended thinking; other providers ignore it."
    },
    "continuation_id": {
     "type": "string",
@@ -1108,7 +1015,7 @@
    },
    "temperature": {
     "type": "number",
-    "description": "Sampling temperature, 0 = deterministic. Accepted from 0 to 2: the selected model's published limit then applies (most models 0-1; OpenAI, Google and xAI up to 2) and a higher value is reduced to the model's maximum.",
+    "description": "Sampling temperature, accepted from 0 to 2. The selected model's own published rule then applies and a non-conforming value is corrected with a warning: Gemini, xAI and some OpenAI models take 0-2, older Claude models 0-1, and many models (the GPT-5 and o-series, newer Claude models, some Grok models) accept only temperature 1 or none, so the value is replaced by 1.0 or not sent and a lower value does not make them deterministic.",
     "minimum": 0.0,
     "maximum": 2.0
    },
@@ -1121,7 +1028,7 @@
      "high",
      "max"
     ],
-    "description": "Reasoning depth: minimal, low, medium, high, or max."
+    "description": "Reasoning depth: minimal, low, medium, high, or max. Honoured by native Gemini and Anthropic models that support extended thinking; other providers ignore it."
    },
    "continuation_id": {
     "type": "string",
@@ -1230,7 +1137,7 @@
     "items": {
      "type": "string"
     },
-    "description": "Optional absolute image paths or base64 blobs for visual context."
+    "description": "Optional absolute image paths or base64 blobs. Delivered only to CLIs with image transport (amp, copilot); aider, claude, codex, crush, gemini and opencode ignore them."
    },
    "continuation_id": {
     "type": "string",
@@ -1239,7 +1146,7 @@
    "read_only": {
     "type": "boolean",
     "default": false,
-    "description": "Restrict the external CLI to read-only operations. Enforced via CLI sandbox flags, prompt instruction, and post-execution filesystem verification."
+    "description": "Restrict the external CLI to read-only operations. Layers: (1) the CLI's own sandbox/plan flag where it has one (claude, codex, gemini, aider, copilot; amp, crush, opencode and custom CLIs have none), (2) a prompt instruction, (3) a post-run snapshot diff of the working directory subtree (detective, not preventive: it cannot see out-of-tree writes or command side effects). Check metadata.read_only_enforced (false means layer 1 did not apply) and metadata.read_only_violations. Violations are reported in metadata and do not block the response."
    },
    "model": {
     "__env_dependent__": true

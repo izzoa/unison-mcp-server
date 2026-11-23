@@ -18,7 +18,7 @@ Close Claude Desktop and restart with debug logging:
 # macOS/Linux
 claude --debug
 
-# Windows (in WSL2)
+# Windows
 claude.exe --debug
 ```
 
@@ -111,7 +111,7 @@ If the problem persists after trying these steps:
 
 ## Windows Users
 
-**Important**: Windows users must use WSL2. Install it with:
+**Windows**: `run-server.ps1` runs natively. If you prefer a Linux environment, install WSL2 with:
 
 ```powershell
 wsl --install -d Ubuntu

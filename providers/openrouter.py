@@ -112,8 +112,10 @@ class OpenRouterProvider(OpenAICompatibleProvider):
            ``submitted_model`` and, when the caller's spelling differed, the caller's
            spelling as ``requested_model``.
         6. The limits applied to the call are those of the resolved slug itself: derived, per field, from its
-           ``:batch`` listing (live catalog, then the committed snapshot), and only for a field neither has, from
-           the curated family entry (one warning). A slug the curated catalog lists keeps its curated LIMITS, but
+           ``:batch`` listing (live catalog, then the committed snapshot, then the live plain listing for numbers
+           and modalities), and only for a field none has, from the curated family entry (one warning). A slug the
+           curated catalog lists keeps its curated context window and flags (its output cap and temperature range
+           can only be lowered by published figures), but
            the request PARAMETERS (``temperature``, ``top_p``, ``seed``, the token-cap spelling ...) are only those
            its ``:batch`` listing names, live then snapshot; with no listing at all the curated entry decides, with
            one warning. The whole result is a :class:`BatchModelResolution`, built once at admission and carried to
@@ -454,7 +456,7 @@ class OpenRouterProvider(OpenAICompatibleProvider):
         catalog: BatchCatalog,
         floated: bool,
     ) -> BatchModelResolution:
-        """Capabilities of ``slug`` from its own listing in ``catalog`` (live, then the snapshot), then ``fallback``.
+        """Capabilities of ``slug`` from its own listings in ``catalog`` (live, snapshot, plain listing), then ``fallback``.
 
         Per field; see :func:`resolve_capabilities`.
         """
@@ -484,9 +486,10 @@ class OpenRouterProvider(OpenAICompatibleProvider):
         catalog: BatchCatalog | None,
         floated: bool,
     ) -> BatchModelResolution:
-        """A reviewed curated entry: its LIMITS are kept, its request PARAMETERS come from the listing (D9).
+        """A reviewed curated entry: its context window and flags are kept, its request PARAMETERS come from the listing (D9).
 
-        ``derived`` stays false, so the reviewed context window and output cap stay enforced. Which optional
+        ``derived`` stays false, so the reviewed context window stays enforced and the output cap can only be reduced
+        by a published figure. Which optional
         parameters a body carries is decided like a derived entry's (live ``:batch`` listing, then the snapshot,
         see :func:`apply_listed_parameters`); with no listing at all the curated entry decides, with one WARNING.
         """
@@ -554,7 +557,7 @@ class OpenRouterProvider(OpenAICompatibleProvider):
         are then, in this order and per field: its live ``:batch`` listing, the committed snapshot, the curated
         family entry (one warning). A full slug the curated catalog does not list but the catalog does gets the
         same chain with the generic defaults as its last resort. A slug the curated catalog lists keeps its curated
-        limits, but the request parameters it sends are those its ``:batch`` listing names (live, then snapshot;
+        context window and flags (output cap and temperature range can only be narrowed), but the request parameters it sends are those its ``:batch`` listing names (live, then snapshot;
         the curated entry only when no listing exists). ``get_capabilities`` and the synchronous path never come
         through here.
 
@@ -823,7 +826,8 @@ class OpenRouterProvider(OpenAICompatibleProvider):
         The cap is the smallest valid figure among OpenRouter's listings, LiteLLM and the reviewed entry (see
         :meth:`BatchModelResolution.output_cap_bound`), so a request is never asked to exceed any published limit.
         One WARNING per model and cap per process names the reduction. With nothing stated (a stand-in cap only) the
-        caller's figure goes out as given, with one DEBUG line: no limit is invented.
+        caller's figure goes out as given, with one WARNING per model per process (warn_once): no limit is
+        invented.
         """
 
         requested = request.max_output_tokens

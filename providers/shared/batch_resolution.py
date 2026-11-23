@@ -5,13 +5,18 @@ that ``conf/openrouter_models.json`` may not list. The limits applied to the cal
 temperature, which request parameters are sent) are then the slug's OWN, derived from its ``:batch`` listing in
 OpenRouter's model list, never the older curated family entry's and never invented:
 
-1. the live catalog the call pinned;
+1. the live catalog's ``:batch`` listing the call pinned;
 2. the committed snapshot (``conf/openrouter_batch_catalog.json``, the same view of each listing);
-3. the curated entry (the alias's family entry, or the generic defaults for a full slug the catalog does not
+3. the live body's plain (non-``:batch``) listing, numbers and modalities only, never ``supported_parameters``;
+4. the curated entry (the alias's family entry, or the generic defaults for a full slug the catalog does not
    list), with one WARNING.
 
-A slug the curated catalog DOES list keeps its reviewed LIMITS (context window, output cap, flags), but not its
-request PARAMETERS: which optional parameters a request carries (``temperature``, ``top_p``, ``seed``, the token
+The output cap and temperature rules are then bounded by :func:`apply_published_bounds` (the smallest valid cap
+among those listings and LiteLLM, never above the context window).
+
+A slug the curated catalog DOES list keeps its reviewed context window and flags, and its output cap and
+temperature range are only ever narrowed by published figures (:func:`apply_published_bounds`), never raised.
+Its request PARAMETERS are not kept: which optional parameters a request carries (``temperature``, ``top_p``, ``seed``, the token
 cap spelling) is decided by the same listing chain, because the listing is what the batch endpoint accepts
 (:func:`apply_listed_parameters`). Only when no listing exists at all does the curated entry decide, with one
 WARNING.
@@ -227,7 +232,7 @@ def resolve_capabilities(
     fallback: ModelCapabilities,
     fallback_label: str,
 ) -> tuple[ModelCapabilities, dict[str, str]]:
-    """Derive ``slug``'s capabilities from ``sources`` (live, then snapshot), field by field, then ``fallback``.
+    """Derive ``slug``'s capabilities from ``sources`` (live, snapshot, then the plain listing), field by field, then ``fallback``.
 
     Returns the capabilities and ``{field: "live" | "snapshot" | fallback_label}``. ``fallback_label`` is
     ``"curated"`` (the alias's family entry) or ``"generic"`` (defaults for a full slug). When any capability
@@ -267,7 +272,7 @@ class BatchModelResolution:
 
     ``requested`` is the name the caller typed (trimmed, any ``:batch`` suffix kept off) and ``slug`` what is sent.
     ``capabilities`` are the limits applied to the call: derived from the slug's own listing (``derived``), or a
-    curated entry whose limits are kept (``derived`` false: a slug the curated catalog lists; its request
+    curated entry whose context window and flags are kept (``derived`` false: a slug the curated catalog lists; its request
     PARAMETERS still come from the listing, see :func:`apply_listed_parameters`, so ``derived`` is NOT the "send
     only listed parameters" switch: ``supported_parameters`` is). ``sources`` records, per capability field,
     where it came from; for a curated slug it holds only ``supported_parameters`` (``live``, ``snapshot`` or
@@ -288,7 +293,7 @@ class BatchModelResolution:
     def window_is_listed(self) -> bool:
         """True when the context window is a real figure for this model rather than a stand-in.
 
-        A curated entry (its limits are kept) carries its reviewed window, and a derived one carries a listed window when
+        A curated entry (its context window is kept) carries its reviewed window, and a derived one carries a listed window when
         its ``context_length`` came from the live or snapshot listing. A window answered by the curated family
         entry (an older, smaller model) or the generic defaults is a guess, and nothing may be refused against it.
         """

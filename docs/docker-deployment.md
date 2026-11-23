@@ -60,8 +60,6 @@ DEFAULT_MODEL=auto
 
 # Logging
 LOG_LEVEL=INFO
-LOG_MAX_SIZE=10MB
-LOG_BACKUP_COUNT=5
 
 # Advanced settings
 DEFAULT_THINKING_MODE_THINKDEEP=high
@@ -177,7 +175,7 @@ The container includes comprehensive health checks:
 - **Process check**: Verifies server.py is running
 - **Import check**: Validates critical Python modules
 - **Directory check**: Ensures log directory is writable
-- **API check**: Tests provider connectivity
+- **Environment check**: Confirms at least one provider API key is set and is at least 10 characters long (no network call is made, so it does not prove the keys work)
 
 Health check configuration:
 ```yaml
@@ -195,18 +193,31 @@ healthcheck:
 
 - **Logs**: `./logs:/app/logs` - Application logs
 - **Config**: `unison-mcp-config:/app/conf` - Configuration persistence
+- **Data**: `unison-mcp-data:/app/.unison` - Batch store (`batches.db`) and SQLite conversation storage
 - **Time sync**: `/etc/localtime:/etc/localtime:ro` - Host timezone sync
 
 **Note:** The `unison-mcp-config` is a named Docker volume that persists configuration data between container restarts. All data placed in `/app/conf` inside the container is preserved thanks to this persistent volume. This applies to both `docker-compose run` and `docker-compose up` commands.
 
+### Batch Store and SQLite Storage
+
+`execution_mode="batch"` (chat and consensus) keeps its records in a SQLite file so a `batch_handle` survives a restart, and `STORAGE_BACKEND=sqlite` writes conversations to another. The compose file runs the container with a read-only root filesystem, so both live on the named volume `unison-mcp-data`, mounted at `/app/.unison`. The image creates that directory owned by the runtime user (`unisonuser`), and Docker gives a new named volume the same ownership on first use.
+
+- `BATCH_STORE_PATH` defaults to `/app/.unison/batches.db` in `docker-compose.yml`. Override it only with a path inside the container that is on a writable mount.
+- `STORAGE_SQLITE_PATH` defaults to `.unison/conversations.db` relative to the working directory `/app`, which is also on the volume.
+- Batch execution needs `OPENROUTER_API_KEY`; see [batch](tools/batch.md).
+- The store holds prompts and generated text in plaintext, so treat the volume like any other secret-bearing data. Remove it with `docker compose down -v`.
+
+With `docker run` (Options 1 and 3 below) nothing is mounted at `/app/.unison` unless you add it. The directory is still writable (inside the container's own layer, so records disappear with `--rm`); add `-v unison-mcp-data:/app/.unison` to keep them. Do not carry a host path such as `BATCH_STORE_PATH=/Users/you/...` from your `.env` into the container: with `--env-file` it would point at a directory that does not exist there. Unset it, or set `-e BATCH_STORE_PATH=/app/.unison/batches.db`.
+
+### Which variables Compose forwards
+
+`docker-compose.yml` forwards only the variables listed in its `environment:` section: the API keys, `DEFAULT_MODEL`, `LOG_LEVEL`, the conversation, storage, batch, `CLINK_*` and `CIRCUIT_*` variables, and a few others. Anything else in `.env` (for example `*_ALLOWED_MODELS`) is not passed through unless you add it to that list or add `env_file: .env` to the service. Variables written as a bare name (`- BATCH_RETENTION_DAYS`) are forwarded only when you set them in your shell or in `.env`; when unset, the container leaves them undefined and the code default applies.
+
+`clink` launches the external CLIs (Gemini CLI, Codex, and so on) inside the container, and none of them ship in the image, so `CLINK_*` settings only matter for an image you extend with those CLIs.
+
 ### Log Management
 
-Logs are automatically rotated with configurable retention:
-
-```env
-LOG_MAX_SIZE=10MB      # Maximum log file size
-LOG_BACKUP_COUNT=5     # Number of backup files to keep
-```
+Logs rotate automatically: `mcp_server.log` at 20 MB with 5 backups and `mcp_activity.log` at 10 MB with 2 backups. These limits are fixed in the server and are not configurable by environment variable.
 
 ## Networking
 
@@ -428,7 +439,7 @@ Configure Claude Desktop to use the containerized server. **Choose one of the co
 - Replace `/absolute/path/to/unison-mcp-server` with the actual path to your project.
 - Always use forward slashes `/` for Docker volumes, even on Windows.
 - Ensure the `.env` file exists and contains your API keys.
-- **Persistent volumes**: Docker Compose options (Options 2) automatically use the `unison-mcp-config` named volume for persistent configuration storage.
+- **Persistent volumes**: Docker Compose options (Options 2) automatically use the `unison-mcp-config` named volume for persistent configuration storage and the `unison-mcp-data` named volume for the batch store and SQLite conversation storage.
 
 **Environment file requirements:**
 ```env

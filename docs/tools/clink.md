@@ -6,6 +6,8 @@ The `clink` tool transforms your CLI into a multi-agent orchestrator. Launch iso
 
 > **CAUTION**: Clink launches real CLI agents with relaxed permission flags (Gemini ships with `--yolo`, Codex with `--dangerously-bypass-approvals-and-sandbox`, Claude with `--permission-mode acceptEdits`) so they can edit files and run tools autonomously via MCP. If that’s more access than you want, remove those flags—the CLI can still open/read files and report findings, it just won’t auto-apply edits. You can also tighten role prompts or system prompts with stop-words/guardrails, or disable clink entirely. Otherwise, keep the shipped presets confined to workspaces you fully trust.
 
+> **MCP annotation**: clink is published with `readOnlyHint: false`, because the CLI it spawns can edit files and run commands in the working directory. Only `read_only=true` asks the CLI to refrain, and that is best-effort (see `read_only` below), so an MCP client may ask for confirmation before calling clink.
+
 ## Why Use Clink (CLI + Link)?
 
 ### Codex-within-Codex: The Ultimate Context Management
@@ -77,15 +79,21 @@ You can make your own custom roles in `conf/cli_clients/` or tweak any of the sh
 
 ## Tool Parameters
 
-- `prompt`: Your question or task for the external CLI (required)
+- `prompt`: Your question or task for the external CLI (required to start a run; omit it when continuing with `job_id`)
 - `cli_name`: Which CLI to use - `aider`, `amp`, `claude`, `codex`, `copilot`, `crush`, `gemini`, `opencode`, or add your own in `conf/cli_clients/`. **Required** when more than one CLI is configured; it may be omitted only in a single-CLI deployment, where that CLI is used. There is no vendor-preferred default.
 - `role`: Preset role - `default`, `planner`, `codereviewer` (default: `default`)
 - `model`: Optional model forwarded to the CLI (e.g. `sonnet` for claude, `provider/model` for opencode/crush, named modes for amp)
 - `working_dir`: Optional **absolute path** the spawned CLI runs in (set as both its cwd and its PWD, so CLIs that root their session at `$PWD` such as opencode honor it too). **It may be omitted**: clink then derives the directory from the conversation, the files you pass, the host's MCP roots, the CLI manifest, `CLINK_DEFAULT_WORKING_DIR` and the server's own working directory, in that order, and refuses with a precise error instead of guessing — see [Working directory](#working-directory). Pass your project or worktree root when you know it — some CLIs (Copilot) root their file tools at their cwd and refuse paths outside it. Broad directories (`/`, `/etc`, `/Users`, `/tmp` itself, …) are refused and your home directory is accepted with a warning. The directory used is reported back as `metadata.working_dir`, with `metadata.working_dir_source` and `metadata.working_dir_warnings` saying how it was chosen
-- `read_only`: Restrict the CLI to read-only operations (sandbox flags + prompt instruction + post-execution snapshot verification)
+- `read_only`: Restrict the CLI to read-only operations: the CLI's own sandbox/plan flag where it has one (claude, codex, gemini, aider, copilot; not amp, crush or opencode), a prompt instruction, and a post-run snapshot diff of the working directory subtree (detective, not preventive). Check `metadata.read_only_enforced` to see whether the sandbox flag applied
 - `absolute_file_paths`: Optional absolute file paths for context (references only, CLI opens files itself). When `working_dir` is omitted they also identify the project the CLI runs in
-- `images`: Optional image paths for visual context
+- `images`: Optional image paths or base64 blobs. Delivered only to CLIs with image transport (amp, copilot); aider, claude, codex, crush, gemini and opencode ignore them
 - `continuation_id`: Continue previous clink conversations
+- `job_id`: Continue a previous call that returned status `running` (pass only this, optionally with `wait_seconds` or `cancel`)
+- `cancel`: With `job_id`, cancel the job and kill the CLI's process tree
+- `wait_seconds`: How long this call may wait (0-50, default 45; larger values are clamped)
+- `idempotency_key`: A retried start with the same key while the run is still going returns the existing job instead of launching duplicate CLI work
+
+See [Long runs](#long-runs-under-impatient-hosts-built-in-job-control) for the job-control protocol.
 
 ## Usage Examples
 
@@ -322,7 +330,7 @@ Clink configurations live in `conf/cli_clients/`. We ship presets for the suppor
 |---|---|---|---|
 | `gemini` | `gemini --telemetry false --yolo -o json` | `--approval-mode plan` | stable |
 | `claude` | `claude --print --output-format json --permission-mode acceptEdits --model sonnet` | `--permission-mode plan` | stable |
-| `codex` | `codex exec --json --dangerously-bypass-approvals-and-sandbox` | prompt-only | stable |
+| `codex` | `codex exec --json --dangerously-bypass-approvals-and-sandbox --enable web_search_request` | `--sandbox read-only` (native OS sandbox; the bypass flag is stripped in read-only mode) | stable |
 | `opencode` | `opencode run --format json` | prompt-only + filesystem snapshot | stable |
 | `aider` | `aider --no-pretty --no-stream --no-auto-commits --yes-always` | `--dry-run` (native) | stable |
 | `crush` | `crush run --quiet` | prompt-only + filesystem snapshot | evolving |

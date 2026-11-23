@@ -53,9 +53,9 @@ def get_language_instruction(self) -> str:
     Returns:
         str: Language instruction to prepend to prompt, or empty string if no locale set
     """
-    import os
+    from utils.env import get_env
 
-    locale = os.getenv("LOCALE", "").strip()
+    locale = (get_env("LOCALE", "") or "").strip()
 
     if not locale:
         return ""
@@ -106,7 +106,7 @@ Output: "Les dictionnaires Python sont des paires clé-valeur qui permettent de 
 
 ### 3. Affected Tools
 
-All MCP tools are affected by this configuration:
+All tools that build a model prompt (simple and workflow tools, chat, etc.) are affected by this configuration:
 
 - `chat` – General conversation
 - `codereview` – Code review
@@ -157,9 +157,9 @@ To customize the language instruction, modify the `get_language_instruction()` m
 
 ```python
 def get_language_instruction(self) -> str:
-    import os
+    from utils.env import get_env
 
-    locale = os.getenv("LOCALE", "").strip()
+    locale = (get_env("LOCALE", "") or "").strip()
 
     if not locale:
         return ""
@@ -174,9 +174,9 @@ You can also override the method in specific tools for custom behavior:
 ```python
 class MyCustomTool(SimpleTool):
     def get_language_instruction(self) -> str:
-        import os
+        from utils.env import get_env
 
-        locale = os.getenv("LOCALE", "").strip()
+        locale = (get_env("LOCALE", "") or "").strip()
 
         if locale == "fr-FR":
             return "Respond in French with precise technical vocabulary.\n\n"

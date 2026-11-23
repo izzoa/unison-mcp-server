@@ -53,10 +53,10 @@ The curated defaults in `conf/openrouter_models.json` include popular entries su
 
 | Alias | Canonical Model | Highlights |
 |-------|-----------------|------------|
-| `opus`, `claude-opus` | `anthropic/claude-opus-4.1` | Flagship Claude reasoning model with vision |
+| `opus`, `opus4.5`, `claude-opus` | `anthropic/claude-opus-4.5` | Flagship Claude reasoning model with vision |
 | `sonnet`, `sonnet4.5` | `anthropic/claude-sonnet-4.5` | Balanced Claude with high context window |
 | `haiku` | `anthropic/claude-3.5-haiku` | Fast Claude option with vision |
-| `pro`, `gemini` | `google/gemini-2.5-pro` | Frontier Gemini with extended thinking |
+| `pro`, `gemini`, `gemini-pro`, `gemini3` | `google/gemini-3-pro-preview` | Frontier Gemini with extended thinking |
 | `flash` | `google/gemini-2.5-flash` | Ultra-fast Gemini with vision |
 | `mistral` | `mistralai/mistral-large-2411` | Frontier Mistral (text only) |
 | `llama3` | `meta-llama/llama-3-70b` | Large open-weight text model |
@@ -72,15 +72,15 @@ Consult the JSON file for the full list, aliases, and capability flags. Add new 
 
 | Alias | Maps to Local Model | Note |
 |-------|-------------------|------|
-| `local-llama`, `local` | `llama3.2` | Requires `CUSTOM_API_URL` configured |
+| `local-llama`, `ollama-llama` | `llama3.2` | Requires `CUSTOM_API_URL` configured |
 
-View the baseline OpenRouter catalogue in [`conf/openrouter_models.json`](conf/openrouter_models.json) and populate [`conf/custom_models.json`](conf/custom_models.json) with your local models.
+View the baseline OpenRouter catalogue in [`conf/openrouter_models.json`](../conf/openrouter_models.json) and populate [`conf/custom_models.json`](../conf/custom_models.json) with your local models.
 
 Native catalogues (`conf/openai_models.json`, `conf/gemini_models.json`, `conf/anthropic_models.json`, `conf/xai_models.json`, `conf/dial_models.json`) follow the same schema. Updating those files lets you:
 
 - Expose new aliases (e.g., map `enterprise-pro` to `gpt-5.2-pro`)
 - Advertise support for JSON mode or vision if the upstream provider adds it
-- Adjust token limits when providers increase context windows
+- Adjust token limits when providers increase context windows (`context_window` is used as written; `max_output_tokens` is only ever lowered to an output cap LiteLLM publishes for the model, so raising it above a published cap has no effect)
 
 ### Latest OpenAI releases
 
@@ -191,23 +191,23 @@ CUSTOM_MODEL_NAME=your-loaded-model
 **Using model aliases (from the registry files):**
 ```
 # OpenRouter models:
-"Use opus for deep analysis"         # → anthropic/claude-opus-4
-"Use sonnet to review this code"     # → anthropic/claude-sonnet-4
-"Use pro via unison to analyze this"    # → google/gemini-2.5-pro
-"Use gpt4o via unison to analyze this"  # → openai/gpt-4o
-"Use mistral via unison to optimize"    # → mistral/mistral-large
+"Use opus for deep analysis"         # → anthropic/claude-opus-4.5
+"Use sonnet to review this code"     # → anthropic/claude-sonnet-4.5
+"Use pro via unison to analyze this"    # → google/gemini-3-pro-preview
+"Use gpt5.2 via unison to analyze this" # → openai/gpt-5.2
+"Use mistral via unison to optimize"    # → mistralai/mistral-large-2411
 
 # Local models (with custom URL configured):
 "Use local-llama to analyze this code"     # → llama3.2 (local)
-"Use local to debug this function"         # → llama3.2 (local)
+"Use ollama-llama to debug this function"  # → llama3.2 (local)
 ```
 
 **Using full model names:**
 ```
 # OpenRouter models:
-"Use anthropic/claude-opus-4 via unison for deep analysis"
-"Use openai/gpt-4o via unison to debug this"
-"Use deepseek/deepseek-coder via unison to generate code"
+"Use anthropic/claude-opus-4.5 via unison for deep analysis"
+"Use openai/gpt-5.2 via unison to debug this"
+"Use deepseek/deepseek-r1-0528 via unison to reason about this"
 
 # Local/custom models:
 "Use llama3.2 via unison to review this"
@@ -226,7 +226,7 @@ The system automatically routes models to the appropriate provider:
 3. **Unknown models** → Fallback logic based on model name patterns
 
 **Provider Priority Order:**
-1. Native APIs (Google, OpenAI) - if API keys are available
+1. Native APIs (Google, OpenAI, Azure, Anthropic, X.AI, DIAL) - if API keys are available
 2. Custom endpoints - for models declared in `conf/custom_models.json`  
 3. OpenRouter - catch-all for cloud models
 

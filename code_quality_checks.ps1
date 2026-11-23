@@ -242,9 +242,10 @@ Write-Host ""
 
 # Step 1b: Type Checking (strict allowlist)
 #
-# The file list mirrors code_quality_checks.sh and the mypy step in
-# .github/workflows/test.yml. Keep all three in sync when adding a module to
-# the strict allowlist in pyproject.toml.
+# The file list is a fourth copy of the strict allowlist: it mirrors
+# code_quality_checks.sh, the mypy step in .github/workflows/test.yml and the
+# [[tool.mypy.overrides]] list in pyproject.toml. Keep all four in sync when
+# adding a module to the strict allowlist.
 if (!$SkipLinting) {
     Write-Emoji "🔎" "Step 1b: Running mypy Type Checking" -Color Cyan
     Write-ColorText "---------------------------------------" -Color Cyan
@@ -255,18 +256,20 @@ if (!$SkipLinting) {
     } else {
         $mypyFiles = @(
             "utils/circuit_breaker.py", "utils/fs_snapshot.py", "utils/tool_execution_context.py", "utils/token_utils.py",
-            "providers/shared/provider_type.py", "providers/shared/model_response.py",
+            "providers/shared/provider_type.py", "providers/shared/model_response.py", "providers/shared/batch.py", "providers/shared/batch_catalog.py", "providers/shared/batch_resolution.py", "providers/shared/published_limits.py", "providers/openrouter_batch_wire.py",
+            "utils/batch_store.py", "utils/batch_coordinator.py", "utils/batch_execution.py", "utils/consensus_batch.py", "tools/shared/batch_support.py",
             "utils/file_types.py", "utils/security_config.py", "utils/conversation_memory.py",
             "utils/env.py", "utils/model_resolution.py", "utils/request_helpers.py",
             "utils/image_utils.py", "utils/context_reconstructor.py", "utils/file_utils.py",
             "tools/registry.py",
-            "scripts/smoke_test_wheel.py", "scripts/build_mockups.py",
-            "clink/agents/opencode.py", "clink/parsers/opencode.py",
+            "scripts/smoke_test_wheel.py", "scripts/build_mockups.py", "scripts/refresh_openrouter_batch_catalog.py",
+            "clink/agents/base.py", "clink/agents/opencode.py", "clink/parsers/opencode.py",
             "clink/agents/aider.py", "clink/parsers/aider.py",
             "clink/agents/crush.py", "clink/parsers/crush.py",
             "clink/agents/amp.py", "clink/parsers/amp.py",
             "clink/agents/copilot.py", "clink/parsers/copilot.py",
-            "utils/observability.py", "utils/json_log_formatter.py"
+            "utils/observability.py", "utils/json_log_formatter.py", "utils/mcp_context.py",
+            "clink/workdir.py", "utils/launch_info.py"
         )
 
         Write-Emoji "🔍" "Running mypy on strict allowlist files..." -Color Yellow

@@ -54,7 +54,7 @@ Documentation generation excels with analytical models like Gemini Pro or O3, wh
 **Workflow Parameters (used during step-by-step process):**
 - `step`: Current step description - discovery phase (step 1) or documentation phase (step 2+)
 - `step_number`: Current step number in documentation sequence (required)
-- `total_steps`: Dynamically calculated as 1 + total_files_to_document
+- `total_steps`: Required; set it to 1 + total_files_to_document once the count is known (the server echoes the value you send and only raises it if `step_number` exceeds it)
 - `next_step_required`: Whether another step is needed
 - `findings`: Discoveries about code structure and documentation needs (required)
 - `relevant_files`: Files being actively documented in current step

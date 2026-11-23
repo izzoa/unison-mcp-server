@@ -6,7 +6,7 @@ The `chat` tool is your collaborative thinking partner for development conversat
 
 ## Thinking Mode
 
-**Default is `medium` (8,192 tokens).** Use `low` for quick questions to save tokens, or `high` for complex discussions when thoroughness matters.
+**Default is `medium` (about a third of the model's thinking budget).** Use `low` for quick questions to save tokens, or `high` for complex discussions when thoroughness matters.
 
 ## Example Prompt
 
@@ -52,12 +52,12 @@ word verdict in the end.
 ## Tool Parameters
 
 - `prompt`: Your question or discussion topic (required to start a call; not needed when resuming with `batch_handle`)
-- `model`: auto|pro|flash|flash-2.0|flashlite|o3|o3-mini|o4-mini|gpt4.1|gpt5.2|gpt5.1-codex|gpt5.1-codex-mini|gpt5|gpt5-mini|gpt5-nano|opus|sonnet|haiku|fable (default: server default)
+- `model`: auto|pro|flash|flash3|flashlite|o3|o3-mini|o4-mini|gpt4.1|gpt5.2|gpt5.1-codex|gpt5.1-codex-mini|gpt5|gpt5-mini|gpt5-nano|opus|sonnet|haiku|fable (default: server default)
 - `absolute_file_paths`: Optional absolute file or directory paths for additional context
 - `images`: Optional images for visual context (absolute paths)
 - `working_directory_absolute_path`: **Required to start a call** - Absolute path to an existing directory where generated code artifacts will be saved
-- `temperature`: Response creativity (default 0.5). Accepted from 0 to 2; the selected model's published limit then applies (most models 0-1, OpenAI, Google and xAI up to 2) and a higher value is reduced to the model's maximum. With `execution_mode: "batch"` the same per-model rule applies to the batched request.
-- `thinking_mode`: minimal|low|medium|high|max (default: medium, Gemini only)
+- `temperature`: Response creativity (default 1.0). Accepted from 0 to 2; the selected model's own rule then applies (Gemini, xAI and some OpenAI models 0-2, older Claude 0-1; models that take only temperature 1 or none ignore or override it). With `execution_mode: "batch"` the same per-model rule applies to the batched request.
+- `thinking_mode`: minimal|low|medium|high|max (default: medium; honored by Gemini and Anthropic models, ignored by providers without a thinking control)
 - `continuation_id`: Continue previous conversations
 - `execution_mode`: `"batch"` runs the call through OpenRouter's asynchronous Batch API at about half price (text only, models OpenRouter lists as `:batch` only; family aliases such as `opus` resolve to the latest batch-listed model); omit or `null` for a normal call. See the [batch guide](batch.md)
 - `batch_handle`: Resume (or, with `cancel`, cancel) a batch call that returned `status: "running"`. Pass only this field

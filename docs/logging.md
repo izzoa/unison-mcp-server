@@ -18,7 +18,7 @@ Logs are stored in the `logs/` directory within your project folder:
 - **`mcp_server.log`** - Main server operations, API calls, and errors
 - **`mcp_activity.log`** - Tool calls and conversation tracking
 
-Log files rotate automatically when they reach 20MB, keeping up to 10 rotated files.
+`mcp_server.log` rotates at 20MB and keeps 5 rotated files (about 100MB total); `mcp_activity.log` rotates at 10MB and keeps 2 (about 20MB total). Set `UNISON_JSON_LOGS=true` to write the activity log as single-line JSON (the server log stays text).
 
 ## Viewing Logs
 

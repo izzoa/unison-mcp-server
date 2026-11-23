@@ -194,7 +194,7 @@ def configure_providers(registry=None):
     # Log provider priority
     priority_info = []
     if has_native_apis:
-        priority_info.append("Native APIs (Gemini, OpenAI)")
+        priority_info.append("Native APIs (Gemini, OpenAI, Azure, Anthropic, X.AI, DIAL)")
     if has_custom:
         priority_info.append("Custom endpoints")
     if has_openrouter:

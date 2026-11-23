@@ -69,9 +69,11 @@ class ModelCapabilities:
     # object; it is validated and converted when the capability is built.
     batch_family: BatchFamilyRule | None = None
     # The request parameters the provider's own listing says the model accepts (sorted names), or ``None`` when no
-    # listing was consulted. Set only for a model whose capabilities were derived from a live or snapshot listing
-    # under batch (see providers/shared/batch_resolution.py); every other entry leaves it ``None``, and callers then
-    # fall back to the supports_* flags exactly as before.
+    # listing was consulted. Under batch it is set in two cases: a model whose capabilities were derived from a live
+    # or snapshot ``:batch`` listing, and a reviewed curated slug, which keeps its reviewed limits but takes its
+    # request parameters from the listing (apply_listed_parameters in providers/shared/batch_resolution.py). With no
+    # listing for a curated slug, and on every non-batch path, it stays ``None``, and callers then fall back to the
+    # supports_* flags exactly as before.
     supported_parameters: tuple[str, ...] | None = None
 
     # Additional attributes

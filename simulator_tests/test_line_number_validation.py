@@ -4,6 +4,7 @@ Test to validate line number handling across different tools
 
 import json
 import os
+import re
 
 from .base_test import BaseSimulatorTest
 
@@ -18,6 +19,95 @@ class LineNumberValidationTest(BaseSimulatorTest):
     @property
     def test_description(self) -> str:
         return "Line number handling validation across tools"
+
+    # Real statuses of a single-step workflow call: the expert model ran, or the tool completed locally.
+    ANALYZE_STATUSES = ("calling_expert_analysis", "analysis_complete_ready_for_implementation")
+    REFACTOR_STATUSES = ("calling_expert_analysis", "refactoring_analysis_complete_ready_for_implementation")
+    # The refactor expert may answer in its own structured format (RefactorAnalysisComplete), which the
+    # tool passes through unchanged instead of wrapping it in the workflow envelope.
+    REFACTOR_STRUCTURED_STATUS = "refactor_analysis_complete"
+    LINE_REFERENCE = re.compile(r"\blines?\s*\d+|\bL\d+\b|\bstart_line\b", re.IGNORECASE)
+
+    def _expert_analysis_text(self, content: str, allowed_statuses: tuple[str, ...], label: str) -> str | None:
+        """Parse a workflow response, check its status, and return the expert analysis text.
+
+        Returns None (after logging the reason) when the response is not valid JSON, carries an
+        unexpected status, or has no expert analysis text to inspect.
+        """
+        try:
+            result = json.loads(content)
+        except json.JSONDecodeError:
+            self.logger.error(f"  ❌ {label} tool response is not valid JSON: {content[:200]}")
+            return None
+
+        status = result.get("status")
+        if status not in allowed_statuses:
+            self.logger.error(f"  ❌ {label} tool returned status {status!r}, expected one of {allowed_statuses}")
+            return None
+
+        expert = result.get("expert_analysis")
+        if not isinstance(expert, dict):
+            self.logger.error(f"  ❌ {label} tool response has no expert_analysis")
+            return None
+
+        text = expert.get("raw_analysis") or expert.get("analysis") or expert.get("content") or ""
+        if not isinstance(text, str) or not text.strip():
+            self.logger.error(f"  ❌ {label} tool expert analysis is empty: {expert}")
+            return None
+        return text
+
+    def _structured_refactor_payload(self, result: dict) -> dict | None:
+        """Return the expert's structured RefactorAnalysisComplete payload, wherever the server put it.
+
+        The real server answers with the workflow envelope (status "calling_expert_analysis") and nests
+        the expert's own JSON under "expert_analysis"; the payload can also be the whole response.
+        """
+        if result.get("status") == self.REFACTOR_STRUCTURED_STATUS:
+            return result
+        expert = result.get("expert_analysis")
+        if isinstance(expert, dict) and (
+            expert.get("status") == self.REFACTOR_STRUCTURED_STATUS
+            or isinstance(expert.get("refactor_opportunities"), list)
+        ):
+            return expert
+        return None
+
+    def _check_refactor_line_numbers(self, content: str, line_count: int) -> bool:
+        """Validate the refactor response in either of its two real shapes."""
+        try:
+            result = json.loads(content)
+        except json.JSONDecodeError:
+            self.logger.error(f"  ❌ Refactor tool response is not valid JSON: {content[:200]}")
+            return False
+
+        structured = self._structured_refactor_payload(result)
+        if structured is not None:
+            opportunities = structured.get("refactor_opportunities")
+            if not isinstance(opportunities, list):
+                self.logger.error("  ❌ Refactor tool response has no refactor_opportunities list")
+                return False
+            if not opportunities:
+                # A legitimate expert verdict on a tiny file, but nothing to verify line numbers against.
+                self.logger.info("  ℹ️ Refactor expert reported no opportunities; line numbers not exercised")
+                return True
+            for opportunity in opportunities:
+                start, end = opportunity.get("start_line"), opportunity.get("end_line")
+                if not (isinstance(start, int) and isinstance(end, int) and 1 <= start <= end <= line_count):
+                    self.logger.error(
+                        f"  ❌ Refactor opportunity has an invalid line range {start}-{end} (file has {line_count} lines)"
+                    )
+                    return False
+            self.logger.info(f"  ✅ Refactor tool returned {len(opportunities)} opportunities with valid line ranges")
+            return True
+
+        text = self._expert_analysis_text(content, self.REFACTOR_STATUSES, "Refactor")
+        if text is None:
+            return False
+        if not self.LINE_REFERENCE.search(text):
+            self.logger.error(f"  ❌ Refactor tool response contained no line number references: {text[:200]}")
+            return False
+        self.logger.info("  ✅ Refactor tool provided line number references")
+        return True
 
     def run_test(self) -> bool:
         """Test line number handling in different tools"""
@@ -52,6 +142,7 @@ def validate_data(data):
     return True  # Line 22
 '''
 
+            line_count = len(test_file_content.splitlines())
             test_file_path = os.path.join(self.test_dir, "line_test.py")
             with open(test_file_path, "w") as f:
                 f.write(test_file_content)
@@ -79,67 +170,59 @@ def validate_data(data):
                 self.logger.error("  ❌ Chat tool request failed")
                 return False
 
-            # Test 2: Analyze tool with line number reference
+            # Test 2: Analyze tool with line number reference (single-step workflow call)
             self.logger.info("  1.2: Testing analyze tool with line number analysis")
             content, continuation_id = self.call_mcp_tool(
                 "analyze",
                 {
-                    "prompt": "What happens between lines 7-11 in this code? Focus on the loop logic.",
-                    "absolute_file_paths": [test_file_path],
+                    "step": "What happens between lines 7-11 in this code? Focus on the loop logic.",
+                    "step_number": 1,
+                    "total_steps": 1,
+                    "next_step_required": False,
+                    "findings": "Starting analysis of the loop between lines 7 and 11",
+                    "relevant_files": [test_file_path],
                     "model": "flash",
                 },
             )
 
-            if content:
-                # Check if the response references the loop
-                if any(term in content.lower() for term in ["loop", "iterate", "line 7", "lines 7"]):
-                    self.logger.info("  ✅ Analyze tool correctly analyzed the specified line range")
-                else:
-                    self.logger.warning("  ⚠️ Analyze tool response unclear about line range")
-            else:
+            if not content:
                 self.logger.error("  ❌ Analyze tool request failed")
                 return False
 
-            # Test 3: Refactor tool with line number precision
+            analysis_text = self._expert_analysis_text(content, self.ANALYZE_STATUSES, "Analyze")
+            if analysis_text is None:
+                return False
+            if not (self.LINE_REFERENCE.search(analysis_text) or "loop" in analysis_text.lower()):
+                self.logger.error(
+                    f"  ❌ Analyze tool response did not reference lines or the loop: {analysis_text[:200]}"
+                )
+                return False
+            self.logger.info("  ✅ Analyze tool correctly analyzed the specified line range")
+
+            # Test 3: Refactor tool with line number precision (single-step workflow call)
             self.logger.info("  1.3: Testing refactor tool line number precision")
             content, continuation_id = self.call_mcp_tool(
                 "refactor",
                 {
-                    "prompt": "Analyze this code for refactoring opportunities",
-                    "absolute_file_paths": [test_file_path],
+                    "step": "Analyze this code for refactoring opportunities and cite the line numbers involved",
+                    "step_number": 1,
+                    "total_steps": 1,
+                    "next_step_required": False,
+                    "findings": (
+                        "Starting refactoring analysis of line_test.py. Candidate smells: the hard-coded tax_rate "
+                        "magic number on line 5, the missing type hints, and the manual accumulation loop on lines 7-9."
+                    ),
+                    "relevant_files": [test_file_path],
                     "refactor_type": "codesmells",
                     "model": "flash",
                 },
             )
 
-            if content:
-                try:
-                    # Parse the JSON response
-                    result = json.loads(content)
-                    if result.get("status") == "refactor_analysis_complete":
-                        opportunities = result.get("refactor_opportunities", [])
-                        if opportunities:
-                            # Check if line numbers are precise
-                            has_line_refs = any(
-                                opp.get("start_line") is not None and opp.get("end_line") is not None
-                                for opp in opportunities
-                            )
-                            if has_line_refs:
-                                self.logger.info("  ✅ Refactor tool provided precise line number references")
-                                # Log some examples
-                                for opp in opportunities[:2]:
-                                    if opp.get("start_line"):
-                                        self.logger.info(
-                                            f"    - Issue at lines {opp['start_line']}-{opp['end_line']}: {opp.get('issue', '')[:50]}..."
-                                        )
-                            else:
-                                self.logger.warning("  ⚠️ Refactor tool response missing line numbers")
-                        else:
-                            self.logger.info("  ℹ️ No refactoring opportunities found (code might be too clean)")
-                except json.JSONDecodeError:
-                    self.logger.warning("  ⚠️ Refactor tool response not valid JSON")
-            else:
+            if not content:
                 self.logger.error("  ❌ Refactor tool request failed")
+                return False
+
+            if not self._check_refactor_line_numbers(content, line_count):
                 return False
 
             # Test 4: Validate log patterns

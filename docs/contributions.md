@@ -42,7 +42,9 @@ This script automatically runs:
 - Ruff linting with auto-fix
 - Black code formatting
 - Import sorting with isort
-- Complete unit test suite (361 tests)
+- Mypy type checking on the strict allowlist
+- README mockup drift check (regenerates docs/assets/mockups from docs/mockup-scenes and diffs)
+- Complete unit test suite (excluding integration tests) with a 44% coverage floor
 - Verification that all checks pass 100%
 
 **Manual commands** (if you prefer to run individually):

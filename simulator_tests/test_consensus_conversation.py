@@ -80,8 +80,8 @@ class TestConsensusConversation(ConversationBaseTest):
                 {
                     "step": "Based on our previous discussion about authentication, I need expert consensus: Should we implement OAuth2 or stick with simple session-based auth?",
                     "step_number": 1,
-                    "total_steps": 2,
-                    "next_step_required": True,
+                    "total_steps": 1,
+                    "next_step_required": False,
                     "findings": "Initial analysis needed on OAuth2 vs session-based authentication approaches for our web application",
                     "models": [
                         {
@@ -119,8 +119,8 @@ class TestConsensusConversation(ConversationBaseTest):
                 self.logger.error(f"Failed to parse consensus response as JSON. Full response: {consensus_response}")
                 return False
 
-            # Check for step 1 status (Claude analysis + first model consultation)
-            expected_status = "analysis_and_first_model_consulted"
+            # Concurrent dispatch consults every model inside step 1, so the response is already final
+            expected_status = "consensus_workflow_complete"
             if consensus_data.get("status") != expected_status:
                 self.logger.error(
                     f"Consensus step 1 failed with status: {consensus_data.get('status')}, expected: {expected_status}"
@@ -180,29 +180,33 @@ class TestConsensusConversation(ConversationBaseTest):
             # Phase 4: Verify response structure
             self.logger.info("Phase 4: Verifying consensus response structure")
 
-            # Check that we have model response from step 1
-            model_response = consensus_data.get("model_response")
-            if not model_response:
-                self.logger.error("Consensus step 1 response missing model_response")
+            # Check that both consulted models answered, in the order they were listed
+            accumulated = consensus_data.get("accumulated_responses")
+            if not isinstance(accumulated, list) or len(accumulated) != 2:
+                self.logger.error(f"Expected 2 accumulated responses, got: {accumulated}")
                 return False
 
-            # Check that model response has expected structure
-            if not model_response.get("model") or not model_response.get("verdict"):
-                self.logger.error("Model response missing required fields (model or verdict)")
-                return False
+            for index, expected_stance in enumerate(["for", "against"]):
+                entry = accumulated[index]
+                if not entry.get("model") or not entry.get("verdict"):
+                    self.logger.error("Model response missing required fields (model or verdict)")
+                    return False
+                if entry.get("stance") != expected_stance:
+                    self.logger.error(f"Response {index + 1} should have stance {expected_stance}: {entry}")
+                    return False
+                self.logger.info(
+                    f"Consensus consulted model: {entry.get('model')} "
+                    f"(stance {entry.get('stance')}, status {entry.get('status', 'unknown')})"
+                )
 
             # Check step information
             if consensus_data.get("step_number") != 1:
                 self.logger.error(f"Expected step_number 1, got: {consensus_data.get('step_number')}")
                 return False
 
-            if not consensus_data.get("next_step_required"):
-                self.logger.error("Expected next_step_required=True for step 1")
+            if not consensus_data.get("consensus_complete"):
+                self.logger.error("Expected consensus_complete=True after step 1")
                 return False
-
-            self.logger.info(f"Consensus step 1 consulted model: {model_response.get('model')}")
-            self.logger.info(f"Model stance: {model_response.get('stance', 'neutral')}")
-            self.logger.info(f"Response status: {model_response.get('status', 'unknown')}")
 
             # Phase 5: Cross-tool continuation test
             self.logger.info("Phase 5: Testing cross-tool continuation from consensus")

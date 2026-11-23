@@ -1,7 +1,7 @@
 """
 Test suite for conversation memory system
 
-Tests the Redis-based conversation persistence needed for AI-to-AI multi-turn
+Tests the in-memory conversation persistence needed for AI-to-AI multi-turn
 discussions in stateless MCP environments.
 """
 
@@ -37,7 +37,7 @@ class TestConversationMemory:
         assert thread_id is not None
         assert len(thread_id) == 36  # UUID4 length
 
-        # Verify Redis was called
+        # Verify storage was called
         mock_client.setex.assert_called_once()
         call_args = mock_client.setex.call_args
         assert call_args[0][0] == f"thread:{thread_id}"  # key
@@ -107,7 +107,7 @@ class TestConversationMemory:
         success = add_turn(test_uuid, "user", "Hello there")
 
         assert success is True
-        # Verify Redis get and setex were called
+        # Verify storage get and setex were called
         mock_client.get.assert_called_once()
         mock_client.setex.assert_called_once()
 
@@ -268,7 +268,7 @@ class TestConversationFlow:
         assert success is True
 
         # REQUEST 2: User responds to follow-up (independent request cycle)
-        # Simulate retrieving updated context from Redis
+        # Simulate retrieving updated context from the conversation store
         context_after_1 = ThreadContext(
             thread_id=thread_id,
             created_at="2023-01-01T00:00:00Z",
@@ -665,7 +665,7 @@ class TestConversationFlow:
 
     @patch("utils.conversation_store.get_storage")
     def test_stateless_request_isolation(self, mock_storage):
-        """Test that each request cycle is independent but shares context via Redis"""
+        """Test that each request cycle is independent but shares context via the conversation store"""
         mock_client = Mock()
         mock_storage.return_value = mock_client
 
@@ -687,7 +687,7 @@ class TestConversationFlow:
         assert success is True
 
         # Process 2: Different "request cycle" accesses same thread
-        context_from_redis = ThreadContext(
+        context_from_store = ThreadContext(
             thread_id=thread_id,
             created_at="2023-01-01T00:00:00Z",
             last_updated_at="2023-01-01T00:01:00Z",
@@ -701,7 +701,7 @@ class TestConversationFlow:
             ],
             initial_context={"prompt": "Think about architecture"},
         )
-        mock_client.get.return_value = context_from_redis.model_dump_json()
+        mock_client.get.return_value = context_from_store.model_dump_json()
 
         # Verify context continuity across "processes"
         retrieved_context = get_thread(thread_id)

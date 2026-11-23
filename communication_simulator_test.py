@@ -26,7 +26,6 @@ Available tests:
     cross_tool_continuation     - Cross-tool conversation continuation scenarios
     cross_tool_comprehensive    - Comprehensive cross-tool integration testing
     line_number_validation      - Line number handling validation across tools
-    memory_validation           - Conversation memory validation
     model_thinking_config       - Model thinking configuration testing
     o3_model_selection          - O3 model selection and routing testing
     ollama_custom_url           - Ollama custom URL configuration testing
@@ -43,7 +42,7 @@ Quick Test Mode (for time-limited testing):
     - cross_tool_continuation (cross-tool conversation memory)
     - basic_conversation (basic chat functionality)
     - content_validation (content validation and deduplication)
-    - model_thinking_config (flash/flashlite model testing)
+    - model_thinking_config (pro/flash thinking configuration testing)
     - o3_model_selection (o3 model selection testing)
     - per_tool_deduplication (file deduplication for individual tools)
 
@@ -113,7 +112,7 @@ class CommunicationSimulator:
             "cross_tool_continuation",  # Cross-tool conversation memory
             "basic_conversation",  # Basic chat functionality
             "content_validation",  # Content validation and deduplication
-            "model_thinking_config",  # Flash/flashlite model testing
+            "model_thinking_config",  # Pro/Flash thinking configuration testing
             "o3_model_selection",  # O3 model selection testing
             "per_tool_deduplication",  # File deduplication for individual tools
         ]

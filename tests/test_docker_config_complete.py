@@ -52,7 +52,7 @@ class TestDockerMCPConfiguration:
                 assert f"{var}=" in content, f"Variable {var} missing"
 
             # Docker-specific variables should also be present
-            docker_vars = ["COMPOSE_PROJECT_NAME", "TZ", "LOG_MAX_SIZE"]
+            docker_vars = ["COMPOSE_PROJECT_NAME", "TZ"]
             for var in docker_vars:
                 assert f"{var}=" in content, f"Docker variable {var} missing"
 
@@ -233,6 +233,68 @@ class TestErrorHandling:
             assert error_message_clear, "Clear Docker error message"
 
         simulate_docker_unavailable()
+
+
+class TestDockerBatchAndEnvConsistency:
+    """Batch store, forwarded environment and log-rotation settings stay consistent."""
+
+    PROJECT_ROOT = Path(__file__).parent.parent
+    # Variables .env.example documents that the container must be able to receive.
+    FORWARDED_PREFIXES = ("BATCH_", "OPENROUTER_BATCH_", "STORAGE_", "CLINK_", "CIRCUIT_")
+
+    def _compose(self):
+        import yaml
+
+        return yaml.safe_load((self.PROJECT_ROOT / "docker-compose.yml").read_text())
+
+    def _compose_env_names(self):
+        env = self._compose()["services"]["unison-mcp"]["environment"]
+        return {entry.split("=", 1)[0] for entry in env}
+
+    def test_compose_mounts_declared_data_volume(self):
+        compose = self._compose()
+        service = compose["services"]["unison-mcp"]
+        assert "unison-mcp-data:/app/.unison" in service["volumes"]
+        assert "unison-mcp-data" in compose["volumes"]
+
+    def test_compose_defaults_batch_store_into_the_volume(self):
+        env = self._compose()["services"]["unison-mcp"]["environment"]
+        assert "BATCH_STORE_PATH=${BATCH_STORE_PATH:-/app/.unison/batches.db}" in env
+
+    def test_dockerfile_creates_writable_data_dir_for_runtime_user(self):
+        lines = (self.PROJECT_ROOT / "Dockerfile").read_text().splitlines()
+        command = "RUN mkdir -p .unison && chown -R unisonuser:unisonuser .unison"
+        assert command in lines
+        mkdir_index = lines.index(command)
+        user_index = next(i for i, line in enumerate(lines) if line.startswith("USER "))
+        assert mkdir_index < user_index
+
+    def test_compose_forwards_every_documented_runtime_variable(self):
+        """Every batch/storage/clink/circuit variable .env.example documents reaches the container."""
+        import re
+
+        documented = set()
+        for line in (self.PROJECT_ROOT / ".env.example").read_text().splitlines():
+            match = re.match(r"^#?\s*([A-Z][A-Z0-9_]+)=", line)
+            if match and match.group(1).startswith(self.FORWARDED_PREFIXES):
+                documented.add(match.group(1))
+        assert documented, "expected .env.example to document batch/storage/clink/circuit variables"
+        missing = documented - self._compose_env_names()
+        assert not missing, f"docker-compose.yml does not forward: {sorted(missing)}"
+
+    def test_log_rotation_variables_are_not_advertised(self):
+        """Rotation is fixed in utils/logging_setup.py; no file may offer knobs that do nothing."""
+        for name in (".env.example", "docker-compose.yml", "run-server.ps1", "docs/docker-deployment.md"):
+            text = (self.PROJECT_ROOT / name).read_text()
+            assert "LOG_MAX_SIZE" not in text, name
+            assert "LOG_BACKUP_COUNT" not in text, name
+
+    def test_conversation_limits_are_commented_out_in_env_example(self):
+        """A fresh install gets the code defaults (3 hours, 50 turns), not example-file values."""
+        lines = (self.PROJECT_ROOT / ".env.example").read_text().splitlines()
+        for name in ("CONVERSATION_TIMEOUT_HOURS", "MAX_CONVERSATION_TURNS"):
+            assert not any(line.startswith(f"{name}=") for line in lines), f"{name} must stay commented out"
+            assert any(line.startswith(f"# {name}=") for line in lines)
 
 
 if __name__ == "__main__":

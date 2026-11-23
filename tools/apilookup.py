@@ -76,7 +76,8 @@ class LookupTool(SimpleTool):
     def get_description(self) -> str:
         return (
             "Use this tool automatically when you need current API/SDK documentation, latest version info, breaking changes, deprecations, migration guides, or official release notes. "
-            "This tool searches authoritative sources (official docs, GitHub, package registries) to ensure up-to-date accuracy."
+            "It does not search itself: it returns instructions that make you research authoritative sources (official docs, "
+            "GitHub, package registries) with your own web search tool, in a separate sub-task, to ensure up-to-date accuracy."
         )
 
     def get_system_prompt(self) -> str:

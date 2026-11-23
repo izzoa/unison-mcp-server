@@ -7,7 +7,7 @@ This guide walks you through setting up the Unison MCP Server from scratch, incl
 - **Python 3.10+** (3.12 recommended)
 - **Git**
 - **[uv installed](https://docs.astral.sh/uv/getting-started/installation/)** (for uvx method)
-- **Windows users**: WSL2 required for Claude Code CLI
+- **Windows users**: run `run-server.ps1` (PowerShell 7+); WSL is not required to run this server (see the [WSL Setup Guide](wsl-setup.md) if you prefer a Linux environment)
 
 ## Step 1: Get API Keys
 
@@ -273,7 +273,7 @@ cd unison-mcp-server
 
 **After updates:** Always run `./run-server.sh` again after `git pull`.
 
-**Windows users**: See the [WSL Setup Guide](wsl-setup.md) for detailed WSL configuration.
+**Windows users**: `run-server.ps1` runs natively; the [WSL Setup Guide](wsl-setup.md) is optional.
 
 ## Step 3: Configure API Keys
 
@@ -362,7 +362,7 @@ Gemini uses a single `timeout` field per server inside `~/.gemini/settings.json`
 Versions 0.2.1 and newer currently ignore values above ~60 seconds for some transports due to a known regression; if you still see premature disconnects we recommend breaking work into smaller calls or watching the Gemini CLI release notes for the fix.
 
 **Important notes:**
-- ⭐ **No restart needed** - Changes take effect immediately 
+- ⭐ **Restart required** - restart your MCP client (or the server) after editing `.env` or the MCP `env` block; configuration is read once at startup
 - ⭐ If multiple APIs configured, native APIs take priority over OpenRouter
 - ⭐ Configure model aliases in [`conf/custom_models.json`](../conf/custom_models.json)
 
@@ -433,10 +433,10 @@ Versions 0.2.1 and newer currently ignore values above ~60 seconds for some tran
 
 ### Quick Tool Reference:
 
-**🤝 Collaboration**: `chat`, `thinkdeep`, `planner`, `consensus`
+**🤝 Collaboration**: `chat`, `clink`, `thinkdeep`, `planner`, `consensus`
 **🔍 Code Analysis**: `analyze`, `codereview`, `debug`, `precommit`  
 **⚒️ Development**: `refactor`, `testgen`, `secaudit`, `docgen`
-**🔧 Utilities**: `challenge`, `tracer`, `listmodels`, `version`
+**🔧 Utilities**: `challenge`, `apilookup`, `tracer`, `listmodels`, `version`
 
 👉 **[Complete Tools Reference](tools/)** with detailed examples and parameters
 

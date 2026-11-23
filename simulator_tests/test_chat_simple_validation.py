@@ -9,7 +9,7 @@ Comprehensive test for the new ChatSimple tool implementation that validates:
 - Image handling in conversations (chat with images)
 - Continuing conversations with files from previous turns (continued chats with files previously)
 - Temperature validation for different models
-- Image limit validation per model
+- Image validation (supports_images gate and the 5-image per-call cap)
 - Conversation context preservation across turns
 """
 
@@ -21,7 +21,7 @@ class ChatSimpleValidationTest(ConversationBaseTest):
 
     @property
     def test_name(self) -> str:
-        return "_validation"
+        return "chat_validation"
 
     @property
     def test_description(self) -> str:
@@ -199,7 +199,8 @@ class ChatSimpleValidationTest(ConversationBaseTest):
             self.cleanup_test_files()
 
     def test_temperature_validation_edge_cases(self) -> bool:
-        """Test temperature is corrected for model limits (too high/low)"""
+        """Test temperatures within the tool bound (0.0-2.0, MAX_TEMPERATURE) are accepted (and clamped per model by the
+        published limits), and values above 2.0 are rejected by validation"""
         try:
             self.logger.info("  4. Test temperature validation edge cases")
 
@@ -207,9 +208,9 @@ class ChatSimpleValidationTest(ConversationBaseTest):
             response1, _ = self.call_mcp_tool_direct(
                 "chat",
                 {
-                    "prompt": "Please use low thinking mode. Hello, this is a test with max temperature",
+                    "prompt": "Please use low thinking mode. Hello, this is a test with a high temperature",
                     "model": "flash",
-                    "temperature": 1.0,  # At the limit
+                    "temperature": 1.0,  # Within the tool bound (0.0-2.0)
                     "thinking_mode": "low",
                 },
             )
@@ -233,10 +234,9 @@ class ChatSimpleValidationTest(ConversationBaseTest):
                 self.logger.error("    ❌ Failed with temperature 0.0")
                 return False
 
-            # Test 3: Check that temperatures above the widest range any model accepts (2.0) are rejected by
-            # validation. (Until D13 the bound was 1.0; 1.5 is now accepted and clamped per model, and Gemini
-            # models take it as given.) The bound is the tool's own (Pydantic `le=2.0`, before any model is consulted), so this
-            # should result in an error response from the tool, not a crash. NOT re-run after the widening (Gemini billing)
+            # Test 3: Temperatures above the tool bound MAX_TEMPERATURE (2.0) are rejected by the tool's own
+            # Pydantic validation (le=MAX_TEMPERATURE) before any model is consulted, so this yields an error
+            # response, not a crash.
             try:
                 response3, _ = self.call_mcp_tool_direct(
                     "chat",
@@ -277,7 +277,7 @@ class ChatSimpleValidationTest(ConversationBaseTest):
                 "chat",
                 {
                     "prompt": "Please use low thinking mode. Can you see this image?",
-                    "model": "local-llama",  # Text-only model
+                    "model": "mistral-large",  # Text-only model (curated supports_images=false); rejected before any API call
                     "images": [small_image],
                     "thinking_mode": "low",
                 },
@@ -288,13 +288,13 @@ class ChatSimpleValidationTest(ConversationBaseTest):
                 self.logger.warning("    ⚠️  Model without image support didn't reject images properly")
 
             # Test 2: Too many images for a model
-            many_images = [small_image] * 25  # Most models support max 20
+            many_images = [small_image] * 25  # More than the 5-image per-call cap (tools/shared/file_processor.py)
 
             response2, _ = self.call_mcp_tool_direct(
                 "chat",
                 {
                     "prompt": "Please use low thinking mode. Analyze these images",
-                    "model": "gemini-2.5-flash",  # Supports max 16 images
+                    "model": "flash",  # Vision-capable; the per-call image cap (5) is enforced before any API call
                     "images": many_images,
                     "thinking_mode": "low",
                 },
@@ -309,7 +309,7 @@ class ChatSimpleValidationTest(ConversationBaseTest):
                 "chat",
                 {
                     "prompt": "Please use low thinking mode. This is a test with one image",
-                    "model": "gemini-2.5-flash",
+                    "model": "flash",
                     "images": [small_image],
                     "thinking_mode": "low",
                 },
@@ -387,7 +387,7 @@ class ChatSimpleValidationTest(ConversationBaseTest):
                 {
                     "prompt": "Please use low thinking mode. I'm sharing an image with you. Can you acknowledge that you received it?",
                     "images": [small_image],
-                    "model": "gemini-2.5-flash",  # Model that supports images
+                    "model": "flash",  # Model that supports images
                     "thinking_mode": "low",
                 },
             )
@@ -406,7 +406,7 @@ class ChatSimpleValidationTest(ConversationBaseTest):
                 {
                     "prompt": "Please use low thinking mode. What did you see in that image I shared earlier?",
                     "continuation_id": continuation_id,
-                    "model": "gemini-2.5-flash",
+                    "model": "flash",
                     "thinking_mode": "low",
                 },
             )
@@ -422,7 +422,7 @@ class ChatSimpleValidationTest(ConversationBaseTest):
                 {
                     "prompt": "Please use low thinking mode. Here are two images for comparison",
                     "images": multiple_images,
-                    "model": "gemini-2.5-flash",
+                    "model": "flash",
                     "thinking_mode": "low",
                 },
             )

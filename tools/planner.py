@@ -210,6 +210,7 @@ class PlannerTool(WorkflowTool):
             "issues_found",  # Planning doesn't find issues
             "confidence",  # Planning uses different confidence model
             "hypothesis",  # Planning doesn't use hypothesis
+            "use_assistant_model",  # Planning is self-contained and never calls an assistant model
         ]
 
         excluded_common_fields = [
@@ -219,15 +220,18 @@ class PlannerTool(WorkflowTool):
             "absolute_file_paths",  # Planning doesn't use file attachments
         ]
 
-        # Build schema with proper field exclusion (following consensus pattern)
+        # Planner never calls a model (requires_model() is False), so `model` is neither published nor
+        # required in auto mode (following the consensus pattern).
+        requires_model = self.requires_model()
         return WorkflowSchemaBuilder.build_schema(
             tool_specific_fields=planner_field_overrides,
             required_fields=[],  # No additional required fields beyond workflow defaults
-            model_field_schema=self.get_model_field_schema(),
-            auto_mode=self.is_effective_auto_mode(),
+            model_field_schema=self.get_model_field_schema() if requires_model else None,
+            auto_mode=self.is_effective_auto_mode() if requires_model else False,
             tool_name=self.get_name(),
             excluded_workflow_fields=excluded_workflow_fields,
             excluded_common_fields=excluded_common_fields,
+            require_model=requires_model,
         )
 
     # ================================================================================

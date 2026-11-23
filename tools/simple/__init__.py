@@ -7,10 +7,9 @@ for tools that don't need multi-step workflows.
 
 Available simple tools:
 - chat: General chat and collaborative thinking
-- consensus: Multi-perspective analysis
-- listmodels: Model listing and information
-- testgen: Test generation
-- tracer: Execution tracing
+- challenge: Critical-thinking wrapper for pushback on a statement
+- apilookup: Current API and SDK documentation lookup
+- clink: Bridge requests to configured external AI CLIs
 """
 
 from .base import SimpleTool

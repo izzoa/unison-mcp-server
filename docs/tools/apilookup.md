@@ -1,7 +1,7 @@
 # API Lookup Tool
 
 The `apilookup` tool ensures you get **current, accurate API/SDK documentation** by forcing the AI to search for the latest information rather than relying on outdated training data. This is especially critical for OS-tied APIs (iOS, macOS, Android, etc.) where the AI's knowledge cutoff may be months or years old.
-Most importantly, it does this within in a sub-process / sub-agent, saving you precious tokens within your working context window. 
+Most importantly, it works by instructing the AI to run the web research in a separate sub-task / sub-agent, keeping the research out of your working context window (the tool itself performs no search and calls no model).
 
 ## Why Use This Tool?
 

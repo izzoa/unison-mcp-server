@@ -276,19 +276,29 @@ class ModelSchemaBuilder:
         return summaries, len(filtered), bool(allowed_map)
 
     def _get_restriction_note(self) -> str | None:
-        """Return a string describing active per-provider allowlists, if any."""
-        from utils.env import get_env
+        """Return a string describing active per-provider allowlists, if any.
 
-        env_labels = {
-            "OPENAI_ALLOWED_MODELS": "OpenAI",
-            "GOOGLE_ALLOWED_MODELS": "Google",
-            "XAI_ALLOWED_MODELS": "X.AI",
-            "OPENROUTER_ALLOWED_MODELS": "OpenRouter",
-            "DIAL_ALLOWED_MODELS": "DIAL",
+        The set of providers comes from ``ModelRestrictionService.ENV_VARS`` so a provider whose
+        allow-list is enforced can never be missing from the note. Only the display label is
+        kept here; a provider without a label falls back to ``provider_type.value``.
+        """
+        from providers.shared import ProviderType
+        from utils.env import get_env
+        from utils.model_restrictions import ModelRestrictionService
+
+        provider_labels = {
+            ProviderType.OPENAI: "OpenAI",
+            ProviderType.ANTHROPIC: "Anthropic",
+            ProviderType.GOOGLE: "Google",
+            ProviderType.XAI: "X.AI",
+            ProviderType.OPENROUTER: "OpenRouter",
+            ProviderType.DIAL: "DIAL",
+            ProviderType.CUSTOM: "Custom",
+            ProviderType.AZURE: "Azure OpenAI",
         }
 
         notes: list[str] = []
-        for env_var, label in env_labels.items():
+        for provider_type, env_var in ModelRestrictionService.ENV_VARS.items():
             raw = get_env(env_var)
             if not raw:
                 continue
@@ -297,6 +307,7 @@ class ModelSchemaBuilder:
             if not models:
                 continue
 
+            label = provider_labels.get(provider_type, provider_type.value)
             notes.append(f"{label}: {', '.join(models)}")
 
         if not notes:

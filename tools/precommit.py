@@ -38,11 +38,11 @@ PRECOMMIT_WORKFLOW_FIELD_DESCRIPTIONS = {
     ),
     "step_number": "Current pre-commit step number (starts at 1).",
     "total_steps": (
-        "Planned number of validation steps. External validation: use at most three (analysis → follow-ups → summary). Internal validation: a single step. Honour these limits when resuming via continuation_id."
+        "Planned number of validation steps. External validation: three steps are recommended (analysis → follow-ups → summary). Internal validation: a single step is enough. The same guidance applies when resuming via continuation_id."
     ),
     "next_step_required": (
         "True to continue with another step, False when validation is complete. "
-        "CRITICAL: If total_steps>=3 or when `precommit_type = external`, set to True until the final step. "
+        "Guidance: if total_steps>=3 or when `precommit_type = external`, keep this True until the final step; the tool replies with corrective guidance if you stop early. "
         "When continuation_id is provided: Follow the same validation rules based on precommit_type."
     ),
     "findings": "Record git diff insights, risks, missing tests, security concerns, and positives; update previous notes as you go.",
@@ -56,7 +56,6 @@ PRECOMMIT_WORKFLOW_FIELD_DESCRIPTIONS = {
     "compare_to": "Optional git ref (branch/tag/commit) to diff against; falls back to staged/unstaged changes.",
     "include_staged": "Whether to inspect staged changes (ignored when `compare_to` is set).",
     "include_unstaged": "Whether to inspect unstaged changes (ignored when `compare_to` is set).",
-    "focus_on": "Optional emphasis areas such as security, performance, or test coverage.",
     "severity_filter": "Lowest severity to include when reporting issues.",
 }
 
@@ -97,12 +96,14 @@ class PrecommitRequest(WorkflowRequest):
     compare_to: str | None = Field(None, description=PRECOMMIT_WORKFLOW_FIELD_DESCRIPTIONS["compare_to"])
     include_staged: bool | None = Field(True, description=PRECOMMIT_WORKFLOW_FIELD_DESCRIPTIONS["include_staged"])
     include_unstaged: bool | None = Field(True, description=PRECOMMIT_WORKFLOW_FIELD_DESCRIPTIONS["include_unstaged"])
-    focus_on: str | None = Field(None, description=PRECOMMIT_WORKFLOW_FIELD_DESCRIPTIONS["focus_on"])
     severity_filter: Literal["critical", "high", "medium", "low", "all"] | None = Field(
         "all", description=PRECOMMIT_WORKFLOW_FIELD_DESCRIPTIONS["severity_filter"]
     )
 
-    # Override inherited fields to exclude them from schema (except model which needs to be available)
+    # Redeclared with exclude=True, which only keeps them out of model_dump(). They are still published in the
+    # input schema (WorkflowSchemaBuilder adds the common fields) and are read for the expert-analysis call.
+    # This redeclaration drops the inherited 0..MAX_TEMPERATURE bound, so out-of-range values are accepted and
+    # then clamped by validate_and_correct_temperature.
     temperature: float | None = Field(default=None, exclude=True)
     thinking_mode: str | None = Field(default=None, exclude=True)
 
@@ -172,7 +173,7 @@ class PrecommitTool(WorkflowTool):
             },
             "total_steps": {
                 "type": "integer",
-                "minimum": 3,
+                "minimum": 1,
                 "description": PRECOMMIT_WORKFLOW_FIELD_DESCRIPTIONS["total_steps"],
             },
             "next_step_required": {
@@ -192,6 +193,11 @@ class PrecommitTool(WorkflowTool):
                 "type": "array",
                 "items": {"type": "string"},
                 "description": PRECOMMIT_WORKFLOW_FIELD_DESCRIPTIONS["relevant_files"],
+            },
+            "relevant_context": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": PRECOMMIT_WORKFLOW_FIELD_DESCRIPTIONS["relevant_context"],
             },
             "precommit_type": {
                 "type": "string",
@@ -228,10 +234,6 @@ class PrecommitTool(WorkflowTool):
                 "default": True,
                 "description": PRECOMMIT_WORKFLOW_FIELD_DESCRIPTIONS["include_unstaged"],
             },
-            "focus_on": {
-                "type": "string",
-                "description": PRECOMMIT_WORKFLOW_FIELD_DESCRIPTIONS["focus_on"],
-            },
             "severity_filter": {
                 "type": "string",
                 "enum": ["critical", "high", "medium", "low", "all"],
@@ -246,6 +248,9 @@ class PrecommitTool(WorkflowTool):
             model_field_schema=self.get_model_field_schema(),
             auto_mode=self.is_effective_auto_mode(),
             tool_name=self.get_name(),
+            # Never read: expert validation is driven by precommit_type, and prepare_step_data supplies fixed
+            # values for these two. The request model keeps them for the shared consolidation code.
+            excluded_workflow_fields=["confidence", "hypothesis"],
         )
 
     def get_required_actions(
@@ -276,7 +281,7 @@ class PrecommitTool(WorkflowTool):
 
         if step_number == 1:
             # Initial pre-commit investigation tasks
-            return [
+            actions = [
                 "Search for all git repositories in the specified path using appropriate tools",
                 "Check git status to identify staged, unstaged, and untracked changes as required",
                 "Execute git status to see all changes",
@@ -285,8 +290,16 @@ class PrecommitTool(WorkflowTool):
                 "List any relevant untracked files as well.",
                 "Understand what functionality was added, modified, or removed",
                 "Identify the scope and intent of the changes being committed",
-                "CRITICAL: You are on step 1 - you MUST set next_step_required=True and continue to at least step 3 minimum",
             ]
+            # The three-step flow is guidance for external validation (or when three or more steps were
+            # planned); an internal validation may be a single step, so it is not told to continue.
+            planned_steps = request.total_steps if request else 3
+            if self.get_precommit_type(request) == "external" or planned_steps >= 3:
+                actions.append(
+                    "GUIDANCE: You are on step 1 - set next_step_required=True and plan for about three steps "
+                    "(analysis, follow-ups, summary) before finishing"
+                )
+            return actions
         elif step_number == 2:
             # Need deeper investigation
             actions = [
@@ -300,7 +313,7 @@ class PrecommitTool(WorkflowTool):
             # Add step validation reminder
             if request and request.total_steps >= 3:
                 actions.append(
-                    f"CRITICAL: You are on step 2 of {request.total_steps} minimum steps - you MUST set next_step_required=True unless this is the final step"
+                    f"Reminder: you are on step 2 of {request.total_steps} planned steps - set next_step_required=True unless this is the final step"
                 )
 
             return actions
@@ -317,7 +330,7 @@ class PrecommitTool(WorkflowTool):
             # Add step validation reminder
             if request and request.total_steps >= 3 and step_number < request.total_steps:
                 actions.append(
-                    f"CRITICAL: You are on step {step_number} of {request.total_steps} minimum steps - set next_step_required=True to continue"
+                    f"Reminder: you are on step {step_number} of {request.total_steps} planned steps - set next_step_required=True to continue"
                 )
             elif request and request.total_steps >= 3 and step_number >= request.total_steps:
                 actions.append(
@@ -338,7 +351,7 @@ class PrecommitTool(WorkflowTool):
             if request and request.total_steps >= 3:
                 if step_number < request.total_steps:
                     actions.append(
-                        f"CRITICAL: You are on step {step_number} of {request.total_steps} minimum steps - set next_step_required=True to continue"
+                        f"Reminder: you are on step {step_number} of {request.total_steps} planned steps - set next_step_required=True to continue"
                     )
                 else:
                     actions.append(
@@ -519,6 +532,13 @@ class PrecommitTool(WorkflowTool):
         except AttributeError:
             return 0
 
+    def get_request_confidence(self, request) -> str:
+        """Precommit does not publish a confidence input, so its status block reports one fixed value.
+
+        analyze, codereview and precommit all report "medium" as current_confidence.
+        """
+        return "medium"
+
     def get_completion_message(self) -> str:
         """Precommit-specific completion message."""
         return (
@@ -639,7 +659,7 @@ class PrecommitTool(WorkflowTool):
                 )
 
         elif step_number == 2:
-            # CRITICAL: Check if violating minimum step requirement
+            # Check whether the caller is finishing before its own planned step count
             if (
                 request.total_steps >= 3
                 and request.step_number < request.total_steps
@@ -647,7 +667,7 @@ class PrecommitTool(WorkflowTool):
             ):
                 next_steps = (
                     f"ERROR: You set total_steps={request.total_steps} but next_step_required=False on step {request.step_number}. "
-                    f"This violates the minimum step requirement. You MUST set next_step_required=True until you reach the final step. "
+                    f"That finishes before the planned final step. Set next_step_required=True until you reach the final step. "
                     f"Call {self.get_name()} again with next_step_required=True and continue your investigation."
                 )
             elif is_external_continuation or (not request.next_step_required and request.precommit_type == "external"):
@@ -664,10 +684,10 @@ class PrecommitTool(WorkflowTool):
             else:
                 # Normal flow - deeper analysis needed
                 next_steps = (
-                    f"STOP! Do NOT call {self.get_name()} again yet. You are on step 2 of {request.total_steps} minimum required steps. "
+                    f"STOP! Do NOT call {self.get_name()} again yet. You are on step 2 of {request.total_steps} planned steps. "
                     f"MANDATORY ACTIONS before calling {self.get_name()} step {step_number + 1}:\\n"
                     + "\\n".join(f"{i+1}. {action}" for i, action in enumerate(required_actions))
-                    + f"\\n\\nRemember: You MUST set next_step_required=True until step {request.total_steps}. "
+                    + f"\\n\\nRemember: set next_step_required=True until step {request.total_steps}. "
                     + f"Only call {self.get_name()} again with step_number: {step_number + 1} AFTER completing these validations."
                 )
 
@@ -689,7 +709,7 @@ class PrecommitTool(WorkflowTool):
                     f"with step_number: {step_number + 1}."
                 )
         else:
-            # Fallback for any other case - check minimum step violation first
+            # Fallback for any other case - check for finishing before the planned step count first
             if (
                 request.total_steps >= 3
                 and request.step_number < request.total_steps
@@ -697,7 +717,7 @@ class PrecommitTool(WorkflowTool):
             ):
                 next_steps = (
                     f"ERROR: You set total_steps={request.total_steps} but next_step_required=False on step {request.step_number}. "
-                    f"This violates the minimum step requirement. You MUST set next_step_required=True until step {request.total_steps}."
+                    f"That finishes before the planned final step. Set next_step_required=True until step {request.total_steps}."
                 )
             elif not request.next_step_required and request.precommit_type == "external":
                 next_steps = (

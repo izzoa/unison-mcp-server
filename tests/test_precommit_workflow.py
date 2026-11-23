@@ -120,14 +120,12 @@ class TestPrecommitWorkflowTool:
             compare_to="main",
             include_staged=True,
             include_unstaged=False,
-            focus_on="security issues",
             severity_filter="high",
         )
 
         assert request.compare_to == "main"
         assert request.include_staged is True
         assert request.include_unstaged is False
-        assert request.focus_on == "security issues"
         assert request.severity_filter == "high"
 
     def test_precommit_type_validation(self):

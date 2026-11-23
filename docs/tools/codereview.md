@@ -6,7 +6,7 @@ The `codereview` tool provides professional code review capabilities with action
 
 ## Thinking Mode
 
-**Default is `medium` (8,192 tokens).** Use `high` for security-critical code (worth the extra tokens) or `low` for quick style checks (saves ~6k tokens).
+**Applies to the expert-analysis call; default is `high`.** Use `max` for security-critical code (worth the extra tokens) or `medium`/`low` for quick style checks (fewer thinking tokens).
 
 ## How the Workflow Works
 
@@ -15,11 +15,11 @@ The codereview tool implements a **structured workflow** that ensures thorough c
 **Investigation Phase (Claude-Led):**
 1. **Step 1**: Claude describes the review plan and begins systematic analysis of code structure
 2. **Step 2+**: Claude examines code quality, security implications, performance concerns, and architectural patterns
-3. **Throughout**: Claude tracks findings, relevant files, issues, and confidence levels
+3. **Throughout**: Claude tracks findings, relevant files, and issues
 4. **Completion**: Once review is comprehensive, Claude signals completion
 
 **Expert Analysis Phase:**
-After Claude completes the investigation (unless confidence is **certain**):
+After Claude completes the investigation (expert analysis runs unless `review_validation_type` is **internal** and the review is finished, or `use_assistant_model` is false):
 - Complete review summary with all findings and evidence
 - Relevant files and code patterns identified
 - Issues categorized by severity levels
@@ -65,7 +65,7 @@ The above prompt will simultaneously run two separate `codereview` tools with tw
 ## Tool Parameters
 
 **Workflow Investigation Parameters (used during step-by-step process):**
-- `step`: Current investigation step description (required for each step)
+- `step`: Current investigation step description (required for each step). In step 1 it carries the review strategy plus a summary of what the code does, expected behavior, constraints, and review objectives
 - `step_number`: Current step number in review sequence (required)
 - `total_steps`: Estimated total investigation steps (adjustable)
 - `next_step_required`: Whether another investigation step is needed
@@ -74,20 +74,21 @@ The above prompt will simultaneously run two separate `codereview` tools with tw
 - `relevant_files`: Files directly relevant to the review (required in step 1)
 - `relevant_context`: Methods/functions/classes central to review findings
 - `issues_found`: Issues identified with severity levels
-- `confidence`: Confidence level in review completeness (exploring/low/medium/high/certain)
 - `images`: Visual references for review context
 
 **Initial Review Configuration (used in step 1):**
-- `prompt`: User's summary of what the code does, expected behavior, constraints, and review objectives (required)
-- `model`: auto|pro|flash|flash-2.0|flashlite|o3|o3-mini|o4-mini|gpt4.1|gpt5.2|gpt5.1-codex|gpt5.1-codex-mini|gpt5|gpt5-mini|gpt5-nano|opus|sonnet|haiku|fable (default: server default)
+- `model`: auto|pro|flash|flash3|flashlite|o3|o3-mini|o4-mini|gpt4.1|gpt5.2|gpt5.1-codex|gpt5.1-codex-mini|gpt5|gpt5-mini|gpt5-nano|opus|sonnet|haiku|fable (default: server default)
 - `review_type`: full|security|performance|quick (default: full)
 - `focus_on`: Specific aspects to focus on (e.g., "security vulnerabilities", "performance bottlenecks")
 - `standards`: Coding standards to enforce (e.g., "PEP8", "ESLint", "Google Style Guide")
 - `severity_filter`: critical|high|medium|low|all (default: all)
-- `temperature`: Temperature for consistency (default 0.2). Accepted from 0 to 2; the selected model's published limit then applies (most models 0-1, OpenAI, Google and xAI up to 2) and a higher value is reduced to the model's maximum.
-- `thinking_mode`: minimal|low|medium|high|max (default: medium, Gemini only)
+- `review_validation_type`: external|internal (default: external); internal keeps the review local and skips the expert model once the final step is reached
+- `temperature`: Temperature for consistency (default 1.0). Accepted from 0 to 2; the selected model's own rule then applies (Gemini, xAI and some OpenAI models 0-2, older Claude 0-1; models that take only temperature 1 or none ignore or override it).
+- `thinking_mode`: minimal|low|medium|high|max (default: high; honored by Gemini and Anthropic models, ignored by providers without a thinking control)
 - `use_assistant_model`: Whether to use expert analysis phase (default: true, set to false to use Claude only)
 - `continuation_id`: Continue previous review discussions
+
+`codereview` takes no `confidence` input. Its `code_review_status` block always reports `current_confidence: "medium"` (the same fixed value for analyze, codereview and precommit), whatever the request sent; it does not measure how far the work has progressed.
 
 ## Review Types
 

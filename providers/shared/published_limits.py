@@ -6,8 +6,11 @@ Two limits of a model are checked against what is PUBLISHED about it, never only
   LiteLLM publishes for the model. On the BATCH path (``batch_resolution``) the OpenRouter listings (live ``:batch``,
   committed snapshot) are further sources; on the synchronous and streaming paths they are NOT (D17): the snapshot's
   figure is the ``:batch`` listing's and must not bound a request the plain listing would accept;
-* the **temperature range**: what LiteLLM publishes where it publishes anything, else the curated constraint,
-  else the labelled vendor fallback.
+* the **temperature range**, in this order: LiteLLM's boolean ``supports_sampling_params`` (false on an
+  Anthropic-family model means temperature 1 only); then an explicit curated constraint (fixed, discrete, none),
+  kept as is; then a curated RANGE narrowed (never widened) by the range of a vendor named in the labelled
+  fallback table. A vendor outside the table only fills a gap (a stand-in or derived capability) and never
+  narrows a reviewed range.
 
 What LiteLLM really publishes (researched 2026-11-22): per model it carries ``max_output_tokens`` (and the legacy
 ``max_tokens``), ``max_input_tokens`` and boolean ``supports_*`` flags. It carries **no numeric temperature range,
@@ -576,8 +579,8 @@ def bound_temperature(
     ):
         return {}, "curated"
     if vendor not in VENDOR_TEMPERATURE_RANGES and not getattr(capabilities, "_is_generic", False):
-        # D16 order: published range, else the curated constraint, else the vendor fallback. The "any other vendor
-        # 0..1" row is a guess, so it fills a gap (a stand-in capability or a derived entry) and never narrows a
+        # D16 order: LiteLLM sampling flag, then an explicit curated constraint, then a curated range intersected
+        # with the named vendor's fallback range. The "any other vendor 0..1" row is a guess, so it fills a gap (a stand-in capability or a derived entry) and never narrows a
         # range somebody reviewed.
         return {}, "curated"
 

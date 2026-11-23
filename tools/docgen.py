@@ -81,6 +81,10 @@ class DocgenRequest(WorkflowRequest):
         True, description=DOCGEN_FIELD_DESCRIPTIONS["comments_on_complex_logic"]
     )
 
+    # Docgen is self-contained (requires_expert_analysis() is False), so use_assistant_model is not published.
+    # Redeclared like PlannerRequest and TracerRequest so the internal default is also False.
+    use_assistant_model: bool | None = Field(default=False, exclude=True, description="Docgen is self-contained")
+
 
 class DocgenTool(WorkflowTool):
     """
@@ -197,7 +201,9 @@ class DocgenTool(WorkflowTool):
         excluded_workflow_fields = [
             "confidence",  # Documentation doesn't use confidence levels
             "hypothesis",  # Documentation doesn't use hypothesis
-            "files_checked",  # Documentation uses doc_files and doc_methods instead for better tracking
+            "issues_found",  # prepare_step_data records no issues for docgen
+            "use_assistant_model",  # Docgen never calls an assistant model
+            "files_checked",  # Docgen tracks progress with num_files_documented / total_files_to_document instead
         ]
 
         # Exclude common fields that documentation generation doesn't need
@@ -311,7 +317,7 @@ class DocgenTool(WorkflowTool):
                 + "\n".join(f"{i+1}. {action}" for i, action in enumerate(required_actions))
                 + f"\n\nCRITICAL: When you call {self.get_name()} step 2, set total_files_to_document to the exact count "
                 f"of files needing documentation and set num_files_documented to 0 (haven't started documenting yet). "
-                f"Your total_steps will be automatically calculated as 1 (discovery) + number of files to document. "
+                f"Set total_steps to 1 (discovery) + the number of files to document (the server echoes the value you send). "
                 f"Step 2 will BEGIN the documentation phase. Report the count clearly and then IMMEDIATELY "
                 f"proceed to call {self.get_name()} step 2 to start documenting the first file."
             )
@@ -394,7 +400,7 @@ class DocgenTool(WorkflowTool):
         """
         Prepare docgen-specific step data for processing.
 
-        Calculates total_steps dynamically based on number of files to document:
+        Records a calculated total_steps in work_history (the response echoes the caller's total_steps):
         - Step 1: Discovery phase
         - Steps 2+: One step per file to document
         """

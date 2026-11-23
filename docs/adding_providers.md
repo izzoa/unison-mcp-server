@@ -203,23 +203,18 @@ Add environment variable mapping in `providers/registry.py`:
     ProviderType.EXAMPLE: "EXAMPLE_API_KEY",
 ```
 
-Add to `server.py`:
+Register the provider in `providers/configure.py`. Inside `configure_providers()`, import your class alongside the others
+(`from providers.example import ExampleModelProvider`) and add a row to the `STANDARD_PROVIDERS` list:
 
-1. **Import your provider**:
 ```python
-from providers.example import ExampleModelProvider
+ProviderSpec("EXAMPLE_API_KEY", "Example", ProviderType.EXAMPLE, ExampleModelProvider),
 ```
 
-2. **Add to `configure_providers()` function**:
-```python
-# Check for Example API key
-example_key = os.getenv("EXAMPLE_API_KEY")
-if example_key:
-    ModelProviderRegistry.register_provider(ProviderType.EXAMPLE, ExampleModelProvider)
-    logger.info("Example API key found - Example models available")
-```
+The shared loop validates the key (placeholder values such as `your_example_api_key_here` are ignored) and registers the
+provider. `server.py` needs no change; it only calls `configure_providers(registry)`. (Azure, Custom and OpenRouter have
+their own special-case blocks in `configure_providers` instead of a `ProviderSpec` row; a standard provider does not need one.)
 
-3. **Add to provider priority** (edit `ModelProviderRegistry.PROVIDER_PRIORITY_ORDER` in `providers/registry.py`): insert your provider in the list at the appropriate point in the cascade of native → custom → catch-all providers.
+2. **Add to provider priority** (edit `ModelProviderRegistry.PROVIDER_PRIORITY_ORDER` in `providers/registry.py`): insert your provider in the list at the appropriate point in the cascade of native → custom → catch-all providers.
 
 ### 4. Environment Configuration
 
@@ -268,7 +263,7 @@ assert capabilities.provider == ProviderType.EXAMPLE
 
 ### Provider Priority
 When a user requests a model, providers are checked in priority order:
-1. **Native providers** (Gemini, OpenAI, Example) - handle their specific models
+1. **Native providers** (Gemini, OpenAI, Azure OpenAI, Anthropic, X.AI, DIAL, Example) - handle their specific models
 2. **Custom provider** - handles local/self-hosted models  
 3. **OpenRouter** - catch-all for everything else
 
@@ -301,7 +296,7 @@ needs additional alias handling beyond the shared behaviour.
 - [ ] Created provider class with all required methods
 - [ ] Added API key mapping in `providers/registry.py`
 - [ ] Added to provider priority order in `registry.py`
-- [ ] Imported and registered in `server.py`
+- [ ] Added a `ProviderSpec` row to `STANDARD_PROVIDERS` in `providers/configure.py`
 - [ ] Basic tests verify model validation and capabilities
 - [ ] Tested with real API calls
 

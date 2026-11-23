@@ -990,8 +990,6 @@ DIAL_API_KEY=your_dial_api_key_here
 # Server Configuration
 DEFAULT_MODEL=auto
 LOG_LEVEL=INFO
-LOG_MAX_SIZE=10MB
-LOG_BACKUP_COUNT=5
 DEFAULT_THINKING_MODE_THINKDEEP=high
 
 # Optional Advanced Settings
@@ -2559,8 +2557,6 @@ DIAL_API_KEY=your_dial_api_key_here
 # Server Configuration
 DEFAULT_MODEL=auto
 LOG_LEVEL=INFO
-LOG_MAX_SIZE=10MB
-LOG_BACKUP_COUNT=5
 DEFAULT_THINKING_MODE_THINKDEEP=high
 
 # Optional Advanced Settings

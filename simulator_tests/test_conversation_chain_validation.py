@@ -7,7 +7,7 @@ This test validates that:
 2. New conversations can be started independently
 3. Original conversation chains can be resumed from any point
 4. History traversal works correctly for all scenarios
-5. Thread relationships are properly maintained in Redis
+5. Thread relationships are properly maintained in the conversation store
 
 Test Flow:
 Chain A: chat -> analyze -> debug (3 linked threads)

@@ -353,12 +353,12 @@ class ModelProvider(ABC):
             model_name: Canonical model name or its alias that the provider supports
             system_prompt: Optional system instructions to prepend to the prompt for
                           establishing context, behavior, or role
-            temperature: Controls randomness in generation (0.0=deterministic, 1.0=creative),
-                        default 0.3. Some models may not support temperature control
+            temperature: Sampling randomness (0.0 = most deterministic; the tools accept up to 2.0 and each model's
+                        own rule then applies), default 0.3. Some models may not support temperature control
             max_output_tokens: Optional maximum number of tokens to generate in the response.
                               If not specified, uses the model's default limit
             **kwargs: Additional provider-specific parameters that vary by implementation
-                     (e.g., thinking_mode for Gemini, top_p for OpenAI, images for vision models)
+                     (e.g., thinking_mode for Gemini and Anthropic, top_p for OpenAI, images for vision models)
 
         Returns:
             ModelResponse: Standardized response object containing:
@@ -526,7 +526,7 @@ class ModelProvider(ABC):
             prompt: The main user prompt/query to send to the model.
             model_name: Canonical model name or alias.
             system_prompt: Optional system instructions.
-            temperature: Sampling temperature (0.0–1.0), default 0.3.
+            temperature: Sampling temperature (tools accept 0.0-2.0; each model's own rule then applies), default 0.3.
             max_output_tokens: Optional cap on generated tokens.
             **kwargs: Additional provider-specific parameters.
 

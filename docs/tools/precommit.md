@@ -6,7 +6,7 @@ The `precommit` tool provides thorough validation of git changes before committi
 
 ## Thinking Mode
 
-**Default is `medium` (8,192 tokens).** Use `high` or `max` for critical releases when thorough validation justifies the token cost.
+**Applies to the expert-validation call; default is `high`.** Use `max` for critical releases when thorough validation justifies the token cost, or `medium`/`low` to save tokens on routine changes.
 
 ## How the Workflow Works
 
@@ -15,11 +15,11 @@ The precommit tool implements a **structured workflow** for comprehensive change
 **Investigation Phase (Claude-Led):**
 1. **Step 1**: Claude states validation strategy using direct statements ("I will examine..." not "Let me examine...")
 2. **Step 2**: Claude examines changes, diffs, dependencies with MANDATORY deeper investigation
-3. **Step 3+**: Claude performs final verification (minimum 3 steps enforced)
+3. **Step 3+**: Claude performs final verification (external validation is guided through three steps)
 4. **Throughout**: Claude tracks findings, relevant files, and issues with CRITICAL step validation
-5. **Completion**: Only after minimum steps, Claude signals completion and creates changeset file
+5. **Completion**: Once the planned steps are done, Claude signals completion and creates changeset file
 
-**For Continuations**: When using `continuation_id` with external validation, Claude will immediately gather git changes and proceed to expert analysis without minimum step requirements.
+**For Continuations**: When using `continuation_id` with external validation, Claude will immediately gather git changes and proceed to expert analysis without the three-step flow.
 
 **Expert Validation Phase:**
 After Claude completes the investigation (unless precommit_type is **internal**):
@@ -31,7 +31,7 @@ After Claude completes the investigation (unless precommit_type is **internal**)
 **Special Notes**: 
 - Default validation type is **external** (uses expert model for additional review)
 - To skip expert validation, explicitly request "don't use any other model" or set precommit_type to "internal"
-- **CRITICAL**: Minimum 3 steps are enforced - tool will prevent setting `next_step_required=false` before final step
+- **Guidance, not a hard limit**: external validation is guided through three steps (analysis, follow-ups, summary) and an internal validation can be a single step (`total_steps` accepts 1). If you set `next_step_required=false` before your own final step, the tool replies with corrective guidance rather than rejecting the call
 - **MANDATORY**: Changeset file (pal_precommit.changeset) must be created for external validation
 
 ## Model Recommendation
@@ -125,10 +125,10 @@ Use unison and perform a thorough precommit ensuring there aren't any new regres
 ## Tool Parameters
 
 **Workflow Investigation Parameters (used during step-by-step process):**
-- `step`: Technical brief to another engineer using direct statements (required, FORBIDDEN: large code snippets)
+- `step`: Technical brief to another engineer using direct statements (required, FORBIDDEN: large code snippets). In step 1 it carries the validation strategy and the original user request description for the changes
 - `step_number`: Current step number in validation sequence (required, starts at 1)
-- `total_steps`: Estimated total investigation steps (minimum 3 enforced)
-- `next_step_required`: Whether another investigation step is needed (CRITICAL: must be true until final step)
+- `total_steps`: Estimated total investigation steps (minimum 1; external validation: three recommended, internal validation: one is enough)
+- `next_step_required`: Whether another investigation step is needed (keep true until your planned final step)
 - `findings`: Specific discoveries and evidence from actual investigation (required, no vague language)
 - `files_checked`: All files examined during investigation
 - `relevant_files`: Files directly relevant to the changes
@@ -139,17 +139,17 @@ Use unison and perform a thorough precommit ensuring there aren't any new regres
 
 **Initial Configuration (used in step 1):**
 - `path`: Starting directory to search for repos (REQUIRED for step 1, must be absolute path)
-- `prompt`: The original user request description for the changes (required for context)
-- `model`: auto|pro|flash|flash-2.0|flashlite|o3|o3-mini|o4-mini|gpt4.1|gpt5.2|gpt5.1-codex|gpt5.1-codex-mini|gpt5|gpt5-mini|gpt5-nano|opus|sonnet|haiku|fable (default: server default)
+- `model`: auto|pro|flash|flash3|flashlite|o3|o3-mini|o4-mini|gpt4.1|gpt5.2|gpt5.1-codex|gpt5.1-codex-mini|gpt5|gpt5-mini|gpt5-nano|opus|sonnet|haiku|fable (default: server default)
 - `compare_to`: Compare against a branch/tag instead of local changes (optional)
 - `severity_filter`: critical|high|medium|low|all (default: all)
 - `include_staged`: Include staged changes in the review (default: true)
 - `include_unstaged`: Include uncommitted changes in the review (default: true)
-- `focus_on`: Specific aspects to focus on
-- `temperature`: Temperature for response (default: 0.2). Accepted from 0 to 2; the selected model's published limit then applies (most models 0-1, OpenAI, Google and xAI up to 2) and a higher value is reduced to the model's maximum.
-- `thinking_mode`: minimal|low|medium|high|max (default: medium, Gemini only)
+- `temperature`: Temperature for response (default 1.0). Accepted from 0 to 2; the selected model's own rule then applies (Gemini, xAI and some OpenAI models 0-2, older Claude 0-1; models that take only temperature 1 or none ignore or override it).
+- `thinking_mode`: minimal|low|medium|high|max (default: high; honored by Gemini and Anthropic models, ignored by providers without a thinking control)
 - `use_assistant_model`: Whether to use expert validation phase (default: true, set to false to use Claude only)
 - `continuation_id`: Continue previous validation discussions
+
+`precommit` takes no `confidence` input. Its `validation_status` block always reports `current_confidence: "medium"` (the same fixed value for analyze, codereview and precommit), whatever the request sent; it does not measure how far the work has progressed.
 
 ## Usage Examples
 
@@ -230,7 +230,7 @@ The tool automatically discovers and validates:
 - **Use for significant changes**: Most valuable for features, refactoring, or security updates
 - **Review before final commit**: Catch issues before they enter the main branch
 - **Include visual context**: Screenshots of requirements or expected behavior
-- **Focus validation scope**: Use `focus_on` parameter for specific concerns
+- **Focus validation scope**: Name the specific concerns in `step` and `findings`
 - **Multi-stage validation**: Use continuation for iterative improvement
 
 ## Output Format

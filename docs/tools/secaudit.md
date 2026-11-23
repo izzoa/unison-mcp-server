@@ -22,7 +22,7 @@ The secaudit tool implements a **structured 6-step security workflow** that ensu
 6. **Step 6**: Compliance & Risk Assessment - Evaluation against specified compliance frameworks and risk prioritization
 
 **Expert Analysis Phase:**
-After Claude completes the investigation (unless confidence is **certain**):
+After Claude completes the investigation (expert analysis runs unless `use_assistant_model` is false):
 - Complete security assessment summary with all vulnerabilities and evidence
 - OWASP Top 10 systematic findings with severity classifications
 - Compliance framework gap analysis and remediation recommendations
@@ -62,7 +62,7 @@ security remediation plan using planner
 - **Threat-level aware analysis**: Critical, high, medium, low threat classifications
 - **Technology-specific security patterns**: Web apps, APIs, mobile, cloud, enterprise systems
 - **Risk-based prioritization**: Business impact and exploitability assessment
-- **Audit focus customization**: Comprehensive, authentication, data protection, infrastructure
+- **Audit focus customization**: Comprehensive, OWASP, compliance, infrastructure, dependencies
 - **Image support**: Security analysis from architecture diagrams, network topology, or security findings
 - **Multi-file security analysis**: Cross-component vulnerability identification
 - **Compliance gap analysis**: Specific framework requirements with remediation guidance
@@ -78,50 +78,46 @@ security remediation plan using planner
 - `next_step_required`: Whether another investigation step is needed
 - `findings`: Security discoveries and evidence collected in this step (required)
 - `files_checked`: All files examined during security investigation
-- `relevant_files`: Files directly relevant to security assessment (required in step 1)
+- `relevant_files`: Files directly relevant to security assessment
 - `relevant_context`: Methods/functions/classes central to security findings
 - `issues_found`: Security issues identified with severity levels
 - `confidence`: Confidence level in security assessment completeness (exploring/low/medium/high/certain)
 - `images`: Architecture diagrams, security documentation, or visual references
 
 **Initial Security Configuration (used in step 1):**
-- `model`: auto|pro|flash|flash-2.0|flashlite|o3|o3-mini|o4-mini|gpt4.1|gpt5.2|gpt5.1-codex|gpt5.1-codex-mini|gpt5|gpt5-mini|gpt5-nano|opus|sonnet|haiku|fable (default: server default)
-- `security_scope`: Application context, technology stack, and security boundary definition (required)
+- `model`: auto|pro|flash|flash3|flashlite|o3|o3-mini|o4-mini|gpt4.1|gpt5.2|gpt5.1-codex|gpt5.1-codex-mini|gpt5|gpt5-mini|gpt5-nano|opus|sonnet|haiku|fable (default: server default)
+- `security_scope`: Application context, technology stack, and security boundary definition (recommended; if omitted the audit defaults to a general application context)
 - `threat_level`: low|medium|high|critical (default: medium) - determines assessment depth and urgency
 - `compliance_requirements`: List of compliance frameworks to assess against (e.g., ["PCI DSS", "SOC2"])
-- `audit_focus`: comprehensive|authentication|data_protection|infrastructure|api_security (default: comprehensive)
+- `audit_focus`: owasp|compliance|infrastructure|dependencies|comprehensive (default: comprehensive)
 - `severity_filter`: critical|high|medium|low|all (default: all)
-- `temperature`: Temperature for analytical consistency (default 0.2). Accepted from 0 to 2; the selected model's published limit then applies (most models 0-1, OpenAI, Google and xAI up to 2) and a higher value is reduced to the model's maximum.
-- `thinking_mode`: minimal|low|medium|high|max (default: medium, Gemini only)
+- `temperature`: Temperature for analytical consistency (default 1.0). Accepted from 0 to 2; the selected model's own rule then applies (Gemini, xAI and some OpenAI models 0-2, older Claude 0-1; models that take only temperature 1 or none ignore or override it).
+- `thinking_mode`: minimal|low|medium|high|max (default: high; honored by Gemini and Anthropic models, ignored by providers without a thinking control)
 - `use_assistant_model`: Whether to use expert security analysis phase (default: true)
 - `continuation_id`: Continue previous security audit discussions
 
 ## Audit Focus Areas
 
 **Comprehensive (default):**
-- Full OWASP Top 10 assessment with all security domains
-- Authentication, authorization, data protection, infrastructure
+- Full OWASP Top 10 assessment plus all other security domains
+- Authentication, authorization, data protection, infrastructure, dependencies
 - Best for complete security posture evaluation
 
-**Authentication:**
-- Focused on identity, access management, and session security
-- Multi-factor authentication, password policies, privilege escalation
-- Best for user management and access control systems
+**OWASP:**
+- Focused on the OWASP Top 10 categories: injection, broken access control, cryptographic failures, authentication and session issues
+- Best for web application security reviews against a well-known baseline
 
-**Data Protection:**
-- Encryption, data handling, privacy controls, and compliance
-- Input validation, output encoding, data classification
-- Best for applications handling sensitive or regulated data
+**Compliance:**
+- Assessment against the frameworks listed in `compliance_requirements` (e.g. PCI DSS, SOC2, GDPR)
+- Best for regulatory alignment and audit preparation
 
 **Infrastructure:**
-- Deployment security, configuration management, dependency security
-- Network security, container security, cloud security posture
+- Deployment security, configuration management, container and cloud security posture
 - Best for DevOps and infrastructure security assessment
 
-**API Security:**
-- REST/GraphQL security, rate limiting, API authentication
-- Input validation, authorization patterns, API gateway security
-- Best for API-first applications and microservices
+**Dependencies:**
+- Third-party libraries and supply-chain vulnerabilities
+- Best for reviewing package manifests and lock files
 
 ## Threat Levels
 
@@ -169,13 +165,13 @@ compliance requirements PCI DSS and SOC2, focus on payment processing security"
 
 **Authentication System Security Review:**
 ```
-"Use o3 to perform secaudit on authentication microservice, focus on authentication, 
+"Use o3 to perform secaudit on authentication microservice, audit focus owasp, 
 threat level critical, check for OWASP A07 and multi-factor authentication implementation"
 ```
 
 **API Security Assessment:**
 ```
-"Secaudit our REST API gateway with gemini pro, audit focus api_security, 
+"Secaudit our REST API gateway with gemini pro, audit focus owasp, 
 compliance requirements GDPR, threat level medium"
 ```
 
@@ -187,7 +183,7 @@ threat level high, include container security and network policies"
 
 **Quick Security Scan:**
 ```
-"Fast secaudit of user registration flow with flash, focus authentication, 
+"Fast secaudit of user registration flow with flash, audit focus owasp, 
 severity filter critical and high only"
 ```
 

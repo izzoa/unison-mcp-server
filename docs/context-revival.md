@@ -92,8 +92,8 @@ saved document / `CLAUDE.md` etc - no need. Unison remembers.
 The system is highly configurable:
 
 ```env
-# Maximum conversation turns (default: 20)
-MAX_CONVERSATION_TURNS=20
+# Maximum conversation turns (default: 50)
+MAX_CONVERSATION_TURNS=50
 
 # Thread expiration in hours (default: 3) 
 CONVERSATION_TIMEOUT_HOURS=3

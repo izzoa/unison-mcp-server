@@ -137,7 +137,7 @@ class GeminiModelProvider(RegistryBackedProviderMixin, ModelProvider):
             prompt: The main user prompt/query to send to the model
             model_name: Canonical model name or its alias (e.g., "gemini-2.5-pro", "flash", "pro")
             system_prompt: Optional system instructions to prepend to the prompt for context/behavior
-            temperature: Controls randomness in generation (0.0=deterministic, 1.0=creative), default 0.3
+            temperature: Sampling temperature, default 1.0; the model's own temperature rule applies (tools accept 0.0-2.0)
             max_output_tokens: Optional maximum number of tokens to generate in the response
             thinking_mode: Thinking budget level for models that support it ("minimal", "low", "medium", "high", "max"), default "medium"
             images: Optional list of image paths or data URLs to include with the prompt (for vision models)

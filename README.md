@@ -379,7 +379,7 @@ Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process
 
 Unison activates any provider that has credentials in your `.env`. See `.env.example` for deeper customization.
 
-**Circuit Breaker** — Each provider has a built-in circuit breaker that detects sustained failures (outages, revoked keys, quota exhaustion) and fails fast instead of waiting through the full retry cycle. When a provider fails `CIRCUIT_FAILURE_THRESHOLD` consecutive times (default 5), its circuit opens and requests return immediately for `CIRCUIT_RESET_TIMEOUT_SECONDS` (default 60s) before probing recovery. The consensus tool automatically skips unavailable providers and synthesizes from the rest. See `.env.example` for configuration options.
+**Circuit Breaker** — Each provider has a built-in circuit breaker that detects sustained provider-side failures (outages, timeouts, connection errors, 5xx, and 408/429 rate-limit or quota responses) and fails fast instead of waiting through the full retry cycle. When a provider fails `CIRCUIT_FAILURE_THRESHOLD` consecutive times (default 5), its circuit opens and requests return immediately for `CIRCUIT_RESET_TIMEOUT_SECONDS` (default 60s) before probing recovery. Request-level 4xx errors such as 400, 401, 403, 404 and 422 (bad request, revoked or invalid key, unknown model) are treated as caller faults and do not count toward the threshold. The consensus tool automatically skips unavailable providers and synthesizes from the rest. See `.env.example` for configuration options.
 
 ## Core Tools
 
@@ -405,9 +405,9 @@ Unison activates any provider that has credentials in your `.env`. See `.env.exa
 - **[`docgen`](docs/tools/docgen.md)** - Generate documentation with complexity analysis
 
 **Utilities**
-- **[`apilookup`](docs/tools/apilookup.md)** - Forces current-year API/SDK documentation lookups in a sub-process (saves tokens within the current context window), prevents outdated training data responses
+- **[`apilookup`](docs/tools/apilookup.md)** - Forces current-year API/SDK documentation lookups by instructing the AI to research in a separate sub-task (saves tokens within the current context window), prevents outdated training data responses
 - **[`challenge`](docs/tools/challenge.md)** - Prevent "You're absolutely right!" responses with critical analysis
-- **[`tracer`](docs/tools/tracer.md)** *(disabled by default - [enable](#tool-configuration))* - Static analysis prompts for call-flow mapping
+- **[`tracer`](docs/tools/tracer.md)** *(disabled by default - [enable](#tool-configuration))* - Step-by-step code tracing workflow (call flow / dependency mapping)
 
 <details>
 <summary><b id="tool-configuration">👉 Tool Configuration</b></summary>
@@ -608,7 +608,7 @@ DISABLED_TOOLS=
 **Developer Experience**
 - **Guided workflows** - Systematic investigation prevents rushed analysis
 - **Smart file handling** - Auto-expand directories, manage token limits
-- **Web search integration** - Access current documentation and best practices
+- **Web search hints** - `chat` can ask the calling agent to run web searches for current documentation; `apilookup` orchestrates documentation lookups
 - **[Large prompt support](docs/advanced-usage.md#working-with-large-prompts)** - Bypass MCP's 25K token limit
 
 ## Example Workflows

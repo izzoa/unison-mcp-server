@@ -25,7 +25,7 @@ The debug tool implements a **systematic investigation methodology** where Claud
 1. **Step 1**: Claude describes the issue and begins thinking deeply about possible underlying causes, side-effects, and contributing factors
 2. **Step 2+**: Claude examines relevant code, traces errors, tests hypotheses, and gathers evidence
 3. **Throughout**: Claude tracks findings, relevant files, methods, and evolving hypotheses with confidence levels
-4. **Backtracking**: Claude can revise previous steps when new insights emerge
+4. **Refinement**: later steps can update findings, hypothesis and confidence as new evidence emerges (steps are append-only; there is no step-revision parameter)
 5. **Completion**: Once investigation is thorough, Claude signals completion
 
 **Expert Analysis Phase:**
@@ -45,15 +45,13 @@ This structured approach ensures Claude performs methodical groundwork before ex
 
 - **Multi-step investigation process** with evidence collection and hypothesis evolution
 - **Systematic code examination** with file and method tracking throughout investigation
-- **Confidence assessment and revision** capabilities for investigative steps
-- **Backtracking support** to revise previous steps when new insights emerge
+- **Confidence assessment** across investigative steps
 - **Expert analysis integration** that provides final debugging recommendations based on complete investigation
 - **Error context support**: Stack traces, logs, and runtime information
 - **Visual debugging**: Include error screenshots, stack traces, console output
 - **Conversation threading**: Continue investigations across multiple sessions
 - **Large context analysis**: Handle extensive log files and multiple related code files
 - **Multi-language support**: Debug issues across Python, JavaScript, Java, C#, Swift, and more
-- **Web search integration**: Identifies when additional research would help solve problems
 
 ## Tool Parameters
 
@@ -65,15 +63,15 @@ This structured approach ensures Claude performs methodical groundwork before ex
 - `findings`: Discoveries and evidence collected in this step (required)
 - `files_checked`: All files examined during investigation (tracks exploration path)
 - `relevant_files`: Files directly tied to the root cause or its effects
-- `relevant_methods`: Specific methods/functions involved in the issue
+- `relevant_context`: Specific methods/functions involved in the issue
 - `hypothesis`: Current best guess about the underlying cause
 - `confidence`: Confidence level in current hypothesis (exploring/low/medium/high/certain)
 - `continuation_id`: Thread ID for continuing investigations across sessions
 - `images`: Visual debugging materials (error screenshots, logs, etc.)
 
 **Model Selection:**
-- `model`: auto|pro|flash|flash-2.0|flashlite|o3|o3-mini|o4-mini|gpt4.1|gpt5.2|gpt5.1-codex|gpt5.1-codex-mini|gpt5|gpt5-mini|gpt5-nano|opus|sonnet|haiku|fable (default: server default)
-- `thinking_mode`: minimal|low|medium|high|max (default: medium, Gemini only)
+- `model`: auto|pro|flash|flash3|flashlite|o3|o3-mini|o4-mini|gpt4.1|gpt5.2|gpt5.1-codex|gpt5.1-codex-mini|gpt5|gpt5-mini|gpt5-nano|opus|sonnet|haiku|fable (default: server default)
+- `thinking_mode`: minimal|low|medium|high|max (default: high; honored by Gemini and Anthropic models, ignored by providers without a thinking control)
 - `use_assistant_model`: Whether to use expert analysis phase (default: true, set to false to use Claude only)
 
 ## Usage Examples
@@ -112,7 +110,7 @@ The debug tool enforces a thorough, structured investigation process:
 2. **Code Examination:** Claude systematically examines relevant files, traces execution paths, and identifies suspicious patterns
 3. **Evidence Collection:** Claude gathers findings, tracks files checked, and identifies methods/functions involved
 4. **Hypothesis Formation:** Claude develops working theories about the root cause with confidence assessments
-5. **Iterative Refinement:** Claude can backtrack and revise previous steps as understanding evolves
+5. **Iterative Refinement:** Claude updates its hypothesis and findings in later steps as understanding evolves
 6. **Investigation Completion:** Claude signals when sufficient evidence has been gathered
 
 **Expert Analysis Phase (Another AI Model When Used):**
@@ -161,7 +159,7 @@ Once investigation is complete, the selected AI model performs:
 - **Track all files examined**: Include even files that don't contain the bug (tracks investigation path)
 - **Document findings clearly**: Summarize discoveries, suspicious patterns, and evidence
 - **Evolve hypotheses**: Update theories as investigation progresses
-- **Use backtracking wisely**: Revise previous steps when new insights emerge
+- **Refine rather than repeat**: record contradicting evidence in the next step
 - **Include visual evidence**: Screenshots, error dialogs, console output
 
 **For Initial Problem Description:**
@@ -183,12 +181,6 @@ With models like Gemini Pro (1M context), you can include extensive log files fo
 Analyze multiple related files simultaneously to understand complex issues:
 ```
 "Debug the data processing pipeline issues across processor.py, validator.py, and output_handler.py"
-```
-
-**Web Search Integration:**
-The tool can recommend specific searches for error messages, known issues, or documentation:
-```
-After analysis: "Recommended searches for Claude: 'Django 4.2 migration error specific_error_code', 'PostgreSQL connection pool exhaustion solutions'"
 ```
 
 ## When to Use Debug vs Other Tools

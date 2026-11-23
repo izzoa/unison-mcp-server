@@ -117,8 +117,8 @@ Batch every model at the request level:
 {
   "step": "Should we move our job queue from Redis to Postgres?",
   "step_number": 1,
-  "total_steps": 2,
-  "next_step_required": true,
+  "total_steps": 1,
+  "next_step_required": false,
   "findings": "Initial analysis of the proposal.",
   "models": [
     {"model": "anthropic/claude-opus-4.5", "stance": "for"},
@@ -127,6 +127,8 @@ Batch every model at the request level:
   "execution_mode": "batch"
 }
 ```
+
+`consensus` consults every model inside step 1, so `total_steps` and `next_step_required` are required but fixed at `1` and `false`; the step-1 response is final, or `status: "running"` with a `batch_handle` to resume.
 
 Or select it per model by putting `execution_mode` on individual `models[]` entries (omitted or `null` on an entry inherits the request-level value, and an entry cannot opt out of a request-level `"batch"`; to batch only some entries, leave the request-level field unset):
 

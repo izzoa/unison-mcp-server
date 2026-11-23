@@ -124,7 +124,10 @@ class RefactorRequest(WorkflowRequest):
         None, description=REFACTOR_FIELD_DESCRIPTIONS["style_guide_examples"]
     )
 
-    # Override inherited fields to exclude them from schema (except model which needs to be available)
+    # Redeclared with exclude=True, which only keeps them out of model_dump(). They are still published in the
+    # input schema (WorkflowSchemaBuilder adds the common fields) and are read for the expert-analysis call.
+    # This redeclaration drops the inherited 0..MAX_TEMPERATURE bound, so out-of-range values are accepted and
+    # then clamped by validate_and_correct_temperature.
     temperature: float | None = Field(default=None, exclude=True)
     thinking_mode: str | None = Field(default=None, exclude=True)
 
@@ -218,6 +221,11 @@ class RefactorTool(WorkflowTool):
                 "items": {"type": "string"},
                 "description": REFACTOR_FIELD_DESCRIPTIONS["relevant_files"],
             },
+            "relevant_context": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": REFACTOR_FIELD_DESCRIPTIONS["relevant_context"],
+            },
             "confidence": {
                 "type": "string",
                 "enum": ["exploring", "incomplete", "partial", "complete"],
@@ -260,6 +268,8 @@ class RefactorTool(WorkflowTool):
             model_field_schema=self.get_model_field_schema(),
             auto_mode=self.is_effective_auto_mode(),
             tool_name=self.get_name(),
+            # Never read: prepare_step_data records `findings` as the hypothesis. The request model keeps the field.
+            excluded_workflow_fields=["hypothesis"],
         )
 
     def get_required_actions(

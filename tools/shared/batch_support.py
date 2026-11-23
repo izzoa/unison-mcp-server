@@ -99,10 +99,10 @@ __all__ = [
 EXECUTION_MODE_BATCH = "batch"
 ACCEPTED_EXECUTION_MODES: tuple[str, ...] = (EXECUTION_MODE_BATCH,)
 
-#: The request keys that make a call a resumption or cancellation rather than new work.
 #: Admission shorter than this is not charged to the wait budget (the common case: the catalog is cached).
 _ADMISSION_CHARGE_FLOOR_SECONDS = 0.1
 
+#: The request keys that make a call a resumption or cancellation rather than new work.
 BATCH_CONTROL_KEYS = frozenset({"batch_handle", "wait_seconds", "cancel"})
 
 BATCH_FIELD_DESCRIPTIONS = {
@@ -137,6 +137,7 @@ EXECUTION_MODE_DESCRIPTION = (
     "listmodels). On a consensus models[] entry, omitting it (or null) uses the "
     "request-level value; to batch only some entries, leave the request-level field unset and set it on those. "
     "On consensus it applies to step 1 only (the step that consults the models); later steps are refused. "
+    "Under batch the temperature is sent only where the model's :batch listing names temperature. "
     "Not available on clink or on the other multi-step workflow tools."
 )
 

@@ -40,4 +40,4 @@ Then make it executable: `chmod +x unison-mcp-server`
 
 4. Restart Gemini CLI.
 
-All 15 Unison tools are now available in your Gemini CLI session.
+The enabled Unison tools (12 by default; see `DISABLED_TOOLS` in `.env`) are now available in your Gemini CLI session.

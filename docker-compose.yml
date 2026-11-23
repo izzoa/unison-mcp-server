@@ -35,14 +35,44 @@ services:
       
       # Logging configuration
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
-      - LOG_MAX_SIZE=${LOG_MAX_SIZE:-10MB}
-      - LOG_BACKUP_COUNT=${LOG_BACKUP_COUNT:-5}
       
       # Advanced configuration
       - DEFAULT_THINKING_MODE_THINKDEEP=${DEFAULT_THINKING_MODE_THINKDEEP:-high}
       - DISABLED_TOOLS=${DISABLED_TOOLS}
       - MAX_MCP_OUTPUT_TOKENS=${MAX_MCP_OUTPUT_TOKENS}
       
+      # Conversation memory (code defaults: 3 hours, 50 turns, when unset)
+      # A bare "- NAME" forwards the variable only when it is set in your shell or .env;
+      # when it is unset the container does not define it, so the code default applies.
+      - CONVERSATION_TIMEOUT_HOURS
+      - MAX_CONVERSATION_TURNS
+
+      # Conversation storage (STORAGE_BACKEND=sqlite writes to the unison-mcp-data volume)
+      - STORAGE_BACKEND
+      - STORAGE_SQLITE_PATH
+      - STORAGE_SWEEP_INTERVAL_SECONDS
+
+      # Batch execution (execution_mode="batch"; needs OPENROUTER_API_KEY).
+      # The store lives on the unison-mcp-data volume so batch handles survive restarts.
+      - BATCH_STORE_PATH=${BATCH_STORE_PATH:-/app/.unison/batches.db}
+      - BATCH_RETENTION_DAYS
+      - OPENROUTER_BATCH_LIVE_CATALOG
+      - OPENROUTER_BATCH_CATALOG_TTL_SECONDS
+
+      # clink (spawns CLIs installed inside the container; none ship in the image)
+      - CLINK_TIMEOUT_SECONDS
+      - CLINK_EXECUTION_MODE
+      - CLINK_SNAPSHOT_BUDGET_SECONDS
+      - CLINK_DEFAULT_WORKING_DIR
+      - CLINK_WORKING_DIR_FALLBACK
+      - CLINK_MCP_ROOTS
+      - CLINK_OPENCODE_MODE
+
+      # Circuit breaker
+      - CIRCUIT_FAILURE_THRESHOLD
+      - CIRCUIT_RESET_TIMEOUT_SECONDS
+      - CIRCUIT_HALF_OPEN_MAX_CALLS
+
       # Server configuration
       - PYTHONUNBUFFERED=1
       - PYTHONPATH=/app
@@ -52,6 +82,9 @@ services:
     volumes:
       - ./logs:/app/logs
       - unison-mcp-config:/app/conf
+      # Writable data directory (batch store, SQLite conversation storage). The container
+      # root filesystem is read-only, so these need a mounted volume.
+      - unison-mcp-data:/app/.unison
       - /etc/localtime:/etc/localtime:ro
     
     # Network configuration
@@ -90,6 +123,8 @@ services:
 # Named volumes
 volumes:
   unison-mcp-config:
+    driver: local
+  unison-mcp-data:
     driver: local
 
 # Networks

@@ -492,7 +492,6 @@ class PerformanceTimer:
                         },
                         {"severity": "low", "description": "Global configuration instance could cause testing issues"},
                     ],
-                    "confidence": "medium",
                     "continuation_id": continuation_id,
                 },
             )
@@ -569,7 +568,6 @@ class PerformanceTimer:
                     "relevant_files": [],
                     "relevant_context": [],
                     "issues_found": [],
-                    "confidence": "low",
                     "continuation_id": continuation_id,
                 },
             )
@@ -595,7 +593,6 @@ class PerformanceTimer:
                         {"severity": "medium", "description": "JSON serialization in model classes could be optimized"},
                         {"severity": "low", "description": "Cache key generation lacks proper escaping"},
                     ],
-                    "confidence": "medium",
                     "continuation_id": continuation_id,
                 },
             )
@@ -612,7 +609,7 @@ class PerformanceTimer:
             return True
 
         except Exception as e:
-            self.logger.error(f"Backtracking test failed: {e}")
+            self.logger.error(f"Refinement test failed: {e}")
             return False
 
     def _test_complete_analysis_with_expert(self) -> bool:
@@ -663,7 +660,6 @@ class PerformanceTimer:
                         {"severity": "medium", "description": "Serialization logic mixed with model classes"},
                         {"severity": "low", "description": "Magic numbers and hardcoded values scattered throughout"},
                     ],
-                    "confidence": "high",
                     "continuation_id": continuation_id,
                     "model": "flash",  # Use flash for expert validation
                 },
@@ -809,7 +805,6 @@ class PerformanceTimer:
                     "relevant_files": [self.main_service_file],  # This should be referenced, not embedded
                     "relevant_context": ["UserService"],
                     "issues_found": [{"severity": "medium", "description": "Direct Redis dependency in service class"}],
-                    "confidence": "low",
                     "prompt": "Analyze service architecture patterns",
                     "analysis_type": "architecture",
                     "model": "flash",
@@ -854,7 +849,6 @@ class PerformanceTimer:
                         {"severity": "high", "description": "Global dependencies create architectural coupling"},
                         {"severity": "medium", "description": "Configuration management lacks flexibility"},
                     ],
-                    "confidence": "high",
                     "model": "flash",
                 },
             )
@@ -917,7 +911,6 @@ class PerformanceTimer:
                         {"severity": "critical", "description": "Weak default secret key in production detection"},
                         {"severity": "medium", "description": "Input sanitization not consistently applied"},
                     ],
-                    "confidence": "high",
                     "prompt": "Analyze security patterns and vulnerabilities",
                     "analysis_type": "security",
                     "model": "flash",
@@ -958,7 +951,6 @@ class PerformanceTimer:
                         {"severity": "medium", "description": "Serialization logic mixed with model classes"},
                         {"severity": "low", "description": "Inconsistent error handling patterns"},
                     ],
-                    "confidence": "high",
                     "prompt": "Analyze code quality and maintainability patterns",
                     "analysis_type": "quality",
                     "model": "flash",

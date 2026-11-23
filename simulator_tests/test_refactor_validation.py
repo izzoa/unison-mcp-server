@@ -435,7 +435,7 @@ class UserData:
                 self.logger.error("Failed to continue to step 2")
                 return False
 
-            # Step 3: Backtrack from step 2
+            # Step 3: refine the investigation path
             self.logger.info("    1.2.3: Step 3 - Refocus on function decomposition")
             response3, _ = self.call_mcp_tool(
                 "refactor",

@@ -96,7 +96,7 @@ common parameters (temperature, model, continuation_id, etc.).
 Workflow tools extend `WorkflowTool`, which mixes in `BaseWorkflowMixin` for step tracking and expert analysis.
 
 1. **Create a request model** that inherits from `tools.shared.base_models.WorkflowRequest` (or a subclass) and add
-   any tool-specific fields or validators. Examples: `CodeReviewRequest`, `ConsensusRequest`.
+   any tool-specific fields or validators. Examples: `CodeReviewRequest`, `ThinkDeepWorkflowRequest`.
 2. **Override the workflow hooks** to steer the investigation. At minimum you must implement
    `get_required_actions(...)`; override `should_call_expert_analysis(...)` and
    `prepare_expert_analysis_context(...)` when the expert model call should happen conditionally.
@@ -105,33 +105,35 @@ Workflow tools extend `WorkflowTool`, which mixes in `BaseWorkflowMixin` for ste
 
 ```python
 from pydantic import Field
-from systemprompts import CONSENSUS_PROMPT
+from systemprompts import REVIEW_PROMPT
 from tools.shared.base_models import WorkflowRequest
 from tools.workflow.base import WorkflowTool
 
-class ConsensusRequest(WorkflowRequest):
-    models: list[dict] = Field(..., description="Models to consult (with optional stance).")
+class ReviewRequest(WorkflowRequest):
+    focus: str | None = Field(None, description="What the review should concentrate on.")
 
-class ConsensusTool(WorkflowTool):
+class ReviewTool(WorkflowTool):
+    """Illustrative skeleton only; see tools/codereview.py for a real workflow tool."""
+
     def get_name(self) -> str:
-        return "consensus"
+        return "review"
 
     def get_description(self) -> str:
-        return "Multi-model consensus workflow with expert synthesis."
+        return "Multi-step review workflow with expert validation."
 
     def get_system_prompt(self) -> str:
-        return CONSENSUS_PROMPT
+        return REVIEW_PROMPT
 
     def get_workflow_request_model(self):
-        return ConsensusRequest
+        return ReviewRequest
 
     def get_required_actions(self, step_number: int, confidence: str, findings: str, total_steps: int, request=None) -> list[str]:
         if step_number == 1:
-            return ["Write the shared proposal all models will evaluate."]
-        return ["Summarize the latest model response before moving on."]
+            return ["Read the files under review and note what they are meant to do."]
+        return ["Record concrete findings (file, line, evidence) before the next step."]
 
     def should_call_expert_analysis(self, consolidated_findings, request=None) -> bool:
-        return not (request and request.next_step_required)
+        return not (request and request.next_step_required)  # expert validation on the final step
 
     def prepare_expert_analysis_context(self, consolidated_findings) -> str:
         return "\n".join(consolidated_findings.findings)
@@ -145,17 +147,23 @@ never calls out to the assistant model.
 
 1. **Create or reuse a system prompt** in `systemprompts/your_tool_prompt.py` and export it from
    `systemprompts/__init__.py`.
-2. **Expose the tool class** from `tools/__init__.py` so that `server.py` can import it.
-3. **Add an instance to the `TOOLS` dictionary** in `server.py`. This makes the tool callable via MCP.
-4. **(Optional) Add a prompt template** to `PROMPT_TEMPLATES` in `server.py` if you want clients to show a canned
-   launch command.
-5. Confirm that `DISABLED_TOOLS` environment variable handling covers the new tool if you need to toggle it.
+2. **Add an entry to `TOOL_DEFINITIONS`** in `tools/registry.py`: `"name": ("tools.module", "ClassName", "one-line description")`.
+   The registry imports the class lazily and exposes it through `server.TOOLS` (only a derived alias). Third-party or
+   out-of-tree tools can instead register via the `unison.tools` entry point or the `@register_tool` decorator; see
+   [plugins.md](plugins.md).
+3. **(Optional) Re-export the class** from `tools/__init__.py` (and add it to `__all__`) for convenient imports;
+   registration does not require it.
+4. **(Optional) Add a prompt template** to `PROMPT_TEMPLATES` in `conf/prompt_templates.py` if you want clients to
+   show a canned launch command.
+5. `DISABLED_TOOLS` filtering is applied by the registry automatically to built-in and plugin tools, so no extra wiring
+   is needed; add the tool name to the essential-tools set only if it must never be disabled.
 
 ## 6. Validate the Tool
 
 - Run unit tests that cover any new request/response logic: `python -m pytest tests/ -v -m "not integration"`.
-- Add a simulator scenario in `simulator_tests/communication_simulator_test.py` to exercise the tool end-to-end and
-  run it with `python communication_simulator_test.py --individual <case>` or `--quick` for the fast smoke suite.
+- Add a test module under `simulator_tests/` and register it in `TEST_REGISTRY` in `simulator_tests/__init__.py` to
+  exercise the tool end-to-end; the runner is `communication_simulator_test.py` at the repo root. Run it with
+  `python communication_simulator_test.py --individual <case>` or `--quick` for the fast smoke suite.
 - If the tool interacts with external providers or multiple models, consider integration coverage via
   `./run_integration_tests.sh --with-simulator`.
 

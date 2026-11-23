@@ -288,10 +288,11 @@ class BaseTool(ABC):
         Return the default temperature setting for this tool.
 
         Override this method to set tool-specific temperature defaults.
-        Lower values (0.0-0.3) for analytical tasks, higher (0.7-1.0) for creative tasks.
+        Every shipped tool currently returns 1.0 via the config.TEMPERATURE_* constants. The range is 0.0 to
+        MAX_TEMPERATURE (2.0); the selected model's published limit is applied afterwards.
 
         Returns:
-            float: Default temperature between 0.0 and 1.0
+            float: Default temperature in 0.0 to MAX_TEMPERATURE
         """
         return 0.5
 

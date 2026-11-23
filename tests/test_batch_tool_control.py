@@ -157,6 +157,15 @@ class TestPublishedSchema:
             jsonschema.validate(instance={"batch_handle": "h", "wait_seconds": -1}, schema=schema)
 
     def test_other_tools_schemas_are_byte_for_byte_unchanged(self):
+        """The batch work changed no other tool's schema.
+
+        The fixture is not a frozen copy of the very first schemas: it was updated narrowly, and only for the
+        intentional published-schema edits listed in tests/test_workflow_published_fields.py
+        (REMOVED_PUBLISHED_FIELDS: properties dropped because the tool never reads them, planner / docgen no
+        longer advertising ``model`` / ``use_assistant_model``, precommit's total_steps minimum of 1, and the
+        tool-specific descriptions that now reach the schema) and for the model / temperature / thinking_mode
+        text. Any other difference, in any tool, still fails here.
+        """
         snapshot = json.loads(SNAPSHOT.read_text())
         tools = [
             AnalyzeTool,

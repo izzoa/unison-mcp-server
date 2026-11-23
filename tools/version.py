@@ -147,15 +147,20 @@ class VersionTool(BaseTool):
     - Current server version
     - Last update date
     - Author information
-    - Python version
-    - Platform information
+    - Model-selection mode, configured providers and available-model count
+    - Update status (a live GitHub check)
+
+    Python version and platform are returned in the response metadata only, not in the displayed text.
     """
 
     def get_name(self) -> str:
         return "version"
 
     def get_description(self) -> str:
-        return "Get server version, configuration details, and list of available tools."
+        return (
+            "Get the server version, update status (checks GitHub), model-selection mode, configured providers "
+            "and available-model count."
+        )
 
     def get_input_schema(self) -> dict[str, Any]:
         """Return the JSON schema for the tool's input"""

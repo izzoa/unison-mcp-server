@@ -76,7 +76,7 @@ class WorkflowTool(BaseTool, BaseWorkflowMixin):
         Workflow tools automatically get all standard workflow fields:
         - step, step_number, total_steps, next_step_required
         - findings, files_checked, relevant_files, relevant_context
-        - issues_found, confidence, hypothesis
+        - issues_found, confidence, hypothesis, use_assistant_model
         - plus common fields (model, temperature, etc.)
 
         Override this method to add additional tool-specific fields.
@@ -101,7 +101,8 @@ class WorkflowTool(BaseTool, BaseWorkflowMixin):
 
         Workflow tools automatically require:
         - step, step_number, total_steps, next_step_required, findings
-        - model (if in auto mode)
+        - model (whenever requires_model() is true, via the default get_input_schema; tools that override
+          get_input_schema without require_model, e.g. analyze, require it only in auto mode)
 
         Override this to add additional required fields.
 
@@ -116,9 +117,11 @@ class WorkflowTool(BaseTool, BaseWorkflowMixin):
 
         All workflow tools perform analysis and investigation without modifying
         the environment. They may call external AI models for expert analysis,
-        but they don't write files or make system changes.
+        but by default they don't write files or make system changes.
 
-        Override this method if your workflow tool needs different annotations.
+        Override this method if your workflow tool needs different annotations;
+        consensus does, because its batch mode bills a provider batch and persists
+        state to the batch store.
 
         Returns:
             Dictionary with readOnlyHint set to True
@@ -396,17 +399,16 @@ class WorkflowTool(BaseTool, BaseWorkflowMixin):
 
     def is_continuation_workflow(self, request) -> bool:
         """
-        Check if this is a continuation workflow that should skip multi-step investigation.
+        Return True when a continuation_id was supplied.
 
-        When continuation_id is provided, the workflow typically continues from a previous
-        conversation and should go directly to expert analysis rather than starting a new
-        multi-step investigation.
+        Informational helper: the workflow engine does not call it, and continuation_id does not skip the
+        multi-step flow. Fast paths are driven by the caller setting next_step_required=false.
 
         Args:
             request: The workflow request object
 
         Returns:
-            True if this is a continuation that should skip multi-step workflow
+            True if the request carries a continuation_id
         """
         continuation_id = self.get_request_continuation_id(request)
         return bool(continuation_id)

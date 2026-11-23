@@ -103,7 +103,10 @@ class CodeReviewRequest(WorkflowRequest):
         "all", description=CODEREVIEW_WORKFLOW_FIELD_DESCRIPTIONS["severity_filter"]
     )
 
-    # Override inherited fields to exclude them from schema (except model which needs to be available)
+    # Redeclared with exclude=True, which only keeps them out of model_dump(). They are still published in the
+    # input schema (WorkflowSchemaBuilder adds the common fields) and are read for the expert-analysis call.
+    # This redeclaration drops the inherited 0..MAX_TEMPERATURE bound, so out-of-range values are accepted and
+    # then clamped by validate_and_correct_temperature.
     temperature: float | None = Field(default=None, exclude=True)
     thinking_mode: str | None = Field(default=None, exclude=True)
 
@@ -196,6 +199,11 @@ class CodeReviewTool(WorkflowTool):
                 "items": {"type": "string"},
                 "description": CODEREVIEW_WORKFLOW_FIELD_DESCRIPTIONS["relevant_files"],
             },
+            "relevant_context": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": CODEREVIEW_WORKFLOW_FIELD_DESCRIPTIONS["relevant_context"],
+            },
             "review_validation_type": {
                 "type": "string",
                 "enum": ["external", "internal"],
@@ -241,6 +249,9 @@ class CodeReviewTool(WorkflowTool):
             model_field_schema=self.get_model_field_schema(),
             auto_mode=self.is_effective_auto_mode(),
             tool_name=self.get_name(),
+            # Never read: expert validation is driven by review_validation_type, and prepare_step_data supplies
+            # fixed values for these two. The request model keeps them for the shared consolidation code.
+            excluded_workflow_fields=["confidence", "hypothesis"],
         )
 
     def get_required_actions(
@@ -478,6 +489,13 @@ class CodeReviewTool(WorkflowTool):
     def get_confidence_level(self, request) -> str:
         """Code review tools use 'certain' for high confidence."""
         return "certain"
+
+    def get_request_confidence(self, request) -> str:
+        """Code review does not publish a confidence input, so its status block reports one fixed value.
+
+        analyze, codereview and precommit all report "medium" as current_confidence.
+        """
+        return "medium"
 
     def get_completion_message(self) -> str:
         """Code review-specific completion message."""

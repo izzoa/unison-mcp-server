@@ -17,9 +17,10 @@ logger = logging.getLogger(__name__)
 class OpenAIModelProvider(RegistryBackedProviderMixin, OpenAICompatibleProvider):
     """Implementation that talks to api.openai.com using rich model metadata.
 
-    In addition to the built-in catalogue, the provider can surface models
-    defined in ``conf/custom_models.json`` (for organisations running their own
-    OpenAI-compatible gateways) while still respecting restriction policies.
+    In addition to the built-in catalogue (``conf/openai_models.json``), the
+    provider can surface entries of ``conf/openrouter_models.json`` (or the file
+    named by ``OPENROUTER_MODELS_CONFIG_PATH``) whose provider is ``openai``,
+    while still respecting restriction policies.
     """
 
     REGISTRY_CLASS = OpenAIModelRegistry
@@ -42,7 +43,7 @@ class OpenAIModelProvider(RegistryBackedProviderMixin, OpenAICompatibleProvider)
         canonical_name: str,
         requested_name: str | None = None,
     ) -> ModelCapabilities | None:
-        """Look up OpenAI capabilities from built-ins or the custom registry."""
+        """Look up OpenAI capabilities from built-ins or openai-provider entries in the OpenRouter registry."""
 
         self._ensure_registry()
         builtin = super()._lookup_capabilities(canonical_name, requested_name)

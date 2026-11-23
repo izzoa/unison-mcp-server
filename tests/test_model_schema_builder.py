@@ -7,6 +7,8 @@ context window formatting, and error message composition.
 
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 
 class TestModelSchemaBuilderInstantiation:
     """Test basic instantiation and attribute access."""
@@ -424,6 +426,61 @@ class TestGetRestrictionNote:
             assert note is not None
             assert "OpenAI" in note
             assert "Google" in note
+
+    @pytest.mark.parametrize(
+        "env_var, label, models",
+        [
+            ("ANTHROPIC_ALLOWED_MODELS", "Anthropic", "claude-sonnet-4-5"),
+            ("AZURE_OPENAI_ALLOWED_MODELS", "Azure OpenAI", "my-deployment"),
+            ("CUSTOM_ALLOWED_MODELS", "Custom", "llama3.2"),
+        ],
+    )
+    def test_previously_omitted_providers_appear_in_note(self, monkeypatch, env_var, label, models):
+        """Anthropic, Azure and Custom allow-lists are enforced, so the note must mention them."""
+        from tools.shared.model_schema_builder import ModelSchemaBuilder
+        from utils.model_restrictions import ModelRestrictionService
+
+        for other in ModelRestrictionService.ENV_VARS.values():
+            monkeypatch.delenv(other, raising=False)
+        monkeypatch.setenv(env_var, models)
+
+        note = ModelSchemaBuilder(tool_name="chat")._get_restriction_note()
+
+        assert note is not None
+        assert f"{label}: {models}" in note
+
+    def test_every_restriction_env_var_yields_a_note(self, monkeypatch):
+        """Drift guard: any provider enforced by ModelRestrictionService must reach the note."""
+        from tools.shared.model_schema_builder import ModelSchemaBuilder
+        from utils.model_restrictions import ModelRestrictionService
+
+        for env_var in ModelRestrictionService.ENV_VARS.values():
+            monkeypatch.delenv(env_var, raising=False)
+
+        builder = ModelSchemaBuilder(tool_name="chat")
+        for provider_type, env_var in ModelRestrictionService.ENV_VARS.items():
+            monkeypatch.setenv(env_var, "some-model")
+            note = builder._get_restriction_note()
+            assert note is not None and "some-model" in note, f"{env_var} ({provider_type.value}) missing from note"
+            monkeypatch.delenv(env_var)
+
+    def test_unlabelled_provider_falls_back_to_provider_value(self, monkeypatch):
+        """A provider without a display label is still reported, under its ProviderType value."""
+        from tools.shared.model_schema_builder import ModelSchemaBuilder
+        from utils.model_restrictions import ModelRestrictionService
+
+        class _FutureProvider:
+            value = "futureprovider"
+
+        for env_var in ModelRestrictionService.ENV_VARS.values():
+            monkeypatch.delenv(env_var, raising=False)
+        monkeypatch.setattr(ModelRestrictionService, "ENV_VARS", {_FutureProvider(): "FUTURE_ALLOWED_MODELS"})
+        monkeypatch.setenv("FUTURE_ALLOWED_MODELS", "m1, m2")
+
+        note = ModelSchemaBuilder(tool_name="chat")._get_restriction_note()
+
+        assert note is not None
+        assert "futureprovider: m1, m2" in note
 
 
 class TestFormatAvailableModelsList:

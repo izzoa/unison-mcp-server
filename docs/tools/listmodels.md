@@ -13,54 +13,56 @@ The `listmodels` tool shows which providers are configured, available models, th
 ## Key Features
 
 - **Provider organization**: Shows all configured providers and their status
-- **Model capabilities**: Context windows, thinking mode support, and special features
+- **Model details**: Context window and description for each model
 - **Alias mapping**: Shows shorthand names and their full model mappings
 - **Configuration status**: Indicates which providers are available based on API keys
 - **Context window information**: Helps you choose models based on your content size needs
-- **Capability overview**: Understanding which models support extended thinking, vision, etc.
 - **Batch tag**: Models that can run through OpenRouter's asynchronous Batch API at reduced pricing (`execution_mode="batch"`, see the [batch guide](batch.md)) are tagged `batch`; an entry whose aliases float under batch also shows what they resolve to (`batch: opus, claude-opus → anthropic/claude-opus-5.5`), read from the batch catalog already loaded, without a network call
 
 ## Output Information
 
-The tool displays:
+The tool returns markdown. For each provider it shows:
 
 **Provider Status:**
-- Which providers are configured and available
-- API key status (without revealing the actual keys)
-- Provider priority order
+- `Configured and available`, or `Not configured (set <ENV_KEY>)`; API keys are never revealed
+- Providers appear in a fixed order; there is no priority ranking in the output
 
-**Model Details:**
-- Full model names and their aliases
-- Context window sizes (tokens)
-- Special capabilities (thinking modes, vision support, etc.)
-- Provider-specific features
+**Models:**
+- Each model with its context window size and description (native providers add a "Supports structured code generation" line where applicable)
+- Aliases (`alias → model`)
+- Models auto-discovered from LiteLLM, listed separately
+- OpenRouter entries as `(score N, <context> context, thinking, batch)`, plus what a family alias resolves to under batch
+- Custom/local endpoint models
 
-**Capability Summary:**
-- Which models support extended thinking
-- Vision-capable models for image analysis
-- Models with largest context windows
-- Fastest models for quick tasks
+**Summary:**
+- Number of configured providers and total available models, followed by usage tips
+
+There is no capability summary (largest context windows, fastest models) and no thinking or vision tags for native providers' models.
 
 ## Example Output
 
 ```
-📋 Available Models by Provider
+# Available AI Models
 
-🔹 Google (Gemini) - ✅ Configured
-  • pro (gemini-2.5-pro) - 1M context, thinking modes
-  • flash (gemini-2.0-flash-experimental) - 1M context, ultra-fast
+## Google Gemini ✅
+**Status**: Configured and available
 
-🔹 OpenAI - ✅ Configured  
-  • o3 (o3) - 200K context, strong reasoning
-  • o3-mini (o3-mini) - 200K context, balanced
-  • o4-mini (o4-mini) - 200K context, latest reasoning
+**Models**:
+- `gemini-3.1-pro-preview` - 1M context
+  - Latest flagship (1M context) - Deep reasoning, thinking mode, complex problems, architecture
+- `gemini-2.5-flash` - 1M context
+  - Stable fast model (1M context) - Quick analysis, simple queries, rapid iterations
 
-🔹 Custom/Local - ✅ Configured
-  • local-llama (llama3.2) - 128K context, local inference
-  • Available at: http://localhost:11434/v1
+**Aliases**:
+- `pro` → `gemini-3.1-pro-preview`
+- `flash` → `gemini-2.5-flash`
 
-🔹 OpenRouter - ❌ Not configured
-  Set OPENROUTER_API_KEY to enable access to Claude, GPT-4, and more models
+## OpenRouter ❌
+**Status**: Not configured (set OPENROUTER_API_KEY)
+
+## Summary
+**Configured Providers**: 1
+**Total Available Models**: 2
 ```
 
 ## When to Use ListModels
@@ -83,10 +85,7 @@ The available models depend on your configuration:
 - `CUSTOM_API_URL` - Enables local/custom models (Ollama, vLLM, etc.)
 
 **Model Restrictions:**
-If you've set model usage restrictions via environment variables, the tool will show:
-- Which models are allowed vs restricted
-- Active restriction policies
-- How to modify restrictions
+If you've set model usage restrictions via environment variables, a restricted provider lists only its allowed models under "Models (policy restricted)" (or says that none are allowed), and OpenRouter adds an allow-list note. The output does not list restricted models or explain how to change a policy; see the configuration guide for the `*_ALLOWED_MODELS` variables.
 
 ## Tool Parameters
 

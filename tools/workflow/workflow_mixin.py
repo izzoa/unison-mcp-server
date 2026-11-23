@@ -639,7 +639,7 @@ class BaseWorkflowMixin(ABC):
 
         Comprehensive workflow implementation that handles all common patterns:
         1. Request validation and step management
-        2. Continuation and backtracking support
+        2. Continuation (restores work_history from the thread)
         3. Step data processing and consolidation
         4. Tool-specific field mapping and customization
         5. Completion logic with optional expert analysis
@@ -1443,7 +1443,7 @@ class BaseWorkflowMixin(ABC):
             self.consolidated_findings.confidence = step_data["confidence"]
 
     def _reprocess_consolidated_findings(self):
-        """Reprocess consolidated findings after backtracking"""
+        """Rebuild consolidated findings from work_history (used when restoring state on continuation)"""
         self.consolidated_findings = ConsolidatedFindings()
         for step in self.work_history:
             self._update_consolidated_findings(step)

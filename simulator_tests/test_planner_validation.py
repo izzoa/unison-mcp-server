@@ -77,7 +77,6 @@ class PlannerValidationTest(ConversationBaseTest):
                     "step_number": 1,
                     "total_steps": 4,
                     "next_step_required": True,
-                    "model": "flash",
                 },
             )
 
@@ -90,8 +89,8 @@ class PlannerValidationTest(ConversationBaseTest):
             if not response1_data:
                 return False
 
-            # Validate step 1 response structure - expect pause_for_planner for next_step_required=True
-            if not self._validate_step_response(response1_data, 1, 4, True, "pause_for_planner"):
+            # Validate step 1 response structure - expect pause_for_planning for next_step_required=True
+            if not self._validate_step_response(response1_data, 1, 4, True, "pause_for_planning"):
                 return False
 
             # Debug: Log the actual response structure to see what we're getting
@@ -127,7 +126,6 @@ class PlannerValidationTest(ConversationBaseTest):
                     "total_steps": 4,
                     "next_step_required": True,
                     "continuation_id": continuation_id,
-                    "model": "flash",
                 },
             )
 
@@ -136,7 +134,7 @@ class PlannerValidationTest(ConversationBaseTest):
                 return False
 
             response2_data = self._parse_planner_response(response2)
-            if not self._validate_step_response(response2_data, 2, 4, True, "pause_for_planner"):
+            if not self._validate_step_response(response2_data, 2, 4, True, "pause_for_planning"):
                 return False
 
             # Check step history tracking in workflow (more flexible)
@@ -168,7 +166,6 @@ class PlannerValidationTest(ConversationBaseTest):
                     "total_steps": 3,  # Adjusted total
                     "next_step_required": False,  # Final step - should complete without expert analysis
                     "continuation_id": continuation_id,
-                    "model": "flash",
                 },
             )
 
@@ -181,8 +178,8 @@ class PlannerValidationTest(ConversationBaseTest):
                 return False
 
             # Validate final response structure - should be self-contained completion
-            if response3_data.get("status") != "planner_complete":
-                self.logger.error(f"Expected status 'planner_complete', got '{response3_data.get('status')}'")
+            if response3_data.get("status") != "planning_complete":
+                self.logger.error(f"Expected status 'planning_complete', got '{response3_data.get('status')}'")
                 return False
 
             if not response3_data.get("planning_complete"):
@@ -226,7 +223,6 @@ class PlannerValidationTest(ConversationBaseTest):
                         "step_number": 1,
                         "total_steps": 2,
                         "next_step_required": True,
-                        "model": "flash",
                     },
                 )
                 if not response0 or not continuation_id:
@@ -243,7 +239,6 @@ class PlannerValidationTest(ConversationBaseTest):
                     "total_steps": 2,
                     "next_step_required": True,
                     "continuation_id": continuation_id,
-                    "model": "flash",
                 },
             )
 
@@ -256,7 +251,7 @@ class PlannerValidationTest(ConversationBaseTest):
                 return False
 
             # Validate continuation behavior
-            if not self._validate_step_response(response1_data, 2, 2, True, "pause_for_planner"):
+            if not self._validate_step_response(response1_data, 2, 2, True, "pause_for_planning"):
                 return False
 
             # Check that continuation_id is preserved
@@ -285,7 +280,6 @@ class PlannerValidationTest(ConversationBaseTest):
                     "step_number": 1,
                     "total_steps": 8,  # Complex plan ≥5 steps
                     "next_step_required": True,
-                    "model": "flash",
                 },
             )
 
@@ -330,7 +324,6 @@ class PlannerValidationTest(ConversationBaseTest):
                     "total_steps": 8,
                     "next_step_required": True,
                     "continuation_id": continuation_id,
-                    "model": "flash",
                 },
             )
 
@@ -359,7 +352,6 @@ class PlannerValidationTest(ConversationBaseTest):
                     "total_steps": 8,
                     "next_step_required": True,
                     "continuation_id": continuation_id,
-                    "model": "flash",
                 },
             )
 
@@ -372,7 +364,7 @@ class PlannerValidationTest(ConversationBaseTest):
                 return False
 
             # Step 4 should use normal flow (no more deep thinking pauses)
-            if response4_data.get("status") != "pause_for_planner":
+            if response4_data.get("status") != "pause_for_planning":
                 self.logger.error("Expected normal planning flow for step 4")
                 return False
 
@@ -401,7 +393,6 @@ class PlannerValidationTest(ConversationBaseTest):
                     "step_number": 1,
                     "total_steps": 2,
                     "next_step_required": True,
-                    "model": "flash",
                 },
             )
 
@@ -419,7 +410,6 @@ class PlannerValidationTest(ConversationBaseTest):
                     "total_steps": 2,
                     "next_step_required": False,  # Final step
                     "continuation_id": continuation_id,
-                    "model": "flash",
                 },
             )
 
@@ -432,7 +422,7 @@ class PlannerValidationTest(ConversationBaseTest):
                 return False
 
             # Validate self-contained completion
-            if response2_data.get("status") != "planner_complete":
+            if response2_data.get("status") != "planning_complete":
                 self.logger.error("Expected self-contained completion status")
                 return False
 
@@ -478,7 +468,6 @@ class PlannerValidationTest(ConversationBaseTest):
                     "step_number": 1,
                     "total_steps": 4,
                     "next_step_required": True,
-                    "model": "flash",
                 },
             )
 
@@ -499,7 +488,6 @@ class PlannerValidationTest(ConversationBaseTest):
                     "branch_from_step": 1,
                     "branch_id": "react-native",
                     "continuation_id": continuation_id,
-                    "model": "flash",
                 },
             )
 
@@ -539,7 +527,6 @@ class PlannerValidationTest(ConversationBaseTest):
                     "is_step_revision": True,
                     "revises_step_number": 2,
                     "continuation_id": continuation_id,
-                    "model": "flash",
                 },
             )
 
@@ -582,7 +569,6 @@ class PlannerValidationTest(ConversationBaseTest):
                     "step_number": 1,
                     "total_steps": 2,
                     "next_step_required": True,
-                    "model": "flash",
                 },
             )
 
@@ -608,7 +594,6 @@ class PlannerValidationTest(ConversationBaseTest):
                     "total_steps": 2,
                     "next_step_required": False,
                     "continuation_id": continuation_id,
-                    "model": "flash",
                 },
             )
 
@@ -621,7 +606,7 @@ class PlannerValidationTest(ConversationBaseTest):
                 return False
 
             # Final step should complete self-contained
-            if response2_data.get("status") != "planner_complete":
+            if response2_data.get("status") != "planning_complete":
                 self.logger.error("Expected self-contained completion for planner workflow")
                 return False
 

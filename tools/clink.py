@@ -109,6 +109,22 @@ def _check_recursion_guard() -> None:
         )
 
 
+# clink-specific wording: the shared "images" text promises visual context, which only some CLIs deliver.
+_IMAGES_DESCRIPTION = (
+    "Optional absolute image paths or base64 blobs. Delivered only to CLIs with image transport (amp, copilot); "
+    "aider, claude, codex, crush, gemini and opencode ignore them."
+)
+
+_READ_ONLY_DESCRIPTION = (
+    "Restrict the external CLI to read-only operations. Layers: (1) the CLI's own sandbox/plan flag where it has one "
+    "(claude, codex, gemini, aider, copilot; amp, crush, opencode and custom CLIs have none), (2) a prompt "
+    "instruction, (3) a post-run snapshot diff of the working directory subtree (detective, not preventive: it "
+    "cannot see out-of-tree writes or command side effects). Check metadata.read_only_enforced (false means layer 1 "
+    "did not apply) and metadata.read_only_violations. Violations are reported in metadata and do not block the "
+    "response."
+)
+
+
 class CLinkRequest(BaseModel):
     """Request model for clink tool."""
 
@@ -157,7 +173,7 @@ class CLinkRequest(BaseModel):
     )
     images: list[str] = Field(
         default_factory=list,
-        description=COMMON_FIELD_DESCRIPTIONS["images"],
+        description=_IMAGES_DESCRIPTION,
     )
     continuation_id: str | None = Field(
         default=None,
@@ -165,11 +181,7 @@ class CLinkRequest(BaseModel):
     )
     read_only: bool = Field(
         default=False,
-        description=(
-            "When true, restricts the external CLI to read-only operations via three enforcement layers: "
-            "(1) CLI-specific sandbox flags, (2) prompt-level instruction, (3) post-execution filesystem verification. "
-            "Violations are reported in metadata but do not block the response."
-        ),
+        description=_READ_ONLY_DESCRIPTION,
     )
     model: str | None = Field(
         default=None,
@@ -274,7 +286,13 @@ class CLinkTool(SimpleTool):
         )
 
     def get_annotations(self) -> dict[str, Any]:
-        return {"readOnlyHint": True}
+        """clink is not read-only: the CLI it spawns can edit files and run commands in the working directory.
+
+        Only ``read_only=true`` asks the CLI to refrain (via its own sandbox flag, a prompt instruction and a
+        post-run snapshot diff), and that is best-effort rather than a guarantee, so the tool is published as
+        not read-only and an MCP client may confirm before calling it.
+        """
+        return {"readOnlyHint": False}
 
     def requires_model(self) -> bool:
         return False
@@ -359,15 +377,12 @@ class CLinkTool(SimpleTool):
                 "description": role_description,
             },
             "absolute_file_paths": SchemaBuilder.SIMPLE_FIELD_SCHEMAS["absolute_file_paths"],
-            "images": SchemaBuilder.COMMON_FIELD_SCHEMAS["images"],
+            "images": {**SchemaBuilder.COMMON_FIELD_SCHEMAS["images"], "description": _IMAGES_DESCRIPTION},
             "continuation_id": SchemaBuilder.COMMON_FIELD_SCHEMAS["continuation_id"],
             "read_only": {
                 "type": "boolean",
                 "default": False,
-                "description": (
-                    "Restrict the external CLI to read-only operations. "
-                    "Enforced via CLI sandbox flags, prompt instruction, and post-execution filesystem verification."
-                ),
+                "description": _READ_ONLY_DESCRIPTION,
             },
             "model": {
                 "type": "string",

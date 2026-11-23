@@ -9,7 +9,7 @@
       "model_name": "The model identifier (undated alias, e.g. 'claude-opus-5-5')",
       "aliases": "Array of short names users can type instead of the full model name",
       "context_window": "Total number of tokens the model can process (input + output combined)",
-      "max_output_tokens": "Maximum number of tokens the model can generate in a single response",
+      "max_output_tokens": "Maximum number of tokens the model can generate in a single response (curated value). At read time it is lowered, never raised, to the figure LiteLLM publishes for the model if that is smaller (providers/shared/published_limits.py); a batch request is further bounded by OpenRouter's :batch listing.",
       "max_thinking_tokens": "Budget-thinking models only: maximum extended-thinking budget the provider will allocate; actual budgets are mode-scaled percentages of this and always leave output headroom inside max_tokens",
       "supports_extended_thinking": "Whether the model can think before answering",
       "supports_adaptive_thinking": "Whether the model takes adaptive thinking (thinking type 'adaptive', depth set by output_config.effort) instead of a budget_tokens budget. Claude 4.7 and later reject budget_tokens with a 400",

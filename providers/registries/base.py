@@ -19,9 +19,9 @@ logger = logging.getLogger(__name__)
 
 CAPABILITY_FIELD_NAMES = {field.name for field in fields(ModelCapabilities)}
 
-# Fields that LiteLLM provides and is authoritative for.
-# When a model exists in both LiteLLM and JSON, LiteLLM wins for these
-# ONLY when LiteLLM provides a non-zero / non-default value.
+# Fields filled from LiteLLM for models that exist ONLY in LiteLLM (auto-discovered entries).
+# A curated JSON entry is never overridden by the registry merge; LiteLLM can only lower its output cap and
+# narrow its temperature range at read time (providers/shared/published_limits.py, apply_published_limits).
 # Note: supports_extended_thinking is excluded — LiteLLM's "supports_reasoning"
 # has different semantics from Unison's thinking mode API.
 _LITELLM_BASE_FIELDS = frozenset(
@@ -88,8 +88,7 @@ class CustomModelRegistryBase:
         """Merge JSON-parsed configs with LiteLLM-discovered models.
 
         Strategy:
-        - Models in both: LiteLLM wins for base capacity/capability fields,
-          JSON wins for Unison-specific fields (intelligence_score, aliases, etc.)
+        - Models in both: the JSON entry is kept as-is (JSON is authoritative for curated models).
         - Models in LiteLLM only: auto-discovered with inferred defaults.
         - Models in JSON only: kept as-is.
         """

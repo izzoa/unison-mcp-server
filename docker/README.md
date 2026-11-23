@@ -118,6 +118,7 @@ The Docker setup includes persistent volumes to preserve data between container 
 
 - **`./logs:/app/logs`** - Persistent log storage (local folder mount)
 - **`unison-mcp-config:/app/conf`** - Configuration persistence (named Docker volume)
+- **`unison-mcp-data:/app/.unison`** - Batch store (`batches.db`) and SQLite conversation storage (named Docker volume; the container root is read-only, so this is the writable data directory)
 - **`/etc/localtime:/etc/localtime:ro`** - Host timezone synchronization (read-only)
 
 ### How Persistent Volumes Work
@@ -130,6 +131,7 @@ In the `docker-compose.yml` file, you will find:
 volumes:
   - ./logs:/app/logs
   - unison-mcp-config:/app/conf
+  - unison-mcp-data:/app/.unison
   - /etc/localtime:/etc/localtime:ro
 ```
 
@@ -138,6 +140,8 @@ and the named volume definition:
 ```yaml
 volumes:
   unison-mcp-config:
+    driver: local
+  unison-mcp-data:
     driver: local
 ```
 
@@ -184,7 +188,7 @@ echo '{"jsonrpc": "2.0", "method": "ping"}' | docker run --rm -i --env-file .env
 # Verify API keys are loaded
 docker run --rm --env-file .env unison-mcp-server:latest python -c "import os; print('GEMINI_API_KEY:', bool(os.getenv('GEMINI_API_KEY')))"
 
-# Test API connectivity
+# Run the container health check (verifies keys are present, not that they work)
 docker run --rm --env-file .env unison-mcp-server:latest python /usr/local/bin/healthcheck.py
 ```
 

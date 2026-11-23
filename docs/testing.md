@@ -45,13 +45,13 @@ tail -f -n 500 logs/mcp_server.log
 # Monitor MCP activity logs (tool calls and completions)  
 tail -f logs/mcp_activity.log
 
-# Check log file sizes (logs rotate at 20MB)
+# Check log file sizes (mcp_server.log rotates at 20MB, mcp_activity.log at 10MB)
 ls -lh logs/mcp_*.log*
 ```
 
-**Log Rotation**: All log files are configured with automatic rotation at 20MB to prevent disk space issues. The server keeps:
-- 10 rotated files for mcp_server.log (200MB total)
-- 5 rotated files for mcp_activity.log (100MB total)
+**Log Rotation**: Log files rotate automatically to prevent disk space issues. The server keeps:
+- 5 rotated files for mcp_server.log (20MB each, about 100MB total)
+- 2 rotated files for mcp_activity.log (10MB each, about 20MB total)
 
 **Why logs appear in files**: The MCP stdio_server captures stderr during tool execution to prevent interference with the JSON-RPC protocol communication. This means tool execution logs are written to files rather than displayed in console output.
 
@@ -77,7 +77,7 @@ python communication_simulator_test.py --individual basic_conversation
 # Examples of available tests:
 python communication_simulator_test.py --individual content_validation
 python communication_simulator_test.py --individual cross_tool_continuation
-python communication_simulator_test.py --individual memory_validation
+python communication_simulator_test.py --individual conversation_chain_validation
 ```
 
 #### Other Options
@@ -130,7 +130,7 @@ Validate real-world usage scenarios by simulating actual Claude prompts:
 - **File deduplication**: Efficient handling of repeated file references
 - **Model selection**: Proper routing to configured providers
 - **Token allocation**: Context window management in practice
-- **Redis validation**: Conversation persistence and retrieval
+- **Conversation chains**: Thread continuity and history reconstruction across tools (`conversation_chain_validation`)
 
 ## Contributing
 

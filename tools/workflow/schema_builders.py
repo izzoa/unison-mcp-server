@@ -101,6 +101,8 @@ class WorkflowSchemaBuilder:
             tool_name: Name of the tool (for schema title)
             excluded_workflow_fields: Workflow fields to exclude from schema (e.g., for planning tools)
             excluded_common_fields: Common fields to exclude from schema
+            require_model: Require the model field even outside auto mode (set by tools whose
+                requires_model() is true)
 
         Returns:
             Complete JSON schema for the workflow tool

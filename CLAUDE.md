@@ -21,6 +21,7 @@ This script automatically runs:
 - Black code formatting 
 - Import sorting with isort
 - Mypy type checking (strict on allowlist files)
+- README mockup drift check (docs/assets/mockups vs docs/mockup-scenes)
 - Complete unit test suite (excluding integration tests)
 - Verification that all checks pass 100%
 
@@ -140,15 +141,15 @@ python communication_simulator_test.py --quick --verbose
 
 **Quick mode runs these 6 essential tests:**
 - `cross_tool_continuation` - Cross-tool conversation memory testing (chat, thinkdeep, codereview, analyze, debug)
-- `conversation_chain_validation` - Core conversation threading and memory validation
-- `consensus_workflow_accurate` - Consensus tool with flash model and stance testing
-- `codereview_validation` - CodeReview tool with flash model and multi-step workflows
-- `planner_validation` - Planner tool with flash model and complex planning workflows
-- `token_allocation_validation` - Token allocation and conversation history buildup testing
+- `basic_conversation` - Basic chat functionality
+- `content_validation` - Content validation and duplicate detection
+- `model_thinking_config` - Thinking configuration behavior on pro/flash
+- `o3_model_selection` - O3 model selection and routing
+- `per_tool_deduplication` - File deduplication for individual tools
 
 **Why these 6 tests:** They cover the core functionality including conversation memory (`utils/conversation_memory.py`), chat tool functionality, file processing and deduplication, model selection (flash/flashlite/o3), and cross-tool conversation workflows. These tests validate the most critical parts of the system in minimal time.
 
-**Note:** Some workflow tools (analyze, codereview, planner, consensus, etc.) require specific workflow parameters and may need individual testing rather than quick mode testing.
+**Note:** Some workflow tools (analyze, codereview, planner, consensus, etc.) require specific workflow parameters and are not in quick mode; run them individually (for example `consensus_workflow_accurate`, `codereview_validation`, `planner_validation`, `conversation_chain_validation`). `python communication_simulator_test.py --list-tests` is the authoritative list of tests.
 
 #### Run Individual Simulator Tests (For Detailed Testing)
 ```bash
@@ -159,13 +160,13 @@ python communication_simulator_test.py --list-tests
 python communication_simulator_test.py --individual basic_conversation
 python communication_simulator_test.py --individual content_validation
 python communication_simulator_test.py --individual cross_tool_continuation
-python communication_simulator_test.py --individual memory_validation
+python communication_simulator_test.py --individual conversation_chain_validation
 
 # Run multiple specific tests
 python communication_simulator_test.py --tests basic_conversation content_validation
 
 # Run individual test with verbose output for debugging
-python communication_simulator_test.py --individual memory_validation --verbose
+python communication_simulator_test.py --individual conversation_chain_validation --verbose
 ```
 
 Available simulator tests include:
@@ -175,7 +176,6 @@ Available simulator tests include:
 - `cross_tool_continuation` - Cross-tool conversation continuation scenarios
 - `cross_tool_comprehensive` - Comprehensive cross-tool file deduplication and continuation
 - `line_number_validation` - Line number handling validation across tools
-- `memory_validation` - Conversation memory validation
 - `model_thinking_config` - Model-specific thinking configuration behavior
 - `o3_model_selection` - O3 model selection and usage validation
 - `ollama_custom_url` - Ollama custom URL endpoint functionality
@@ -185,7 +185,9 @@ Available simulator tests include:
 - `testgen_validation` - TestGen tool validation with specific test function
 - `refactor_validation` - Refactor tool validation with codesmells
 - `conversation_chain_validation` - Conversation chain and threading validation
-- `consensus_stance` - Consensus tool validation with stance steering (for/against/neutral)
+- `consensus_workflow_accurate` - Consensus tool concurrent consultation: all models consulted in step 1, which returns consensus_workflow_complete
+- `consensus_three_models` - Consensus with three models and stances (for/against/neutral)
+- `consensus_conversation` - Consensus conversation continuation via continuation_id
 
 **Note**: All simulator tests should be run individually for optimal testing and better error isolation.
 
@@ -232,7 +234,7 @@ export CUSTOM_API_URL="http://localhost:11434"
 
 **Run Integration Tests:**
 ```bash
-# Run integration tests that make real API calls to local models
+# Run integration tests (local Ollama models, recorded cassettes, locally installed CLIs, Docker)
 python -m pytest tests/ -v -m "integration"
 
 # Run specific integration test
@@ -242,7 +244,7 @@ python -m pytest tests/test_prompt_regression.py::TestPromptIntegration::test_ch
 python -m pytest tests/ -v
 ```
 
-**Note**: Integration tests use the local-llama model via Ollama, which is completely FREE to run unlimited times. Requires `CUSTOM_API_URL` environment variable set to your local Ollama endpoint. They can be run safely in CI/CD but are excluded from code quality checks to keep them fast.
+**Note**: The `integration` marker covers tests that need an external service, a real CLI, Docker, recorded cassettes or a local Ollama model. `tests/test_prompt_regression.py` uses the local-llama model via Ollama (FREE to run unlimited times) and needs `CUSTOM_API_URL` set to your local Ollama endpoint; `tests/test_consensus_integration.py` replays recorded OpenAI/Gemini cassettes (no network, no keys needed unless a cassette is missing); `tests/test_clink_integration.py` and `tests/test_clink_opencode_v2_integration.py` spawn locally installed CLIs and skip when they are absent; `tests/test_docker_mcp_validation.py` needs Docker. They can be run safely in CI/CD but are excluded from code quality checks to keep them fast.
 
 ### Development Workflow
 
@@ -267,7 +269,7 @@ python -m pytest tests/ -v
 > unless the commit is purely non-code (docs, config, CI).
 
 1. **Update `CHANGELOG.md`** under the `[Unreleased]` section for ANY code changes. Use [Keep a Changelog](https://keepachangelog.com/) categories: Added, Changed, Deprecated, Removed, Fixed, Security. This is not optional.
-2. **Update `README.md`** for substantial feature releases — specifically the "Differences from PAL MCP" table and the "Key Features" section. Skip only for internal refactors with no user-facing change.
+2. **Update `README.md`** for substantial feature releases — specifically the "What this fork adds over PAL" callout, the "PAL vs Unison: full comparison" table and the "Key Features" section. Skip only for internal refactors with no user-facing change.
 3. Final quality check: `./code_quality_checks.sh`
 4. Run integration tests: `./run_integration_tests.sh`
 5. Run quick test mode: `python communication_simulator_test.py --quick`
@@ -325,21 +327,23 @@ isort --check-only .
 
 #### Type Checking (mypy)
 ```bash
-# Run mypy on strict allowlist files (same as CI)
-mypy utils/circuit_breaker.py utils/fs_snapshot.py utils/tool_execution_context.py utils/token_utils.py
+# The full strict allowlist is also Step 1b of ./code_quality_checks.sh (which additionally runs ruff --fix,
+# black, isort, the mockup check and the unit suite). To run only the type check, reuse the script's file list:
+mypy $(sed -n '/\$MYPY \\/,/^    echo/p' code_quality_checks.sh | grep -oE '[A-Za-z_/0-9]+\.py')
 
 # Run mypy on a specific file
 mypy utils/circuit_breaker.py
 ```
 
-**Gradual strictness strategy:** 16 modules are under strict mypy checking (see `pyproject.toml` `[[tool.mypy.overrides]]` for the full list). Other packages run with permissive defaults.
+**Gradual strictness strategy:** the modules listed in `pyproject.toml` `[[tool.mypy.overrides]]` are under strict mypy checking (currently 45; `code_quality_checks.sh`, `code_quality_checks.ps1` and `.github/workflows/test.yml` carry the same list). Other packages run with permissive defaults.
 
 > **MANDATORY: When creating new `.py` files or substantially refactoring existing ones, you MUST
 > run `mypy --strict <file>` on the new/changed file.** If it passes with zero errors, add it to
-> the strict allowlist in **all three places**:
+> the strict allowlist in **all four places**:
 > 1. `pyproject.toml` — `[[tool.mypy.overrides]]` module list
 > 2. `code_quality_checks.sh` — the `$MYPY` command's file list
-> 3. `.github/workflows/test.yml` — the `mypy` step's file list
+> 3. `code_quality_checks.ps1` — the `$mypyFiles` list
+> 4. `.github/workflows/test.yml` — the `mypy` step's file list
 >
 > If strict mypy fails due to third-party library issues (untyped decorators, missing stubs),
 > document the blockers in the commit message and skip adding the file — do not weaken the

@@ -6,7 +6,7 @@ The `refactor` tool provides intelligent code refactoring recommendations with a
 
 ## Thinking Mode
 
-**Default is `medium` (8,192 tokens).** Use `high` for complex legacy systems (worth the investment for thorough refactoring plans) or `max` for extremely complex codebases requiring deep analysis.
+**Applies to the expert-analysis call; default is `high`.** Use `max` for extremely complex codebases requiring deep analysis, or `medium`/`low` to save tokens on simple refactors.
 
 ## How the Workflow Works
 
@@ -97,15 +97,13 @@ This results in Claude first performing its own expert analysis, encouraging it 
 - `relevant_context`: Methods/functions/classes requiring refactoring
 - `issues_found`: Refactoring opportunities with severity and type
 - `confidence`: Confidence level in analysis completeness (exploring/incomplete/partial/complete)
-- `hypothesis`: Current assessment of refactoring priorities
 
 **Initial Configuration (used in step 1):**
-- `prompt`: Description of refactoring goals, context, and specific areas of focus (required)
 - `refactor_type`: codesmells|decompose|modernize|organization (default: codesmells)
-- `model`: auto|pro|flash|flash-2.0|flashlite|o3|o3-mini|o4-mini|gpt4.1|gpt5.2|gpt5.1-codex|gpt5.1-codex-mini|gpt5|gpt5-mini|gpt5-nano|opus|sonnet|haiku|fable (default: server default)
+- `model`: auto|pro|flash|flash3|flashlite|o3|o3-mini|o4-mini|gpt4.1|gpt5.2|gpt5.1-codex|gpt5.1-codex-mini|gpt5|gpt5-mini|gpt5-nano|opus|sonnet|haiku|fable (default: server default)
 - `focus_areas`: Specific areas to focus on (e.g., 'performance', 'readability', 'maintainability', 'security')
 - `style_guide_examples`: Optional existing code files to use as style/pattern reference (absolute paths)
-- `thinking_mode`: minimal|low|medium|high|max (default: medium, Gemini only)
+- `thinking_mode`: minimal|low|medium|high|max (default: high; honored by Gemini and Anthropic models, ignored by providers without a thinking control)
 - `use_assistant_model`: Whether to use expert analysis phase (default: true, set to false to use Claude only)
 - `continuation_id`: Thread continuation ID for multi-turn conversations
 

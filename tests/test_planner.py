@@ -58,8 +58,9 @@ class TestPlannerTool:
         assert "branch_id" in schema["properties"]
         assert "continuation_id" in schema["properties"]
 
-        # Check that workflow-based planner includes model field and excludes some fields
-        assert "model" in schema["properties"]  # Workflow tools include model field
+        # The planner never calls a model, so it neither publishes `model` nor `use_assistant_model`
+        assert "model" not in schema["properties"]
+        assert "use_assistant_model" not in schema["properties"]
         assert "images" not in schema["properties"]  # Excluded for planning
         assert "absolute_file_paths" not in schema["properties"]  # Excluded for planning
         assert "temperature" not in schema["properties"]

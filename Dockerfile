@@ -65,6 +65,11 @@ RUN mkdir -p logs && chown -R unisonuser:unisonuser logs
 # Create tmp directory for container operations
 RUN mkdir -p tmp && chown -R unisonuser:unisonuser tmp
 
+# Writable data directory for the batch store (.unison/batches.db) and SQLite conversation
+# storage. Docker initialises a new named volume mounted here with this ownership, so the
+# non-root runtime user can write to it even when the container root is read-only.
+RUN mkdir -p .unison && chown -R unisonuser:unisonuser .unison
+
 # Copy health check script
 COPY --chown=unisonuser:unisonuser docker/scripts/healthcheck.py /usr/local/bin/healthcheck.py
 RUN chmod +x /usr/local/bin/healthcheck.py

@@ -75,7 +75,7 @@ class ThinkDeepWorkflowRequest(WorkflowRequest):
     # in expert analysis (commented out exclude=True)
     temperature: float | None = Field(
         default=None,
-        description="Creative thinking temp (0-2, clamped to the model's published range; default 0.7)",
+        description="Creative thinking temp (0-2, clamped to the model's published range; default 1.0)",
         ge=0.0,
         le=MAX_TEMPERATURE,
     )
@@ -109,12 +109,6 @@ class ThinkDeepTool(WorkflowTool):
         "Use for architecture decisions, complex bugs, performance challenges, and security analysis. "
         "Provides systematic hypothesis testing, evidence-based investigation, and expert validation."
     )
-
-    def __init__(self):
-        """Initialize the ThinkDeep workflow tool"""
-        super().__init__()
-        # Storage for request parameters to use in expert analysis
-        self.stored_request_params = {}
 
     def get_name(self) -> str:
         """Return the tool name"""
@@ -173,22 +167,19 @@ class ThinkDeepTool(WorkflowTool):
 
         return DEFAULT_THINKING_MODE_THINKDEEP
 
+    def get_expert_thinking_mode(self) -> str:
+        """Fallback thinking mode for expert analysis when the final request does not set one.
+
+        The base mixin methods read temperature and thinking_mode from the current (final-step)
+        request and fall back to get_default_temperature() and this method, so thinkdeep
+        honours DEFAULT_THINKING_MODE_THINKDEEP instead of a fixed "high".
+        """
+        return self.get_default_thinking_mode()
+
     def customize_workflow_response(self, response_data: dict, request, **kwargs) -> dict:
         """
         Customize the workflow response for thinkdeep-specific needs
         """
-        # Store request parameters for later use in expert analysis
-        self.stored_request_params = {}
-        try:
-            self.stored_request_params["temperature"] = request.temperature
-        except AttributeError:
-            self.stored_request_params["temperature"] = None
-
-        try:
-            self.stored_request_params["thinking_mode"] = request.thinking_mode
-        except AttributeError:
-            self.stored_request_params["thinking_mode"] = None
-
         # Add thinking-specific context to response
         response_data.update(
             {
@@ -311,28 +302,6 @@ but also acknowledge strong insights and valid conclusions.
             "understand exactly what to do next and how to implement the best solution."
         )
 
-    # Override hook methods to use stored request parameters for expert analysis
-
-    def get_request_temperature(self, request) -> float:
-        """Use stored temperature from initial request."""
-        try:
-            stored_params = self.stored_request_params
-            if stored_params and stored_params.get("temperature") is not None:
-                return stored_params["temperature"]
-        except AttributeError:
-            pass
-        return super().get_request_temperature(request)
-
-    def get_request_thinking_mode(self, request) -> str:
-        """Use stored thinking mode from initial request."""
-        try:
-            stored_params = self.stored_request_params
-            if stored_params and stored_params.get("thinking_mode") is not None:
-                return stored_params["thinking_mode"]
-        except AttributeError:
-            pass
-        return super().get_request_thinking_mode(request)
-
     def _get_problem_context(self, request) -> str:
         """Get problem context from request. Override for custom context handling."""
         try:
@@ -363,7 +332,7 @@ but also acknowledge strong insights and valid conclusions.
                     "Establish initial investigation approach",
                 ]
             )
-        elif confidence == "low":
+        elif confidence in ("exploring", "low"):
             actions.extend(
                 [
                     "Continue gathering evidence and insights",
@@ -411,7 +380,13 @@ but also acknowledge strong insights and valid conclusions.
     def should_call_expert_analysis(self, consolidated_findings, request=None) -> bool:
         """
         Determine if expert analysis should be called based on confidence and completion.
+
+        ``use_assistant_model`` false skips it, the same convention as the base WorkflowTool and every
+        other workflow tool that calls a model.
         """
+        if request and not self.get_request_use_assistant_model(request):
+            return False
+
         if request:
             try:
                 # Don't call expert analysis if confidence is "certain"

@@ -22,12 +22,14 @@ class CustomProvider(OpenAICompatibleProvider):
         metadata.
 
     Notable behaviour
-        * Uses :class:`OpenRouterModelRegistry` to load model definitions and
-          aliases so custom deployments share the same metadata pipeline as
-          OpenRouter itself.
-        * Normalises version-tagged model names (``model:latest``) and applies
-          restriction policies just like cloud providers, ensuring consistent
-          behaviour across environments.
+        * Loads model definitions and aliases from
+          :class:`CustomEndpointModelRegistry` (``conf/custom_models.json``);
+          :class:`OpenRouterModelRegistry` is consulted only as an alias fallback
+          for unknown, untagged names.
+        * Forwards version-tagged identifiers (``llama3.2:3b``) intact: an alias
+          in front of a tag resolves to the canonical name with the tag
+          re-attached, and an undeclared tag inherits the declared base model's
+          capabilities. Restriction policies apply as for cloud providers.
     """
 
     FRIENDLY_NAME = "Custom API"

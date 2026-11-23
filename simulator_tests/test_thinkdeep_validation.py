@@ -294,8 +294,8 @@ class ThinkDeepWorkflowValidationTest(ConversationBaseTest):
                 self.logger.error("Failed to continue to step 2")
                 return False
 
-            # Step 3: Backtrack and revise approach
-            self.logger.info("    1.2.3: Step 3 - Backtrack and revise thinking")
+            # Step 3: refine approach
+            self.logger.info("    1.2.3: Step 3 - Refine approach")
             response3, _ = self.call_mcp_tool(
                 "thinkdeep",
                 {

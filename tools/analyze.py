@@ -71,10 +71,6 @@ ANALYZE_WORKFLOW_FIELD_DESCRIPTIONS = {
     "images": (
         "Optional absolute paths to architecture diagrams or visual references that help with analysis context."
     ),
-    "confidence": (
-        "Your confidence in the analysis: exploring, low, medium, high, very_high, almost_certain, or certain. "
-        "'certain' indicates the analysis is complete and ready for validation."
-    ),
     "analysis_type": "Type of analysis to perform (architecture, performance, security, quality, general)",
     "output_format": "How to format the output (summary, detailed, actionable)",
 }
@@ -177,8 +173,9 @@ class AnalyzeTool(WorkflowTool):
         """Generate input schema using WorkflowSchemaBuilder with analyze-specific overrides."""
         from .workflow.schema_builders import WorkflowSchemaBuilder
 
-        # Fields to exclude from analyze workflow (inherited from WorkflowRequest but not used)
-        excluded_fields = {"hypothesis", "confidence"}
+        # Inherited workflow fields analyze never reads, so they are not published. The request model keeps them
+        # (WorkflowRequest) because prepare_step_data supplies fixed values for the shared consolidation code.
+        excluded_fields = ["hypothesis", "confidence"]
 
         # Analyze workflow-specific field overrides
         analyze_field_overrides = {
@@ -214,10 +211,10 @@ class AnalyzeTool(WorkflowTool):
                 "items": {"type": "string"},
                 "description": ANALYZE_WORKFLOW_FIELD_DESCRIPTIONS["relevant_files"],
             },
-            "confidence": {
-                "type": "string",
-                "enum": ["exploring", "low", "medium", "high", "very_high", "almost_certain", "certain"],
-                "description": ANALYZE_WORKFLOW_FIELD_DESCRIPTIONS["confidence"],
+            "relevant_context": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": ANALYZE_WORKFLOW_FIELD_DESCRIPTIONS["relevant_context"],
             },
             "images": {
                 "type": "array",
@@ -249,7 +246,7 @@ class AnalyzeTool(WorkflowTool):
             model_field_schema=self.get_model_field_schema(),
             auto_mode=self.is_effective_auto_mode(),
             tool_name=self.get_name(),
-            excluded_workflow_fields=list(excluded_fields),
+            excluded_workflow_fields=excluded_fields,
         )
 
     def get_required_actions(
@@ -424,6 +421,10 @@ class AnalyzeTool(WorkflowTool):
 
     def get_confidence_level(self, request) -> str:
         """Analyze tools use fixed confidence for consistency."""
+        return "medium"
+
+    def get_request_confidence(self, request) -> str:
+        """Analyze does not publish a confidence input, so report the fixed value used for step consolidation."""
         return "medium"
 
     def get_completion_message(self) -> str:

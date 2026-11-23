@@ -25,6 +25,7 @@ CONSENSUS_CASSETTES = {
 
 GEMINI_REPLAY_DIR = Path(__file__).parent / "gemini_cassettes"
 GEMINI_REPLAY_DIR.mkdir(exist_ok=True)
+# The "step2" in the cassette name is historical: this is the concurrent step-1 Gemini "against" call.
 GEMINI_REPLAY_ID = "consensus/step2_gemini25_flash_against/mldev"
 GEMINI_REPLAY_PATH = GEMINI_REPLAY_DIR / "consensus" / "step2_gemini25_flash_against" / "mldev.json"
 
@@ -121,12 +122,12 @@ async def test_consensus_multi_model_consultations(monkeypatch, openai_model):
             {"model": "gemini-2.5-flash", "stance": "against"},
         ]
 
-        # Step 1: CLI agent analysis followed by first model consultation
+        # Step 1: all models are consulted concurrently and the response is final
         step1_arguments = {
             "step": "Evaluate SwiftUI vs UIKit adoption and recommend ONE word (SwiftUI or UIKit).",
             "step_number": 1,
-            "total_steps": len(models_to_consult),
-            "next_step_required": True,
+            "total_steps": 1,
+            "next_step_required": False,
             "findings": "SwiftUI momentum is strong but UIKit remains battle-tested.",
             "models": models_to_consult,
         }
@@ -178,7 +179,7 @@ async def test_consensus_multi_model_consultations(monkeypatch, openai_model):
 @pytest.mark.asyncio
 @pytest.mark.no_mock_provider
 async def test_consensus_auto_mode_with_openrouter_and_gemini(monkeypatch):
-    """Ensure continuation flow resolves to real models instead of leaking 'auto'."""
+    """Ensure the single-step consensus run resolves to real models instead of leaking 'auto'."""
 
     gemini_key = os.getenv("GEMINI_API_KEY", "").strip() or "dummy-key-for-replay"
     openrouter_key = os.getenv("OPENROUTER_API_KEY", "").strip() or "dummy-key-for-replay"
@@ -230,8 +231,8 @@ async def test_consensus_auto_mode_with_openrouter_and_gemini(monkeypatch):
         step1_args = {
             "step": "Evaluate framework options.",
             "step_number": 1,
-            "total_steps": len(models_to_consult),
-            "next_step_required": True,
+            "total_steps": 1,
+            "next_step_required": False,
             "findings": "Initial analysis requested.",
             "models": models_to_consult,
         }

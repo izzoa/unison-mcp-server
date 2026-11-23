@@ -6,7 +6,7 @@ The `analyze` tool provides comprehensive code analysis and understanding capabi
 
 ## Thinking Mode
 
-**Default is `medium` (8,192 tokens).** Use `high` for architecture analysis (comprehensive insights worth the cost) or `low` for quick file overviews (save ~6k tokens).
+**Applies to the expert-analysis call; default is `high`.** Use `max` for architecture analysis where comprehensive insights are worth the cost, or `medium`/`low` for quick file overviews (fewer thinking tokens).
 
 ## How the Workflow Works
 
@@ -15,11 +15,11 @@ The analyze tool implements a **structured workflow** for thorough code understa
 **Investigation Phase (Claude-Led):**
 1. **Step 1**: Claude describes the analysis plan and begins examining code structure
 2. **Step 2+**: Claude investigates architecture, patterns, dependencies, and design decisions
-3. **Throughout**: Claude tracks findings, relevant files, insights, and confidence levels
+3. **Throughout**: Claude tracks findings, relevant files, and insights
 4. **Completion**: Once analysis is comprehensive, Claude signals completion
 
 **Expert Analysis Phase:**
-After Claude completes the investigation (unless confidence is **certain**):
+After Claude completes the investigation (expert analysis always runs unless `use_assistant_model` is false):
 - Complete analysis summary with all findings
 - Architectural insights and pattern identification
 - Strategic improvement recommendations
@@ -45,12 +45,11 @@ This workflow ensures methodical analysis before expert insights, resulting in d
 - **Cross-file relationship mapping**: Understand dependencies and interactions
 - **Architecture visualization**: Describe system structure and component relationships
 - **Image support**: Analyze architecture diagrams, UML charts, flowcharts: `"Analyze this system diagram with gemini to understand the data flow and identify bottlenecks"`
-- **Web search capability**: Automatically requests Claude to perform web searches when fresh documentation, patterns, or best practices are needed, ensuring the analysis stays current
 
 ## Tool Parameters
 
 **Workflow Investigation Parameters (used during step-by-step process):**
-- `step`: Current investigation step description (required for each step)
+- `step`: Current investigation step description (required for each step). In step 1 it carries the request text: what to analyze or look for
 - `step_number`: Current step number in analysis sequence (required)
 - `total_steps`: Estimated total investigation steps (adjustable)
 - `next_step_required`: Whether another investigation step is needed
@@ -59,18 +58,18 @@ This workflow ensures methodical analysis before expert insights, resulting in d
 - `relevant_files`: Files directly relevant to the analysis (required in step 1)
 - `relevant_context`: Methods/functions/classes central to analysis findings
 - `issues_found`: Issues or concerns identified with severity levels
-- `confidence`: Confidence level in analysis completeness (exploring/low/medium/high/certain)
 - `images`: Visual references for analysis context
 
 **Initial Configuration (used in step 1):**
-- `prompt`: What to analyze or look for (required)
-- `model`: auto|pro|flash|flash-2.0|flashlite|o3|o3-mini|o4-mini|gpt4.1|gpt5.2|gpt5.1-codex|gpt5.1-codex-mini|gpt5|gpt5-mini|gpt5-nano|opus|sonnet|haiku|fable (default: server default)
+- `model`: auto|pro|flash|flash3|flashlite|o3|o3-mini|o4-mini|gpt4.1|gpt5.2|gpt5.1-codex|gpt5.1-codex-mini|gpt5|gpt5-mini|gpt5-nano|opus|sonnet|haiku|fable (default: server default)
 - `analysis_type`: architecture|performance|security|quality|general (default: general)
 - `output_format`: summary|detailed|actionable (default: detailed)
-- `temperature`: Temperature for analysis (default 0.2). Accepted from 0 to 2; the selected model's published limit then applies (most models 0-1, OpenAI, Google and xAI up to 2) and a higher value is reduced to the model's maximum.
-- `thinking_mode`: minimal|low|medium|high|max (default: medium, Gemini only)
+- `temperature`: Temperature for analysis (default 1.0). Accepted from 0 to 2; the selected model's own rule then applies (Gemini, xAI and some OpenAI models 0-2, older Claude 0-1; models that take only temperature 1 or none ignore or override it).
+- `thinking_mode`: minimal|low|medium|high|max (default: high; honored by Gemini and Anthropic models, ignored by providers without a thinking control)
 - `use_assistant_model`: Whether to use expert analysis phase (default: true, set to false to use Claude only)
 - `continuation_id`: Continue previous analysis sessions
+
+`analyze` takes no `confidence` input. Its `analysis_status` block always reports `current_confidence: "medium"` (the same fixed value for analyze, codereview and precommit), whatever the request sent; it does not measure how far the work has progressed.
 
 ## Analysis Types
 
@@ -180,12 +179,6 @@ Understand how components interact across multiple files:
 Identify design patterns, anti-patterns, and architectural decisions:
 ```
 "Analyze src/ to identify all design patterns used and assess their implementation quality"
-```
-
-**Web Search Enhancement:**
-The tool can recommend searches for current best practices and documentation:
-```
-After analysis: "Recommended searches for Claude: 'FastAPI async best practices 2024', 'SQLAlchemy ORM performance optimization patterns'"
 ```
 
 ## When to Use Analyze vs Other Tools

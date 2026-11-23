@@ -124,15 +124,15 @@ def helper_function():
         self, mock_get_provider, mock_storage, tool, temp_directory_with_files
     ):
         """Test that conversation continuation works correctly with directory expansion"""
-        # Setup mock Redis client with in-memory storage
+        # Setup mock storage client with in-memory dict
         mock_client = Mock()
-        redis_storage = {}  # Simulate Redis storage
+        mock_store = {}  # Simulate the conversation store
 
         def mock_get(key):
-            return redis_storage.get(key)
+            return mock_store.get(key)
 
         def mock_setex(key, ttl, value):
-            redis_storage[key] = value
+            mock_store[key] = value
             return True
 
         mock_client.get.side_effect = mock_get
@@ -199,15 +199,15 @@ def helper_function():
     @patch("utils.conversation_store.get_storage")
     def test_get_conversation_embedded_files_with_expanded_files(self, mock_storage, tool, temp_directory_with_files):
         """Test that get_conversation_embedded_files returns expanded files"""
-        # Setup mock Redis client with in-memory storage
+        # Setup mock storage client with in-memory dict
         mock_client = Mock()
-        redis_storage = {}  # Simulate Redis storage
+        mock_store = {}  # Simulate the conversation store
 
         def mock_get(key):
-            return redis_storage.get(key)
+            return mock_store.get(key)
 
         def mock_setex(key, ttl, value):
-            redis_storage[key] = value
+            mock_store[key] = value
             return True
 
         mock_client.get.side_effect = mock_get
@@ -240,15 +240,15 @@ def helper_function():
     @patch("utils.conversation_store.get_storage")
     def test_file_filtering_with_mixed_files_and_directories(self, mock_storage, tool, temp_directory_with_files):
         """Test file filtering when request contains both individual files and directories"""
-        # Setup mock Redis client with in-memory storage
+        # Setup mock storage client with in-memory dict
         mock_client = Mock()
-        redis_storage = {}  # Simulate Redis storage
+        mock_store = {}  # Simulate the conversation store
 
         def mock_get(key):
-            return redis_storage.get(key)
+            return mock_store.get(key)
 
         def mock_setex(key, ttl, value):
-            redis_storage[key] = value
+            mock_store[key] = value
             return True
 
         mock_client.get.side_effect = mock_get

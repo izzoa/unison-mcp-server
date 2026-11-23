@@ -70,7 +70,11 @@ TOOL_DEFINITIONS: dict[str, tuple[str, str, str]] = {
     "clink": ("tools.clink", "CLinkTool", "Bridge requests to configured AI CLIs"),
     "thinkdeep": ("tools.thinkdeep", "ThinkDeepTool", "Step-by-step deep thinking workflow with expert analysis"),
     "planner": ("tools.planner", "PlannerTool", "Interactive sequential planner using workflow architecture"),
-    "consensus": ("tools.consensus", "ConsensusTool", "Step-by-step consensus workflow with multi-model analysis"),
+    "consensus": (
+        "tools.consensus",
+        "ConsensusTool",
+        "Multi-model consensus: consults several models concurrently in one call and returns all verdicts",
+    ),
     "codereview": (
         "tools.codereview",
         "CodeReviewTool",

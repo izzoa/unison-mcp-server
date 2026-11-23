@@ -29,8 +29,8 @@ class TestConsensusTool:
         step1_request = ConsensusRequest(
             step="Analyzing the real-time collaboration proposal",
             step_number=1,
-            total_steps=4,  # 1 (Claude) + 2 models + 1 (synthesis)
-            next_step_required=True,
+            total_steps=1,  # all models are consulted concurrently inside step 1
+            next_step_required=False,
             findings="Initial assessment shows strong value but technical complexity",
             confidence="medium",
             models=[{"model": "flash", "stance": "neutral"}, {"model": "o3-mini", "stance": "for"}],
@@ -48,28 +48,44 @@ class TestConsensusTool:
             ConsensusRequest(
                 step="Test step",
                 step_number=1,
-                total_steps=3,
-                next_step_required=True,
+                total_steps=1,
+                next_step_required=False,
                 findings="Test findings",
                 # Missing models field
             )
 
     def test_request_validation_later_steps(self):
-        """Test request validation for steps 2+."""
+        """Test request validation for steps 2+ (accepted for compatibility; they consult no model)."""
         # Step 2+ doesn't require models field
         step2_request = ConsensusRequest(
-            step="Processing first model response",
+            step="A later step, which consults no model",
             step_number=2,
             total_steps=4,
             next_step_required=True,
             findings="Model provided supportive perspective",
             confidence="medium",
             continuation_id="test-id",
-            current_model_index=1,
         )
 
         assert step2_request.step_number == 2
         assert step2_request.models is None  # Not required after step 1
+
+    def test_retired_legacy_fields_are_not_part_of_the_request_model(self):
+        """current_model_index and model_responses are gone; a client that still sends them is ignored, not stored."""
+        assert "current_model_index" not in ConsensusRequest.model_fields
+        assert "model_responses" not in ConsensusRequest.model_fields
+
+        request = ConsensusRequest(
+            step="A later step",
+            step_number=2,
+            total_steps=2,
+            next_step_required=True,
+            findings="Notes",
+            current_model_index=1,
+            model_responses=[{"model": "flash"}],
+        )
+        assert not hasattr(request, "current_model_index")
+        assert not hasattr(request, "model_responses")
 
     def test_request_validation_duplicate_model_stance(self):
         """Test that duplicate model+stance combinations are rejected."""
@@ -78,7 +94,7 @@ class TestConsensusTool:
             step="Analyze this proposal",
             step_number=1,
             total_steps=1,
-            next_step_required=True,
+            next_step_required=False,
             findings="Initial analysis",
             models=[
                 {"model": "o3", "stance": "for"},
@@ -95,7 +111,7 @@ class TestConsensusTool:
                 step="Analyze this proposal",
                 step_number=1,
                 total_steps=1,
-                next_step_required=True,
+                next_step_required=False,
                 findings="Initial analysis",
                 models=[
                     {"model": "o3", "stance": "for"},
@@ -125,6 +141,10 @@ class TestConsensusTool:
         # model field should NOT be present as consensus uses 'models' field instead
         assert "model" not in schema["properties"]
 
+        # The retired sequential-flow fields are no longer published
+        assert "current_model_index" not in schema["properties"]
+        assert "model_responses" not in schema["properties"]
+
         # Verify workflow fields that should NOT be present
         assert "files_checked" not in schema["properties"]
         assert "hypothesis" not in schema["properties"]
@@ -150,22 +170,16 @@ class TestConsensusTool:
         assert "stance_prompt" in models_items["properties"]
 
     def test_get_required_actions(self):
-        """Test required actions for different consensus phases."""
+        """Required actions are the same for every step: all models are consulted in step 1, so only synthesis remains."""
         tool = ConsensusTool()
 
-        # Step 1: Claude's initial analysis
-        actions = tool.get_required_actions(1, "exploring", "Initial findings", 4)
-        assert any("initial analysis" in action for action in actions)
-        assert any("consult other models" in action for action in actions)
-
-        # Step 2-3: Model consultations
-        actions = tool.get_required_actions(2, "medium", "Model findings", 4)
-        assert any("Review the model response" in action for action in actions)
-
-        # Final step: Synthesis
-        actions = tool.get_required_actions(4, "high", "All findings", 4)
-        assert any("All models have been consulted" in action for action in actions)
-        assert any("Synthesize all perspectives" in action for action in actions)
+        for step_number, total_steps in ((1, 1), (2, 4), (4, 4)):
+            actions = tool.get_required_actions(step_number, "exploring", "Findings", total_steps)
+            assert any("All models have been consulted" in action for action in actions)
+            assert any("Synthesize all perspectives" in action for action in actions)
+            for action in actions:
+                assert "Wait for the next" not in action
+                assert "consult other models" not in action
 
     def test_prepare_step_data(self):
         """Test step data preparation for consensus workflow."""
@@ -173,8 +187,8 @@ class TestConsensusTool:
         request = ConsensusRequest(
             step="Test step",
             step_number=1,
-            total_steps=3,
-            next_step_required=True,
+            total_steps=1,
+            next_step_required=False,
             findings="Test findings",
             confidence="medium",
             models=[{"model": "test"}],
@@ -228,8 +242,8 @@ class TestConsensusTool:
         arguments = {
             "step": "Initial analysis of proposal",
             "step_number": 1,
-            "total_steps": 2,
-            "next_step_required": True,
+            "total_steps": 1,
+            "next_step_required": False,
             "findings": "Found pros and cons",
             "models": [{"model": "flash", "stance": "neutral"}, {"model": "o3-mini", "stance": "for"}],
         }
@@ -240,23 +254,158 @@ class TestConsensusTool:
         assert request.models[0]["model"] == "flash"
         assert request.models[1]["model"] == "o3-mini"
 
-    def test_execute_workflow_total_steps_calculation(self):
-        """Test that total_steps is calculated correctly from models."""
-        tool = ConsensusTool()
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("sent_total_steps, sent_next_step_required", [(4, True), (1, False), (1, True)])
+    async def test_step_one_ignores_total_steps_and_next_step_required(self, sent_total_steps, sent_next_step_required):
+        """Step 1 consults every model, reports total_steps 1 and is final whatever the caller sent."""
+        import json
+        from unittest.mock import AsyncMock, patch
 
-        # Test with 2 models
+        tool = ConsensusTool()
         arguments = {
-            "step": "Initial analysis",
+            "step": "Evaluate the proposal",
             "step_number": 1,
-            "total_steps": 4,  # This should be corrected to 2
-            "next_step_required": True,
+            "total_steps": sent_total_steps,
+            "next_step_required": sent_next_step_required,
             "findings": "Analysis complete",
             "models": [{"model": "flash", "stance": "neutral"}, {"model": "o3-mini", "stance": "for"}],
         }
 
-        request = tool.get_workflow_request_model()(**arguments)
-        # The tool should set total_steps = len(models) = 2
-        assert len(request.models) == 2
+        async def consult(config, request):  # noqa: ARG001 - stands in for the provider call
+            return {"model": config["model"], "stance": config["stance"], "status": "success", "verdict": "ok"}
+
+        with patch.object(tool, "_consult_model", new=AsyncMock(side_effect=consult)) as consulted:
+            blocks = await tool.execute_workflow(arguments)
+
+        payload = json.loads(blocks[0].text)
+        assert consulted.await_count == 2  # every model, in this one call
+        assert payload["status"] == "consensus_workflow_complete"
+        assert payload["step_number"] == 1
+        assert payload["total_steps"] == 1
+        assert payload["consensus_complete"] is True
+        assert payload["consensus_workflow_status"] == "consensus_workflow_complete"  # agrees with status
+        assert payload["metadata"]["total_models"] == 2
+        assert payload["metadata"]["consensus_complete"] is True
+        assert "consultation_step" not in payload["metadata"]
+        assert "next_step_required" not in payload
+        assert [r["model"] for r in payload["accumulated_responses"]] == ["flash", "o3-mini"]  # roster order
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("sent_total_steps", [2, 3, 9])
+    async def test_step_two_with_next_step_required_never_promises_another_model(self, sent_total_steps):
+        """A non-conforming step 2+ call (next_step_required true) must not say a model is still to be consulted."""
+        import json
+        from unittest.mock import AsyncMock, patch
+
+        tool = ConsensusTool()
+        models = [{"model": "flash", "stance": "neutral"}, {"model": "o3-mini", "stance": "for"}]
+        step_one = {
+            "step": "Evaluate the proposal",
+            "step_number": 1,
+            "total_steps": 1,
+            "next_step_required": False,
+            "findings": "Analysis complete",
+            "models": models,
+        }
+
+        async def consult(config, request):  # noqa: ARG001 - stands in for the provider call
+            return {"model": config["model"], "stance": config["stance"], "status": "success", "verdict": "ok"}
+
+        with patch.object(tool, "_consult_model", new=AsyncMock(side_effect=consult)) as consulted:
+            await tool.execute_workflow(step_one)
+            assert consulted.await_count == 2
+            later = dict(step_one, step_number=2, total_steps=sent_total_steps, next_step_required=True)
+            blocks = await tool.execute_workflow(later)
+            assert consulted.await_count == 2  # step 2 consults nobody
+
+        payload = json.loads(blocks[0].text)
+        assert payload["status"] == "ready_for_synthesis"
+        assert payload["consensus_workflow_status"] == "ready_for_synthesis"
+        # Whatever total_steps was sent, the metadata reports a finished consultation, never a consultation step
+        assert payload["metadata"]["consensus_complete"] is True
+        assert payload["metadata"]["models_consulted"] == ["flash:neutral", "o3-mini:for"]
+        for retired in ("models_to_consult", "consultation_step", "total_consultation_steps"):
+            assert retired not in payload["metadata"]
+        assert "next_model" not in payload
+        assert "models_remaining" not in payload
+        next_steps = payload["next_steps"].lower()
+        assert "no further models" in next_steps
+        assert "in progress" not in next_steps and "next:" not in next_steps
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("step_number", [2, 3])
+    @pytest.mark.parametrize(
+        "next_step_required, expected",
+        [(True, "ready_for_synthesis"), (False, "consensus_workflow_complete")],
+    )
+    async def test_step_two_plus_workflow_status_always_agrees_with_status(
+        self, step_number, next_step_required, expected
+    ):
+        import json
+        from unittest.mock import AsyncMock, patch
+
+        tool = ConsensusTool()
+        step_one = {
+            "step": "Evaluate the proposal",
+            "step_number": 1,
+            "total_steps": 1,
+            "next_step_required": False,
+            "findings": "Analysis complete",
+            "models": [{"model": "flash", "stance": "neutral"}],
+        }
+
+        async def consult(config, request):  # noqa: ARG001 - stands in for the provider call
+            return {"model": config["model"], "stance": config["stance"], "status": "success", "verdict": "ok"}
+
+        with patch.object(tool, "_consult_model", new=AsyncMock(side_effect=consult)):
+            await tool.execute_workflow(step_one)
+            later = dict(
+                step_one, step_number=step_number, total_steps=step_number, next_step_required=next_step_required
+            )
+            payload = json.loads((await tool.execute_workflow(later))[0].text)
+
+        assert payload["status"] == expected
+        assert payload["consensus_workflow_status"] == payload["status"]
+
+    @pytest.mark.asyncio
+    async def test_step_two_plus_repeats_verdicts_only_in_the_process_that_ran_step_one(self):
+        """docs/tools/consensus.md: a step 2+ reply repeats accumulated_responses only where step 1 ran."""
+        import json
+        from unittest.mock import AsyncMock, patch
+
+        step_one = {
+            "step": "Evaluate the proposal",
+            "step_number": 1,
+            "total_steps": 1,
+            "next_step_required": False,
+            "findings": "Analysis complete",
+            "models": [{"model": "flash", "stance": "neutral"}],
+        }
+        later = dict(step_one, step_number=2, total_steps=2, next_step_required=True)
+
+        async def consult(config, request):  # noqa: ARG001 - stands in for the provider call
+            return {"model": config["model"], "stance": config["stance"], "status": "success", "verdict": "ok"}
+
+        ran_step_one = ConsensusTool()
+        with patch.object(ran_step_one, "_consult_model", new=AsyncMock(side_effect=consult)):
+            await ran_step_one.execute_workflow(step_one)
+            same_process = json.loads((await ran_step_one.execute_workflow(later))[0].text)
+        fresh_process = json.loads((await ConsensusTool().execute_workflow(later))[0].text)
+
+        assert [r["model"] for r in same_process["accumulated_responses"]] == ["flash"]
+        assert same_process["metadata"]["models_consulted"] == ["flash:neutral"]
+        assert "accumulated_responses" not in fresh_process
+        assert fresh_process["metadata"]["models_consulted"] == [] and fresh_process["metadata"]["total_models"] == 0
+
+    def test_handle_work_continuation_says_no_further_model_is_consulted(self):
+        tool = ConsensusTool()
+        tool.models_to_consult = [{"model": "flash", "stance": "neutral"}, {"model": "o3-mini", "stance": "for"}]
+        for step_number, total_steps in ((2, 2), (2, 4), (3, 9)):
+            request = Mock(step_number=step_number, total_steps=total_steps)
+            result = tool.handle_work_continuation({}, request)
+            assert result["status"] == "ready_for_synthesis"
+            assert "next_model" not in result and "models_remaining" not in result
+            assert "No further models" in result["next_steps"]
 
     def test_consult_model_basic_structure(self):
         """Test basic model consultation structure."""
@@ -291,44 +440,45 @@ class TestConsensusTool:
         assert request.models[0]["model"] == "flash"
         assert request.models[0]["stance"] == "neutral"
 
-    def test_handle_work_continuation(self):
-        """Test work continuation handling - legacy method for compatibility."""
-        tool = ConsensusTool()
-        tool.models_to_consult = [{"model": "flash", "stance": "neutral"}, {"model": "o3-mini", "stance": "for"}]
-
-        # Note: In the new workflow, model consultation happens DURING steps in execute_workflow
-        # This method is kept for compatibility but not actively used in the step-by-step flow
-
-        # Test after step 1
-        request = Mock(step_number=1, current_model_index=0)
-        response_data = {}
-
-        result = tool.handle_work_continuation(response_data, request)
-        # The method still exists but returns legacy status for compatibility
-        assert "status" in result
-
-        # Test between model consultations
-        request = Mock(step_number=2, current_model_index=1)
-        response_data = {}
-
-        result = tool.handle_work_continuation(response_data, request)
-        assert "status" in result
-
     def test_customize_workflow_response(self):
-        """Test response customization for consensus workflow."""
+        """Step 1 repeats the response's own status; a later step can only report that synthesis is next."""
         tool = ConsensusTool()
         tool.accumulated_responses = [{"model": "test", "response": "data"}]
 
-        # Test different step numbers (new workflow: 2 models = 2 steps)
-        request = Mock(step_number=1, total_steps=2)
-        response_data = {}
-        result = tool.customize_workflow_response(response_data, request)
-        assert result["consensus_workflow_status"] == "initial_analysis_complete"
+        # Step 1 is the whole consultation, so its workflow status must not contradict its status
+        request = Mock(step_number=1)
+        result = tool.customize_workflow_response({"status": "consensus_workflow_complete"}, request)
+        assert result["consensus_workflow_status"] == "consensus_workflow_complete"
+        result = tool.customize_workflow_response({"status": "all_providers_unavailable"}, request)
+        assert result["consensus_workflow_status"] == "all_providers_unavailable"
 
+        # A later step mirrors its own status too, whichever of the two step 2+ variants it is
         request = Mock(step_number=2, total_steps=2)
-        response_data = {}
-        result = tool.customize_workflow_response(response_data, request)
-        assert result["consensus_workflow_status"] == "ready_for_synthesis"
+        for own_status in ("ready_for_synthesis", "consensus_workflow_complete"):
+            result = tool.customize_workflow_response({"status": own_status}, request)
+            assert result["consensus_workflow_status"] == own_status
+        # Only a hand-built response with no status at all gets the fallback
+        assert tool.customize_workflow_response({}, request)["consensus_workflow_status"] == "ready_for_synthesis"
+
+    @pytest.mark.parametrize("step_number, total_steps", [(1, 1), (2, 2), (2, 4), (3, 9)])
+    def test_consensus_metadata_is_always_the_finished_shape(self, step_number, total_steps):
+        """No step reports an in-progress consultation: the models_to_consult / consultation_step shape is gone."""
+        tool = ConsensusTool()
+        tool.models_to_consult = [{"model": "flash", "stance": "neutral"}, {"model": "o3-mini", "stance": "for"}]
+
+        result = tool.customize_workflow_response({}, Mock(step_number=step_number, total_steps=total_steps))
+
+        metadata = result["metadata"]
+        assert metadata["workflow_type"] == "multi_model_consensus"
+        assert metadata["models_consulted"] == ["flash:neutral", "o3-mini:for"]
+        assert metadata["consensus_complete"] is True
+        assert metadata["total_models"] == 2
+        for retired in ("models_to_consult", "consultation_step", "total_consultation_steps"):
+            assert retired not in metadata
+
+    def test_consensus_is_not_published_read_only(self):
+        """Batch mode bills a provider batch and persists to the batch store, so the base read-only hint is overridden."""
+        assert ConsensusTool().get_annotations() == {"readOnlyHint": False}
 
     @pytest.mark.asyncio
     async def test_consensus_with_relevant_files_model_context_fix(self):

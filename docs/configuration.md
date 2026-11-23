@@ -15,11 +15,6 @@ OPENAI_API_KEY=your-openai-key
 
 ## Complete Configuration Reference
 
-### Required Configuration
-
-**Workspace Root:**
-```env
-
 ### API Keys (At least one required)
 
 **Important:** Use EITHER OpenRouter OR native APIs, not both! Having both creates ambiguity about which provider serves each model.
@@ -87,9 +82,9 @@ DEFAULT_MODEL=auto  # Claude picks best model for each task (recommended)
   | Provider | Canonical Models | Notable Aliases |
   |----------|-----------------|-----------------|
   | OpenAI | `gpt-5.2`, `gpt-5.1-codex`, `gpt-5.1-codex-mini`, `gpt-5`, `gpt-5.2-pro`, `gpt-5-mini`, `gpt-5-nano`, `gpt-5-codex`, `gpt-4.1`, `o3`, `o3-mini`, `o3-pro`, `o4-mini` | `gpt5.2`, `gpt-5.2`, `5.2`, `gpt5.1-codex`, `codex-5.1`, `codex-mini`, `gpt5`, `gpt5pro`, `mini`, `nano`, `codex`, `o3mini`, `o3pro`, `o4mini` |
-  | Gemini | `gemini-2.5-pro`, `gemini-2.5-flash`, `gemini-2.0-flash`, `gemini-2.0-flash-lite` | `pro`, `gemini-pro`, `flash`, `flash-2.0`, `flashlite` |
+  | Gemini | `gemini-3.1-pro-preview`, `gemini-3-pro-preview`, `gemini-2.5-pro`, `gemini-3-flash-preview`, `gemini-2.5-flash`, `gemini-2.5-flash-lite` | `pro`, `gemini`, `gemini-pro`, `gemini3.1`, `gemini3`, `flash`, `flash2.5`, `flash3`, `flashlite`, `flash-lite` |
   | Anthropic | `claude-fable-5-1`, `claude-fable-5`, `claude-opus-5-5`, `claude-opus-5`, `claude-opus-4-8`, `claude-sonnet-5-5`, `claude-sonnet-5`, `claude-sonnet-4-6`, `claude-haiku-5-5`, `claude-haiku-4-5` | `fable`, `opus`, `sonnet`, `claude`, `haiku` (newest of each family), `opus5`, `sonnet5`, `fable5`, `opus4`, `sonnet4`, `haiku4` |
-  | X.AI | `grok-4`, `grok-4.1-fast` | `grok`, `grok4`, `grok-4.1-fast-reasoning` |
+  | X.AI | `grok-4`, `grok-4-1-fast-reasoning` | `grok`, `grok4`, `grok-4.1`, `grok-4.1-fast`, `grok-4.1-fast-reasoning` |
   | OpenRouter | See `conf/openrouter_models.json` for the continually evolving catalogue | e.g., `opus`, `sonnet`, `flash`, `pro`, `mistral` |
   | Custom | User-managed entries such as `llama3.2` | Define your own aliases per entry |
 
@@ -157,17 +152,20 @@ The `allow_code_generation` capability enables models to generate complete, prod
 
 **Default Thinking Mode for ThinkDeep:**
 ```env
-# Only applies to models supporting extended thinking (e.g., Gemini 3.0 Pro)
-# Starting with Gemini 3.0 Pro, `thinking level` should stick to `high`
+# Only applies to Gemini and native Anthropic models that support extended thinking;
+# other providers (OpenAI/GPT-5, X.AI, OpenRouter, custom) ignore thinking_mode.
+# gemini-3-pro-preview upgrades `medium` to `high` automatically.
 
 DEFAULT_THINKING_MODE_THINKDEEP=high
 
-# Available modes and token consumption:
-#   minimal: 128 tokens   - Quick analysis, fastest response
-#   low:     2,048 tokens - Light reasoning tasks  
-#   medium:  8,192 tokens - Balanced reasoning
-#   high:    16,384 tokens - Complex analysis (recommended for thinkdeep)
-#   max:     32,768 tokens - Maximum reasoning depth
+# Available modes, as a share of the model's max thinking budget:
+#   minimal: ~0.5% - Quick analysis, fastest response
+#   low:     8%    - Light reasoning tasks
+#   medium:  33%   - Balanced reasoning
+#   high:    67%   - Complex analysis (recommended for thinkdeep)
+#   max:     100%  - Maximum reasoning depth
+# Example: Gemini 2.5 Pro (32,768 max) gives about 160 / 2.6K / 10.8K / 22K / 32.8K tokens.
+# Adaptive Claude models map the mode to an effort level instead of a token budget.
 ```
 
 ### Model Usage Restrictions
@@ -246,16 +244,16 @@ ANTHROPIC_API_URL=https://your-gateway.example.com
 # How long AI-to-AI conversation threads persist in memory (hours)
 # Conversations are auto-purged when claude closes its MCP connection or 
 # when a session is quit / re-launched 
-CONVERSATION_TIMEOUT_HOURS=5
+CONVERSATION_TIMEOUT_HOURS=5  # example value; the default is 3
 
 # Maximum conversation turns (each exchange = 2 turns)
-MAX_CONVERSATION_TURNS=20
+MAX_CONVERSATION_TURNS=20  # example value; the default is 50
 ```
 
 **Logging Configuration:**
 ```env
 # Logging level: DEBUG, INFO, WARNING, ERROR
-LOG_LEVEL=DEBUG  # Default: shows detailed operational messages
+LOG_LEVEL=INFO  # Default: general operational messages (use DEBUG for troubleshooting)
 ```
 
 ### Batch Store

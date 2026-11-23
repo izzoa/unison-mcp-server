@@ -95,7 +95,10 @@ class DebugInvestigationRequest(WorkflowRequest):
     # Optional images for visual debugging
     images: list[str] | None = Field(default=None, description=DEBUG_INVESTIGATION_FIELD_DESCRIPTIONS["images"])
 
-    # Override inherited fields to exclude them from schema (except model which needs to be available)
+    # Redeclared with exclude=True, which only keeps them out of model_dump(). They are still published in the
+    # input schema (WorkflowSchemaBuilder adds the common fields) and are read for the expert-analysis call.
+    # This redeclaration drops the inherited 0..MAX_TEMPERATURE bound, so out-of-range values are accepted and
+    # then clamped by validate_and_correct_temperature.
     temperature: float | None = Field(default=None, exclude=True)
     thinking_mode: str | None = Field(default=None, exclude=True)
 
@@ -178,6 +181,11 @@ class DebugIssueTool(WorkflowTool):
                 "items": {"type": "string"},
                 "description": DEBUG_INVESTIGATION_FIELD_DESCRIPTIONS["relevant_files"],
             },
+            "relevant_context": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": DEBUG_INVESTIGATION_FIELD_DESCRIPTIONS["relevant_context"],
+            },
             "confidence": {
                 "type": "string",
                 "enum": ["exploring", "low", "medium", "high", "very_high", "almost_certain", "certain"],
@@ -200,6 +208,8 @@ class DebugIssueTool(WorkflowTool):
             model_field_schema=self.get_model_field_schema(),
             auto_mode=self.is_effective_auto_mode(),
             tool_name=self.get_name(),
+            # Never read: prepare_step_data records no issues for debug. The request model keeps the field.
+            excluded_workflow_fields=["issues_found"],
         )
 
     def get_required_actions(

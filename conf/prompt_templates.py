@@ -28,8 +28,8 @@ PROMPT_TEMPLATES = {
     },
     "consensus": {
         "name": "consensus",
-        "description": "Step-by-step consensus workflow with multi-model analysis",
-        "template": "Start comprehensive consensus workflow with {model}",
+        "description": "Multi-model consensus: consults several models concurrently in one call and returns all verdicts",
+        "template": "Run a consensus across several models on this proposal, listing each model with its stance in the `models` field",
     },
     "codereview": {
         "name": "review",

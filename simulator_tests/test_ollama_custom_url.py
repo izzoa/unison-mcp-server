@@ -104,8 +104,12 @@ if __name__ == "__main__":
             response2, _ = self.call_mcp_tool(
                 "analyze",
                 {
-                    "absolute_file_paths": [ollama_test_file],
-                    "prompt": "Analyze this Ollama client code. What does this code do and what are its main functions?",
+                    "step": "Analyze this Ollama client code. What does this code do and what are its main functions?",
+                    "step_number": 1,
+                    "total_steps": 1,
+                    "next_step_required": False,
+                    "findings": "Starting analysis of the Ollama client code",
+                    "relevant_files": [ollama_test_file],
                     "model": "llama3.2",
                 },
             )

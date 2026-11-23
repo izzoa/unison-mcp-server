@@ -61,7 +61,8 @@ _PROVIDER_TO_LITELLM: dict[ProviderType, set[str]] = {
     ProviderType.CUSTOM: {"ollama"},
 }
 
-# Fields that LiteLLM is authoritative for (the "base" fields)
+# Documentation only: nothing imports this. The registry merge never overrides a curated JSON entry with LiteLLM
+# data; these are the "base" fields LiteLLM fills for auto-discovered models (see providers/registries/base.py).
 LITELLM_AUTHORITATIVE_FIELDS = frozenset(
     {
         "context_window",
@@ -72,7 +73,7 @@ LITELLM_AUTHORITATIVE_FIELDS = frozenset(
     }
 )
 
-# Fields that JSON overrides are authoritative for (Unison-specific)
+# Documentation only: nothing imports this. The Unison-specific fields a curated JSON entry carries.
 JSON_OVERRIDE_FIELDS = frozenset(
     {
         "intelligence_score",

@@ -173,7 +173,7 @@ class DIALModelProvider(RegistryBackedProviderMixin, OpenAICompatibleProvider):
             prompt: The main user prompt/query to send to the model
             model_name: Model name or alias (e.g., "o3", "sonnet-4.1", "gemini-2.5-pro")
             system_prompt: Optional system instructions to prepend to the prompt for context/behavior
-            temperature: Sampling temperature for randomness (0.0=deterministic, 1.0=creative), default 0.3
+            temperature: Sampling temperature (0.0 = most deterministic; tools accept up to 2.0), default 0.3
                         Note: O3/O4 models don't support temperature and will ignore this parameter
             max_output_tokens: Optional maximum number of tokens to generate in the response
             images: Optional list of image paths or data URLs to include with the prompt (for vision-capable models)

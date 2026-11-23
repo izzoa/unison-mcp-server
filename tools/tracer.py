@@ -70,10 +70,13 @@ TRACER_WORKFLOW_FIELD_DESCRIPTIONS = {
         "Prioritize those in the execution flow or dependency chain."
     ),
     "confidence": (
-        "Your confidence in the tracing analysis. Use: 'exploring', 'low', 'medium', 'high', 'very_high', 'almost_certain', 'certain'. "
-        "CRITICAL: 'certain' implies the analysis is 100% complete locally and PREVENTS external model validation."
+        "Your confidence in the tracing analysis: exploring, low, medium, high, very_high, almost_certain or certain. "
+        "Guides the next-step guidance only; the tracer never calls an external model."
     ),
-    "trace_mode": "Type of tracing: 'ask' (default - prompts user to choose mode), 'precision' (execution flow) or 'dependencies' (structural relationships)",
+    "trace_mode": (
+        "Type of tracing: 'precision' (execution flow), 'dependencies' (structural relationships) or 'ask' "
+        "(step 1 pauses so you can ask the user which mode to use). Required on every call."
+    ),
     "target_description": (
         "Description of what to trace and WHY. Include context about what you're trying to understand or analyze."
     ),
@@ -187,8 +190,51 @@ class TracerTool(WorkflowTool):
         return TracerRequest
 
     def get_tool_fields(self) -> dict[str, dict[str, Any]]:
-        """Return tracing-specific field definitions beyond the standard workflow fields."""
+        """Return the tracing-specific field definitions and the tracer's own text for the shared workflow fields."""
         return {
+            # Tracer's own descriptions for the shared workflow fields (same names and types as the generic ones)
+            "step": {
+                "type": "string",
+                "description": TRACER_WORKFLOW_FIELD_DESCRIPTIONS["step"],
+            },
+            "step_number": {
+                "type": "integer",
+                "minimum": 1,
+                "description": TRACER_WORKFLOW_FIELD_DESCRIPTIONS["step_number"],
+            },
+            "total_steps": {
+                "type": "integer",
+                "minimum": 1,
+                "description": TRACER_WORKFLOW_FIELD_DESCRIPTIONS["total_steps"],
+            },
+            "next_step_required": {
+                "type": "boolean",
+                "description": TRACER_WORKFLOW_FIELD_DESCRIPTIONS["next_step_required"],
+            },
+            "findings": {
+                "type": "string",
+                "description": TRACER_WORKFLOW_FIELD_DESCRIPTIONS["findings"],
+            },
+            "files_checked": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": TRACER_WORKFLOW_FIELD_DESCRIPTIONS["files_checked"],
+            },
+            "relevant_files": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": TRACER_WORKFLOW_FIELD_DESCRIPTIONS["relevant_files"],
+            },
+            "relevant_context": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": TRACER_WORKFLOW_FIELD_DESCRIPTIONS["relevant_context"],
+            },
+            "confidence": {
+                "type": "string",
+                "enum": ["exploring", "low", "medium", "high", "very_high", "almost_certain", "certain"],
+                "description": TRACER_WORKFLOW_FIELD_DESCRIPTIONS["confidence"],
+            },
             # Tracer-specific fields
             "trace_mode": {
                 "type": "string",
@@ -214,6 +260,7 @@ class TracerTool(WorkflowTool):
         excluded_workflow_fields = [
             "issues_found",  # Tracing doesn't track issues
             "hypothesis",  # Tracing doesn't use hypothesis
+            "use_assistant_model",  # Tracing is self-contained and never calls an assistant model
         ]
 
         # Exclude common fields that tracing doesn't need
@@ -223,14 +270,18 @@ class TracerTool(WorkflowTool):
             "absolute_file_paths",  # Tracing uses relevant_files instead
         ]
 
+        # Tracer never calls a model (requires_model() is False), so `model` is neither published nor
+        # required in auto mode.
+        requires_model = self.requires_model()
         return WorkflowSchemaBuilder.build_schema(
             tool_specific_fields=self.get_tool_fields(),
-            required_fields=["target_description", "trace_mode"],  # Step 1 requires these
-            model_field_schema=self.get_model_field_schema(),
-            auto_mode=self.is_effective_auto_mode(),
+            required_fields=["target_description", "trace_mode"],  # Required on every call (schema level)
+            model_field_schema=self.get_model_field_schema() if requires_model else None,
+            auto_mode=self.is_effective_auto_mode() if requires_model else False,
             tool_name=self.get_name(),
             excluded_workflow_fields=excluded_workflow_fields,
             excluded_common_fields=excluded_common_fields,
+            require_model=requires_model,
         )
 
     # ================================================================================

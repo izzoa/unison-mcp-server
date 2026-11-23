@@ -2,8 +2,8 @@
 """
 Model Thinking Configuration Test
 
-Tests that thinking configuration is properly applied only to models that support it,
-and that Flash models work correctly without thinking config.
+Tests that thinking configuration is accepted for models that support it (Pro and Flash both
+do, through a thinking budget) and that model aliases and full names resolve correctly.
 """
 
 from .base_test import BaseSimulatorTest
@@ -30,7 +30,7 @@ class TestModelThinkingConfig(BaseSimulatorTest):
                 "chat",
                 {
                     "prompt": "What is 2 + 2? Please think carefully and explain.",
-                    "model": "pro",  # Should resolve to gemini-2.5-pro
+                    "model": "pro",  # Resolves to the Gemini Pro alias target (currently gemini-3.1-pro-preview)
                     "thinking_mode": "high",  # Should use thinking_config
                 },
             )
@@ -45,30 +45,30 @@ class TestModelThinkingConfig(BaseSimulatorTest):
             self.logger.error(f"❌ Pro model test failed: {e}")
             return False
 
-    def test_flash_model_without_thinking_config(self):
-        """Test that Flash model works without thinking configuration"""
-        self.logger.info("Testing Flash model without thinking configuration...")
+    def test_flash_model_with_thinking_config(self):
+        """Test that Flash accepts a thinking_mode (a thinking budget is applied since flash supports extended thinking)"""
+        self.logger.info("Testing Flash model with thinking configuration...")
 
         try:
-            # Test with explicit flash model and thinking mode (should be ignored)
+            # Test with explicit flash model and thinking mode
             response, continuation_id = self.call_mcp_tool(
                 "chat",
                 {
                     "prompt": "What is 3 + 3? Give a quick answer.",
                     "model": "flash",  # Should resolve to gemini-2.5-flash
-                    "thinking_mode": "high",  # Should be ignored for Flash model
+                    "thinking_mode": "high",  # Applied as a thinking budget: flash supports extended thinking
                 },
             )
 
             if not response:
                 raise Exception("Flash model test failed: No response received")
 
-            self.logger.info("✅ Flash model without thinking config works correctly")
+            self.logger.info("✅ Flash model with thinking config works correctly")
             return True
 
         except Exception as e:
             if "thinking" in str(e).lower() and ("not supported" in str(e).lower() or "invalid" in str(e).lower()):
-                raise Exception(f"Flash model incorrectly tried to use thinking config: {e}")
+                raise Exception(f"Flash model rejected the thinking config: {e}")
             self.logger.error(f"❌ Flash model test failed: {e}")
             return False
 
@@ -142,8 +142,8 @@ class TestModelThinkingConfig(BaseSimulatorTest):
             if not self.test_pro_model_with_thinking_config():
                 return False
 
-            # Test Flash model without thinking config
-            if not self.test_flash_model_without_thinking_config():
+            # Test Flash model with thinking config
+            if not self.test_flash_model_with_thinking_config():
                 return False
 
             # Test model resolution logic

@@ -33,10 +33,10 @@ Regardless of your default configuration, you can specify models per request:
 
 | Model | Provider | Context | Strengths | Auto Mode Usage |
 |-------|----------|---------|-----------|------------------|
-| **`pro`** (Gemini 3.0 Pro) | Google | 1M tokens | Extended thinking (up to 32K tokens), deep analysis | Complex architecture, security reviews, deep debugging |
+| **`pro`** (Gemini 3.1 Pro Preview) | Google | 1M tokens | Extended thinking (up to 32K tokens), deep analysis | Complex architecture, security reviews, deep debugging |
 | **`flash`** (Gemini 2.5 Flash) | Google | 1M tokens | Ultra-fast responses with thinking | Quick checks, formatting, simple analysis |
-| **`flash-2.0`** (Gemini 2.0 Flash) | Google | 1M tokens | Latest fast model with audio/video support | Quick analysis with multimodal input |
-| **`flashlite`** (Gemini 2.0 Flash Lite) | Google | 1M tokens | Lightweight text-only model | Fast text processing without vision |
+| **`flash3`** (Gemini 3 Flash Preview) | Google | 1M tokens | Fast Gemini 3 model with thinking | Quick analysis with stronger reasoning than Flash 2.5 |
+| **`flashlite`** (Gemini 2.5 Flash Lite) | Google | 1M tokens | Lightweight, cost-efficient, high throughput, vision supported | Fast, low-cost bulk processing |
 | **`o3`** | OpenAI | 200K tokens | Strong logical reasoning | Debugging logic errors, systematic analysis |
 | **`o3-mini`** | OpenAI | 200K tokens | Balanced speed/quality | Moderate complexity tasks |
 | **`o4-mini`** | OpenAI | 200K tokens | Latest reasoning model | Optimized for shorter contexts |
@@ -61,10 +61,10 @@ cloud models (expensive/powerful) AND local models (free/private) in the same co
 
 **Model Capabilities:**
 - **Gemini Models**: Support thinking modes (minimal to max), web search, 1M context
-  - **Pro 3.0**: Deep analysis with max 32K thinking tokens
+  - **Pro 3.1 (preview)**: Deep analysis with max 32K thinking tokens
   - **Flash 2.5**: Ultra-fast with thinking support (24K thinking tokens)
-  - **Flash 2.0**: Latest fast model with audio/video input (24K thinking tokens)
-  - **Flash Lite 2.0**: Text-only lightweight model (no thinking support)
+  - **Flash 3 (preview)**: Fast Gemini 3 model (24K thinking tokens)
+  - **Flash Lite 2.5**: Lightweight, cost-efficient, high throughput; supports thinking and vision
 - **Claude Models (native)**: Thinking modes mapped onto adaptive-thinking effort levels (extended-thinking budgets on Sonnet 4.6 and Haiku 4.5), vision support
   - **Fable 5.1 / Opus 5.5 / Sonnet 5.5 / Haiku 5.5**: current models behind the bare aliases; 1M context, up to 128K output
   - **Fable 5 / Opus 5 / Sonnet 5**: superseded point releases, pinned via `fable5` / `opus5` / `sonnet5`
@@ -114,15 +114,17 @@ OPENAI_ALLOWED_MODELS=o3,o4-mini
 
 ### Thinking Modes & Token Budgets
 
-These only apply to models that support customizing token usage for extended thinking, such as Gemini 3.0 Pro.
+These only apply to Gemini and native Anthropic models that support extended thinking; other providers ignore `thinking_mode`. Each mode is a share of the model's maximum thinking budget, not a fixed token count:
 
-| Mode | Token Budget | Use Case | Cost Impact |
-|------|-------------|----------|-------------|
-| `minimal` | 128 tokens | Simple, straightforward tasks | Lowest cost |
-| `low` | 2,048 tokens | Basic reasoning tasks | 16x more than minimal |
-| `medium` | 8,192 tokens | **Default** - Most development tasks | 64x more than minimal |
-| `high` | 16,384 tokens | Complex problems requiring thorough analysis (default for `thinkdeep`) | 128x more than minimal |
-| `max` | 32,768 tokens | Exhaustive reasoning | 256x more than minimal |
+| Mode | Share of max thinking budget | Use Case |
+|------|------------------------------|----------|
+| `minimal` | about 0.5% | Simple, straightforward tasks |
+| `low` | 8% | Basic reasoning tasks |
+| `medium` | 33% | **Default for simple tools such as `chat`** - Most development tasks |
+| `high` | 67% | Complex problems requiring thorough analysis (default for `thinkdeep` and for the expert-analysis call of the workflow tools) |
+| `max` | 100% | Exhaustive reasoning |
+
+For example, Gemini 2.5 Pro (32,768 max thinking tokens) gives about 160, 2,600, 10,800, 22,000 and 32,800 tokens. `gemini-3-pro-preview` upgrades `medium` to `high`. Adaptive Claude models map the mode to an effort level instead of a token budget, and other Claude models enforce a 1,024-token minimum. Higher modes use more tokens, which raises cost and response time.
 
 ### How to Use Thinking Modes
 
@@ -147,8 +149,8 @@ These only apply to models that support customizing token usage for extended thi
 - Working on performance optimizations
 
 **Token Cost Examples:**
-- `minimal` (128 tokens) vs `max` (32,768 tokens) = 256x difference in thinking tokens
-- For a simple formatting check, using `minimal` instead of the default `medium` saves ~8,000 thinking tokens
+- `minimal` (about 0.5% of the budget) vs `max` (100%) = roughly a 200x difference in thinking tokens
+- For a simple formatting check, using `minimal` instead of the default `medium` saves about a third of the model's thinking budget
 - For critical security reviews, the extra tokens in `high` or `max` mode are a worthwhile investment
 
 **Examples by scenario:**
@@ -162,7 +164,7 @@ These only apply to models that support customizing token usage for extended thi
 # Complex debugging, letting claude pick the best model
 "Use unison to debug this race condition with max thinking mode"
 
-# Architecture analysis with Gemini 3.0 Pro
+# Architecture analysis with Gemini Pro
 "Analyze the entire src/ directory architecture with high thinking using pro"
 ```
 
@@ -172,14 +174,15 @@ All tools that work with files support **both individual files and entire direct
 
 ### File-Processing Tools
 
+These are multi-step workflow tools. Every call carries `step`, `step_number`, `total_steps`, `next_step_required` and `findings`; files go in `relevant_files` (and `files_checked`), not in a `files` parameter, and `relevant_files` is required in step 1 for most of them. They also share `relevant_context`, `images`, `confidence` and `use_assistant_model` (where the tool uses them), `model`, `temperature`, `thinking_mode` and `continuation_id`. See `docs/tools/<tool>.md` for each tool's full parameter list.
+
 **`analyze`** - Analyze files or directories
-- `files`: List of file paths or directories (required)
-- `question`: What to analyze (required)  
-- `model`: auto|pro|flash|flash-2.0|flashlite|o3|o3-mini|o4-mini|gpt4.1|gpt5.2|gpt5.1-codex|gpt5.1-codex-mini|gpt5|gpt5-mini|gpt5-nano|opus|sonnet|haiku|fable (default: server default)
+- `step` / `findings`: What to analyze and what you found (step 1 carries the request text)
+- `relevant_files`: Files or directories to analyze (required in step 1)
+- `model`: auto|pro|flash|flash3|flashlite|o3|o3-mini|o4-mini|gpt4.1|gpt5.2|gpt5.1-codex|gpt5.1-codex-mini|gpt5|gpt5-mini|gpt5-nano|opus|sonnet|haiku|fable (default: server default)
 - `analysis_type`: architecture|performance|security|quality|general
 - `output_format`: summary|detailed|actionable
-- `thinking_mode`: minimal|low|medium|high|max (default: medium, Gemini only)
-- **Web search capability**: The assistant now automatically requests web searches when it needs current documentation or best practices—no parameter required
+- `thinking_mode`: minimal|low|medium|high|max (default: high; honored by Gemini and Anthropic models, ignored by providers without a thinking control)
 
 ```
 "Analyze the src/ directory for architectural patterns" (auto mode picks best model)
@@ -189,13 +192,14 @@ All tools that work with files support **both individual files and entire direct
 ```
 
 **`codereview`** - Review code files or directories
-- `files`: List of file paths or directories (required)
-- `model`: auto|pro|flash|flash-2.0|flashlite|o3|o3-mini|o4-mini|gpt4.1|gpt5.2|gpt5.1-codex|gpt5.1-codex-mini|gpt5|gpt5-mini|gpt5-nano|opus|sonnet|haiku|fable (default: server default)
+- `relevant_files`: Files or directories to review (required in step 1)
+- `model`: auto|pro|flash|flash3|flashlite|o3|o3-mini|o4-mini|gpt4.1|gpt5.2|gpt5.1-codex|gpt5.1-codex-mini|gpt5|gpt5-mini|gpt5-nano|opus|sonnet|haiku|fable (default: server default)
 - `review_type`: full|security|performance|quick
 - `focus_on`: Specific aspects to focus on
 - `standards`: Coding standards to enforce
-- `severity_filter`: critical|high|medium|all
-- `thinking_mode`: minimal|low|medium|high|max (default: medium, Gemini only)
+- `severity_filter`: critical|high|medium|low|all
+- `review_validation_type`: external|internal (default: external)
+- `thinking_mode`: minimal|low|medium|high|max (default: high; honored by Gemini and Anthropic models, ignored by providers without a thinking control)
 
 ```
 "Review the entire api/ directory for security issues" (auto mode picks best model)
@@ -205,14 +209,11 @@ All tools that work with files support **both individual files and entire direct
 ```
 
 **`debug`** - Debug with file context
-- `error_description`: Description of the issue (required)
-- `model`: auto|pro|flash|flash-2.0|flashlite|o3|o3-mini|o4-mini|gpt4.1|gpt5.2|gpt5.1-codex|gpt5.1-codex-mini|gpt5|gpt5-mini|gpt5-nano|opus|sonnet|haiku|fable (default: server default)
-- `error_context`: Stack trace or logs
-- `files`: Files or directories related to the issue
-- `runtime_info`: Environment details
-- `previous_attempts`: What you've tried
-- `thinking_mode`: minimal|low|medium|high|max (default: medium, Gemini only)
-- **Web search capability**: Automatically initiates searches for relevant error messages or recent fixes when needed
+- `step` / `findings`: Describe the issue (error messages, stack traces and logs go in `step`/`findings`), then the evidence you gather
+- `relevant_files`: Files or directories related to the issue
+- `hypothesis` and `confidence`: Your current best theory and how sure you are
+- `model`: auto|pro|flash|flash3|flashlite|o3|o3-mini|o4-mini|gpt4.1|gpt5.2|gpt5.1-codex|gpt5.1-codex-mini|gpt5|gpt5-mini|gpt5-nano|opus|sonnet|haiku|fable (default: server default)
+- `thinking_mode`: minimal|low|medium|high|max (default: high; honored by Gemini and Anthropic models, ignored by providers without a thinking control)
 
 ```
 "Debug this logic error with context from backend/" (auto mode picks best model)
@@ -221,13 +222,12 @@ All tools that work with files support **both individual files and entire direct
 ```
 
 **`thinkdeep`** - Extended analysis with file context
-- `current_analysis`: Your current thinking (required)
-- `model`: auto|pro|flash|flash-2.0|flashlite|o3|o3-mini|o4-mini|gpt4.1|gpt5.2|gpt5.1-codex|gpt5.1-codex-mini|gpt5|gpt5-mini|gpt5-nano|opus|sonnet|haiku|fable (default: server default)
+- `step`: Your current thinking to extend and validate (step 1)
+- `relevant_files`: Files or directories for context
+- `model`: auto|pro|flash|flash3|flashlite|o3|o3-mini|o4-mini|gpt4.1|gpt5.2|gpt5.1-codex|gpt5.1-codex-mini|gpt5|gpt5-mini|gpt5-nano|opus|sonnet|haiku|fable (default: server default)
 - `problem_context`: Additional context
 - `focus_areas`: Specific aspects to focus on
-- `files`: Files or directories for context
-- `thinking_mode`: minimal|low|medium|high|max (default: max, Gemini only)
-- **Web search capability**: Automatically calls for research when architecture references or external insights are required
+- `thinking_mode`: minimal|low|medium|high|max (default: high; honored by Gemini and Anthropic models, ignored by providers without a thinking control)
 
 ```
 "Think deeper about my design with reference to src/models/" (auto mode picks best model)
@@ -236,11 +236,10 @@ All tools that work with files support **both individual files and entire direct
 ```
 
 **`testgen`** - Comprehensive test generation with edge case coverage
-- `files`: Code files or directories to generate tests for (required)
-- `prompt`: Description of what to test, testing objectives, and scope (required)
-- `model`: auto|pro|flash|flash-2.0|flashlite|o3|o3-mini|o4-mini|gpt4.1|gpt5.2|gpt5.1-codex|gpt5.1-codex-mini|gpt5|gpt5-mini|gpt5-nano|opus|sonnet|haiku|fable (default: server default)
-- `test_examples`: Optional existing test files as style/pattern reference
-- `thinking_mode`: minimal|low|medium|high|max (default: medium, Gemini only)
+- `step`: What to test, the testing objectives and the scope (step 1)
+- `relevant_files`: Code files or directories to generate tests for (required in step 1); add existing test files here and say in `step`/`findings` that they are the style reference
+- `model`: auto|pro|flash|flash3|flashlite|o3|o3-mini|o4-mini|gpt4.1|gpt5.2|gpt5.1-codex|gpt5.1-codex-mini|gpt5|gpt5-mini|gpt5-nano|opus|sonnet|haiku|fable (default: server default)
+- `thinking_mode`: minimal|low|medium|high|max (default: high; honored by Gemini and Anthropic models, ignored by providers without a thinking control)
 
 ```
 "Generate tests for User.login() method with edge cases" (auto mode picks best model)
@@ -250,13 +249,13 @@ All tools that work with files support **both individual files and entire direct
 ```
 
 **`refactor`** - Intelligent code refactoring with decomposition focus
-- `files`: Code files or directories to analyze for refactoring opportunities (required)
-- `prompt`: Description of refactoring goals, context, and specific areas of focus (required)
-- `refactor_type`: codesmells|decompose|modernize|organization (required)
-- `model`: auto|pro|flash|flash-2.0|flashlite|o3|o3-mini|o4-mini|gpt4.1|gpt5.2|gpt5.1-codex|gpt5.1-codex-mini|gpt5|gpt5-mini|gpt5-nano|opus|sonnet|haiku|fable (default: server default)
+- `step`: Refactoring goals, context and areas of focus (step 1)
+- `relevant_files`: Code files or directories to analyze for refactoring opportunities (required in step 1)
+- `refactor_type`: codesmells|decompose|modernize|organization (default: codesmells)
+- `model`: auto|pro|flash|flash3|flashlite|o3|o3-mini|o4-mini|gpt4.1|gpt5.2|gpt5.1-codex|gpt5.1-codex-mini|gpt5|gpt5-mini|gpt5-nano|opus|sonnet|haiku|fable (default: server default)
 - `focus_areas`: Specific areas to focus on (e.g., 'performance', 'readability', 'maintainability', 'security')
 - `style_guide_examples`: Optional existing code files to use as style/pattern reference
-- `thinking_mode`: minimal|low|medium|high|max (default: medium, Gemini only)
+- `thinking_mode`: minimal|low|medium|high|max (default: high; honored by Gemini and Anthropic models, ignored by providers without a thinking control)
 - `continuation_id`: Thread continuation ID for multi-turn conversations
 
 ```
@@ -424,43 +423,27 @@ This feature ensures you can send arbitrarily large prompts to Gemini without hi
 
 ## Web Search Integration
 
-**Smart web search recommendations for enhanced analysis**
+**Web search recommendations in `chat`**
 
-Web search is now enabled by default for all tools. Instead of performing searches directly, Gemini intelligently analyzes when additional information from the web would enhance its response and provides specific search recommendations for Claude to execute.
+Unison itself never performs web searches. The `chat` tool appends web-search guidance to the prompt it sends the consulted model: when the model judges that current documentation, API references or community solutions would strengthen its answer, it tells the calling agent which searches to run and to continue with the `continuation_id`. The workflow tools (`analyze`, `codereview`, `consensus`, `debug`, `docgen`, `planner`, `precommit`, `refactor`, `secaudit`, `testgen`, `thinkdeep`, `tracer`) add no such guidance. For documentation lookups use [`apilookup`](tools/apilookup.md), which tells the calling agent to search with its own web tool.
 
-**How it works:**
-1. Gemini analyzes the request and identifies areas where current documentation, API references, or community solutions would be valuable
-2. It provides its analysis based on its training data
-3. If web searches would strengthen the analysis, Gemini includes a "Recommended Web Searches for Claude" section
-4. Claude can then perform these searches and incorporate the findings
+**How it works in `chat`:**
+1. The model analyzes the request and identifies areas where current information would be valuable
+2. It answers from its training data
+3. If searches would help, it asks the calling agent to run specific ones, marked as valuable or required
+4. The agent runs them and continues the thread with the same `continuation_id`
 
 **Example:**
 ```
-User: "Use gemini to debug this FastAPI async error"
+User: "Use gemini to chat about this FastAPI async error"
 
-Gemini's Response:
-[... debugging analysis ...]
-
-**Recommended Web Searches for Claude:**
-- "FastAPI async def vs def performance 2024" - to verify current best practices for async endpoints
-- "FastAPI BackgroundTasks memory leak" - to check for known issues with the version you're using
-- "FastAPI lifespan context manager pattern" - to explore proper resource management patterns
-
-Claude can then search for these specific topics and provide you with the most current information.
+Model response:
+[... analysis ...]
+Please perform a web search on "FastAPI BackgroundTasks memory leak" and then continue this analysis
+using the continuation_id from this response if you find relevant information.
 ```
 
-**Benefits:**
-- Always access to latest documentation and best practices
-- Gemini focuses on reasoning about what information would help
-- Claude maintains control over actual web searches
-- More collaborative approach between the two AI assistants
-- Reduces hallucination by encouraging verification of assumptions
-
-**Web search control:**
-Web search is enabled by default, allowing models to request Claude perform searches for current documentation and solutions. If you prefer the model to work only with its training data, you can disable web search:
-```
-"Use gemini to review this code and confirm whether any new framework changes affect the recommendation"
-```
+The calling agent keeps control over the actual searches; if you want the model to rely on its training data only, say so in the prompt.
 
 ## System Prompts
 
@@ -482,4 +465,4 @@ Each tool has a unique system prompt that defines its role and approach:
 To modify tool behavior, you can:
 1. Edit the prompt file in `systemprompts/` (and export it via `systemprompts/__init__.py`) for global changes
 2. Override `get_system_prompt()` in a tool class for tool-specific changes
-3. Use the `temperature` parameter to adjust response style (0.2 for focused, 0.7 for creative)
+3. Use the `temperature` parameter to adjust response style (not available on `consensus`). The default is 1.0 for every tool, accepted from 0 to 2, and each model's own rule then applies: many models accept only 1.0 and ignore or override other values

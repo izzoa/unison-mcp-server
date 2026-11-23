@@ -23,10 +23,16 @@ logger = logging.getLogger(__name__)
 COMMON_FIELD_DESCRIPTIONS = {
     "model": "Model to run. Supply a name if requested by the user or stay in auto mode. When in auto mode, use `listmodels` tool for model discovery.",
     "temperature": (
-        "Sampling temperature, 0 = deterministic. Accepted from 0 to 2: the selected model's published limit then "
-        "applies (most models 0-1; OpenAI, Google and xAI up to 2) and a higher value is reduced to the model's maximum."
+        "Sampling temperature, accepted from 0 to 2. The selected model's own published rule then applies and a "
+        "non-conforming value is corrected with a warning: Gemini, xAI and some OpenAI models take 0-2, older "
+        "Claude models 0-1, and many models (the GPT-5 and o-series, newer Claude models, some Grok models) accept "
+        "only temperature 1 or none, so the value is replaced by 1.0 or not sent and a lower value does not make "
+        "them deterministic."
     ),
-    "thinking_mode": "Reasoning depth: minimal, low, medium, high, or max.",
+    "thinking_mode": (
+        "Reasoning depth: minimal, low, medium, high, or max. Honoured by native Gemini and Anthropic models that "
+        "support extended thinking; other providers ignore it."
+    ),
     "continuation_id": (
         "Unique thread continuation ID for multi-turn conversations. Works across different tools. "
         "ALWAYS reuse the last continuation_id you were given—this preserves full conversation context, "
@@ -106,7 +112,8 @@ class WorkflowRequest(BaseWorkflowRequest):
     This model extends ToolRequest with fields specific to the workflow
     pattern, where tools perform multi-step work with forced pauses between steps.
 
-    Used by: debug, precommit, codereview, refactor, thinkdeep, analyze
+    Used by all workflow tools: analyze, codereview, consensus, debug, docgen, planner, precommit,
+    refactor, secaudit, testgen, thinkdeep, tracer
     """
 
     # Required workflow fields

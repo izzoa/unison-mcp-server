@@ -164,14 +164,10 @@ class OpenRouterFallbackTest(BaseSimulatorTest):
                 if "OpenRouter provider" in line or "OpenRouterProvider" in line or "openrouter.ai/api/v1" in line
             ]
 
-            # Check for model resolution through OpenRouter
+            # Check for model resolution through OpenRouter. The only alias-resolution log is the DEBUG line
+            # "Resolved model alias '<alias>' to '<slug>'" (providers/openrouter.py), so this needs LOG_LEVEL=DEBUG.
             model_resolution_logs = [
-                line
-                for line in logs.split("\n")
-                if ("Resolved model" in line and "via OpenRouter" in line)
-                or ("Model alias" in line and "resolved to" in line)
-                or ("flash" in line and "gemini-flash" in line)
-                or ("pro" in line and "gemini-pro" in line)
+                line for line in logs.split("\n") if "Resolved model alias" in line and "google/gemini" in line
             ]
 
             # Log findings

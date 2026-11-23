@@ -1,8 +1,8 @@
-# Tracer Tool - Static Code Analysis Prompt Generator
+# Tracer Tool - Step-by-Step Code Tracing
 
-**Creates detailed analysis prompts for call-flow mapping and dependency tracing**
+**Guides the calling agent through tracing call flows and mapping dependencies**
 
-The `tracer` tool is a specialized prompt-generation tool that creates structured analysis requests for Claude to perform comprehensive static code analysis. Rather than passing entire projects to another model, this tool generates focused prompts that Claude can use to efficiently trace execution flows and map dependencies within the codebase.
+The `tracer` tool is a multi-step workflow that guides Claude through investigating and tracing code: either the execution flow of a method or function (`precision`) or the structural relationships of a class, module or protocol (`dependencies`). It returns required actions for each step and, on the final step, formatting and rendering instructions for the call-flow or dependency output. The tracing runs inside the calling agent: no external model is called, so it is fast and uses no provider tokens.
 
 ## Two Analysis Modes
 
@@ -18,19 +18,30 @@ The `tracer` tool is a specialized prompt-generation tool that creates structure
 
 ## Key Features
 
-- **Generates comprehensive analysis prompts** instead of performing analysis directly
-- **Faster and more efficient** than full project analysis by external models
-- **Creates structured instructions** for call-flow graph generation
-- **Provides detailed formatting requirements** for consistent output
+- **Multi-step workflow** that tells the agent what to investigate at each step and when the trace is complete
+- **No model call**: the workflow runs inside the calling agent, with no external model involved
+- **Returns rendering instructions** for the final call-flow or dependency output, so the format is consistent
+- **Mode choice up front**: `trace_mode` is required on every call; with `ask`, step 1 stops and tells the agent to ask the user to choose `precision` or `dependencies` before continuing
 - **Supports any programming language** with automatic convention detection
-- **Output can be used as input** into another tool, such as `chat` along with related code files to perform logical call-flow analysis
+- **Output can be used as input** into another tool, such as `chat` along with related code files
 - **Image support**: Analyze visual call flow diagrams, sequence diagrams: `"Generate tracer analysis for this payment flow using the sequence diagram"`
 
 ## Tool Parameters
 
-- `prompt`: Detailed description of what to trace and WHY you need this analysis (required)
-- `trace_mode`: precision|dependencies (required)
+**Workflow Investigation Parameters (used during step-by-step process):**
+- `step`: Current tracing step description (required for each step; in step 1 it carries what you are about to trace)
+- `step_number`: Current step number (required)
+- `total_steps`: Estimated total tracing steps (required, adjustable)
+- `next_step_required`: Whether another tracing step is needed (required)
+- `findings`: Discoveries collected in this step (required)
+- `target_description`: What to trace and WHY (required in the published schema)
+- `trace_mode`: precision|dependencies|ask (required on every call; `ask` makes step 1 pause so the agent can ask the user to choose a mode)
+- `files_checked`: All files examined during the trace
+- `relevant_files`: Files directly relevant to the tracing target
+- `relevant_context`: Methods/functions central to the trace, as `ClassName.methodName`
+- `confidence`: Confidence in the trace (exploring/low/medium/high/very_high/almost_certain/certain); it only shapes the next-step guidance, the tracer never calls an external model
 - `images`: Optional images of system architecture diagrams, flow charts, or visual references (absolute paths)
+- `continuation_id`: Continue a previous tracing session
 
 ## Usage Examples
 
@@ -53,12 +64,12 @@ The `tracer` tool is a specialized prompt-generation tool that creates structure
 
 **Complex System Analysis:**
 ```
-"Create a tracer prompt to understand how the OrderProcessor.processPayment method flows through the entire system"
+"Use tracer to understand how the OrderProcessor.processPayment method flows through the entire system"
 ```
 
 ## Precision Mode Output
 
-When using `precision` mode for methods/functions, the tool generates prompts that will help Claude create:
+When using `precision` mode for methods/functions, the final step instructs Claude to render:
 
 **Call Chain Analysis:**
 - Where the method is defined
@@ -80,7 +91,7 @@ When using `precision` mode for methods/functions, the tool generates prompts th
 
 ## Dependencies Mode Output
 
-When using `dependencies` mode for classes/modules, the tool generates prompts that will help Claude create:
+When using `dependencies` mode for classes/modules, the final step instructs Claude to render:
 
 **Structural Relationships:**
 - Inheritance hierarchies
@@ -100,41 +111,21 @@ When using `dependencies` mode for classes/modules, the tool generates prompts t
 - Refactoring impact assessment
 - Testability implications
 
-## Example Generated Prompts
+## Example Step 1 Call
 
-**For Precision Mode:**
-```
-Analyze the execution flow and usage of the `authenticate` method in UserAuthManager:
-
-1. **Method Location**: Find where UserAuthManager.authenticate is defined
-2. **Call Sites**: Identify all locations where this method is called
-3. **Execution Flow**: Trace the step-by-step execution path
-4. **Side Effects**: Document state changes and external interactions
-5. **Return Handling**: Show how return values are used by callers
-
-Format the analysis as:
-- Method signature and location
-- Call hierarchy (direct and indirect callers)
-- Execution flow diagram
-- Side effects and dependencies
-- Usage patterns and frequency
+```json
+{
+  "step": "Trace how UserAuthManager.authenticate is used and why",
+  "step_number": 1,
+  "total_steps": 3,
+  "next_step_required": true,
+  "findings": "Starting the trace: locating the definition and call sites of authenticate.",
+  "target_description": "UserAuthManager.authenticate: all callers, execution flow and side effects",
+  "trace_mode": "precision"
+}
 ```
 
-**For Dependencies Mode:**
-```
-Map the structural dependencies for PaymentProcessor class:
-
-1. **Direct Dependencies**: What PaymentProcessor directly imports/uses
-2. **Reverse Dependencies**: What classes/modules depend on PaymentProcessor
-3. **Inheritance Relationships**: Parent classes and implemented interfaces
-4. **Composition**: Objects that PaymentProcessor contains or creates
-
-Format the analysis as:
-- Dependency graph (incoming and outgoing)
-- Architectural layer analysis
-- Coupling assessment
-- Refactoring impact evaluation
-```
+Later steps carry the files examined, the relevant files and the call chain discovered so far. When the trace is complete, the final response tells the agent how to format the call-flow (precision) or dependency graph (dependencies) output.
 
 ## Best Practices
 
@@ -142,7 +133,7 @@ Format the analysis as:
 - **Describe context**: Mention if you're debugging, refactoring, or learning the codebase
 - **Choose appropriate mode**: Use `precision` for method flows, `dependencies` for architecture
 - **Include visual context**: Reference diagrams or documentation when available
-- **Follow up with analysis**: Use the generated prompt with `chat` or `analyze` tools
+- **Follow up with analysis**: Pass the finished trace to `chat` or `analyze` along with the relevant files
 
 ## Integration with Other Tools
 
@@ -150,21 +141,21 @@ The `tracer` tool works best when combined with other analysis tools:
 
 **Tracer + Chat:**
 ```
-1. Generate analysis prompt with tracer
-2. Use the prompt with chat tool and relevant code files
-3. Get detailed call-flow or dependency analysis
+1. Run the tracer workflow to map the call flow or dependencies
+2. Give the result to the chat tool along with relevant code files
+3. Get detailed call-flow or dependency discussion
 ```
 
 **Tracer + Analyze:**
 ```
-1. Use tracer to create structured analysis prompt
-2. Apply the prompt using analyze tool for systematic code exploration
+1. Use tracer to map the structure
+2. Use analyze for systematic code exploration of the same files
 3. Get architectural insights and dependency mapping
 ```
 
 ## When to Use Tracer vs Other Tools
 
-- **Use `tracer`** for: Creating structured analysis prompts, systematic code exploration planning
-- **Use `analyze`** for: Direct code analysis without prompt generation
+- **Use `tracer`** for: Step-by-step call-flow tracing and dependency mapping with a consistent output format
+- **Use `analyze`** for: General code analysis with expert model validation
 - **Use `debug`** for: Specific runtime error investigation
 - **Use `chat`** for: Open-ended code discussions and exploration

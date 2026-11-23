@@ -1,16 +1,16 @@
 """
-Consensus tool - Step-by-step multi-model consensus with expert analysis
+Consensus tool - concurrent multi-model consensus
 
-This tool provides a structured workflow for gathering consensus from multiple models.
-It guides the CLI agent through systematic steps where the CLI agent first provides its own analysis,
-then consults each requested model one by one, and finally synthesizes all perspectives.
+A single step-1 call records the calling agent's analysis, consults every requested model
+concurrently (each blinded to the others, with a per-model timeout and isolated errors, and
+optionally as provider batches), and returns all verdicts for the calling agent to synthesize.
+Later steps are accepted for compatibility but consult no model.
 
 Key features:
-- Step-by-step consensus workflow with progress tracking
-- The CLI agent's initial neutral analysis followed by model-specific consultations
+- All models consulted concurrently inside step 1, responses returned in the order listed
 - Context-aware file embedding
 - Support for stance-based analysis (for/against/neutral)
-- Final synthesis combining all perspectives
+- The calling agent, not the tool, synthesizes the final recommendation
 """
 
 from __future__ import annotations
@@ -74,23 +74,43 @@ logger = logging.getLogger(__name__)
 # Tool-specific field descriptions for consensus workflow
 CONSENSUS_WORKFLOW_FIELD_DESCRIPTIONS = {
     "step": (
-        "Consensus prompt. Step 1: write the exact proposal/question every model will see (use 'Evaluate…', not meta commentary). "
-        "Steps 2+: capture internal notes about the latest model response—these notes are NOT sent to other models."
+        "Consensus prompt: write the exact proposal/question every model will see (use 'Evaluate…', not meta commentary). "
+        "It is sent verbatim, plus any relevant_files, to every consulted model and is echoed back as "
+        "agent_analysis.initial_analysis."
     ),
-    "step_number": "Current step index (starts at 1). Step 1 is your analysis; steps 2+ handle each model response.",
-    "total_steps": "Total steps = number of models consulted plus the final synthesis step.",
-    "next_step_required": "True if more model consultations remain; set false when ready to synthesize.",
+    "step_number": (
+        "Send 1. A single step-1 call consults every model in `models` concurrently and returns the finished consensus "
+        "(consensus_complete true) with all verdicts; there are no per-model steps. (With execution_mode batch the "
+        "call may instead return status running and a batch_handle; resume it with only that handle.) Later steps are not needed and "
+        "consult no model. To run another round, send a new step 1 call (optionally with the earlier continuation_id "
+        "to stay in the same thread); the consulted models never see earlier rounds or each other's answers, and "
+        "every new round consults and bills all models again."
+    ),
+    "total_steps": (
+        "Required; send 1. All models are consulted concurrently inside step 1, so the whole consultation is one step: "
+        "there are no per-model steps and no server-side synthesis step (you synthesize the returned responses "
+        "yourself). The server treats step 1 as total_steps 1 whatever value you send, and the response reports "
+        "total_steps 1."
+    ),
+    "next_step_required": (
+        "Required; send false. Step 1 consults every model and finishes the consensus: the server ignores this value "
+        "on step 1, and the response (status consensus_workflow_complete, or all_providers_unavailable when every "
+        "model failed; consensus_complete true) carries no next_step_required field. Do not call again to gather "
+        "more responses; read accumulated_responses and synthesize them yourself. The one exception is "
+        "execution_mode batch: a response with status running and a batch_handle means the verdicts are not ready, "
+        "so call again with only that batch_handle (no next_step_required needed) until it finishes."
+    ),
     "findings": (
-        "Step 1: your independent analysis for later synthesis (not shared with other models). Steps 2+: summarize the newest model response."
+        "Your own independent analysis, kept for your later synthesis. It is never sent to the consulted models and "
+        "is echoed back as agent_analysis.findings."
     ),
     "relevant_files": "Optional supporting files that help the consensus analysis. Must be absolute full, non-abbreviated paths.",
     "models": (
-        "User-specified list of models to consult (provide at least two entries). "
-        "Each entry may include model, stance (for/against/neutral), and stance_prompt. "
+        "Models to consult (provide at least two entries). All entries are consulted concurrently in step 1 and their "
+        "verdicts are returned in the order listed (a model that fails yields an error entry without cancelling the "
+        "others). Each entry may include model, stance (for/against/neutral), stance_prompt, and execution_mode. "
         "Each (model, stance) pair must be unique, e.g. [{'model':'gpt5','stance':'for'}, {'model':'pro','stance':'against'}]."
     ),
-    "current_model_index": "0-based index of the next model to consult (managed internally).",
-    "model_responses": "Internal log of responses gathered so far.",
     "images": "Optional absolute image paths or base64 references that add helpful visual context.",
 }
 
@@ -120,16 +140,6 @@ class ConsensusRequest(BatchControlFields, WorkflowRequest):
     relevant_files: list[str] | None = Field(
         default_factory=list,
         description=CONSENSUS_WORKFLOW_FIELD_DESCRIPTIONS["relevant_files"],
-    )
-
-    # Internal tracking fields
-    current_model_index: int | None = Field(
-        0,
-        description=CONSENSUS_WORKFLOW_FIELD_DESCRIPTIONS["current_model_index"],
-    )
-    model_responses: list[dict] | None = Field(
-        default_factory=list,
-        description=CONSENSUS_WORKFLOW_FIELD_DESCRIPTIONS["model_responses"],
     )
 
     # Optional images for visual debugging
@@ -192,11 +202,11 @@ class ConsensusRequest(BatchControlFields, WorkflowRequest):
 
 class ConsensusTool(BatchResumableToolMixin, WorkflowTool):
     """
-    Consensus workflow tool for step-by-step multi-model consensus gathering.
+    Consensus workflow tool for concurrent multi-model consensus gathering.
 
-    This tool implements a structured consensus workflow where the CLI agent first provides
-    its own neutral analysis, then consults each specified model individually,
-    and finally synthesizes all perspectives into a unified recommendation.
+    Step 1 consults every specified model concurrently (each sees only the original proposal and
+    files) and returns every verdict at once; the calling agent then synthesizes them into a
+    unified recommendation. The tool itself does not synthesize.
     """
 
     # -- batch selection (execution_mode on the request and on each models[] entry) ----------
@@ -656,7 +666,7 @@ class ConsensusTool(BatchResumableToolMixin, WorkflowTool):
             responses=responses,
         )
         response_data = self.customize_workflow_response(
-            response_data, SimpleNamespace(step_number=1, total_steps=1), models=state.models, responses=responses
+            response_data, SimpleNamespace(step_number=1), models=state.models, responses=responses
         )
         self._add_workflow_metadata(response_data, {})
 
@@ -677,11 +687,26 @@ class ConsensusTool(BatchResumableToolMixin, WorkflowTool):
     def get_name(self) -> str:
         return "consensus"
 
+    def get_annotations(self) -> dict[str, Any] | None:
+        """Consensus is not read-only: it bills provider calls and, in batch mode, writes a durable record.
+
+        A plain run only calls provider APIs and returns text, but ``execution_mode='batch'`` submits a billed
+        provider batch and persists its state to the batch store (``.unison/batches.db``) so the run can be
+        resumed with a ``batch_handle``. The workflow base class's read-only hint would hide that from clients.
+        """
+
+        return {"readOnlyHint": False}
+
     def get_description(self) -> str:
         return (
-            "Builds multi-model consensus through systematic analysis and structured debate. "
-            "Use for complex decisions, architectural choices, feature proposals, and technology evaluations. "
-            "Consults multiple models with different stances to synthesize comprehensive recommendations."
+            "Builds multi-model consensus. A single call (step_number 1, total_steps 1, next_step_required false) "
+            "consults every model in `models` concurrently, each with its own stance (for/against/neutral) and "
+            "without seeing the others or their answers, then returns all verdicts together in accumulated_responses, "
+            "in the order the models were listed. You then synthesize them into a recommendation; the tool does not "
+            "synthesize for you. With execution_mode='batch' the batch-selected models run as provider batches and "
+            "the call may return a batch_handle; resume it with batch_handle (and wait_seconds) until the verdicts "
+            "are complete. Use for complex decisions, architectural choices, feature proposals, and technology "
+            "evaluations."
         )
 
     def get_system_prompt(self) -> str:
@@ -766,21 +791,8 @@ of the evidence, even when it strongly points in one direction.""",
                     },
                     "required": ["model"],
                 },
-                "description": (
-                    "User-specified roster of models to consult (provide at least two entries). "
-                    + CONSENSUS_WORKFLOW_FIELD_DESCRIPTIONS["models"]
-                ),
+                "description": CONSENSUS_WORKFLOW_FIELD_DESCRIPTIONS["models"],
                 "minItems": 2,
-            },
-            "current_model_index": {
-                "type": "integer",
-                "minimum": 0,
-                "description": CONSENSUS_WORKFLOW_FIELD_DESCRIPTIONS["current_model_index"],
-            },
-            "model_responses": {
-                "type": "array",
-                "items": {"type": "object"},
-                "description": CONSENSUS_WORKFLOW_FIELD_DESCRIPTIONS["model_responses"],
             },
             "images": {
                 "type": "array",
@@ -860,35 +872,22 @@ of the evidence, even when it strongly points in one direction.""",
     def get_required_actions(
         self, step_number: int, confidence: str, findings: str, total_steps: int, request=None
     ) -> list[str]:  # noqa: ARG002
-        """Define required actions for each consensus phase.
+        """Required actions for the calling agent, identical for every step.
 
-        Now includes request parameter for continuation-aware decisions.
-        Note: confidence parameter is kept for compatibility with base class but not used.
+        Retained only to satisfy the abstract contract: consensus never calls it, and returns its
+        guidance through ``handle_work_completion``. Every model is consulted concurrently in step 1,
+        so there is never a "wait for the next model" phase; the only action left is synthesis.
+        The step and confidence arguments are kept for compatibility and not used.
         """
-        if step_number == 1:
-            # CLI Agent's initial analysis
-            return [
-                "You've provided your initial analysis. The tool will now consult other models.",
-                "Wait for the next step to receive the first model's response.",
-            ]
-        elif step_number < total_steps - 1:
-            # Processing individual model responses
-            return [
-                "Review the model response provided in this step",
-                "Note key agreements and disagreements with previous analyses",
-                "Wait for the next model's response",
-            ]
-        else:
-            # Ready for final synthesis
-            return [
-                "All models have been consulted",
-                "Synthesize all perspectives into a comprehensive recommendation",
-                "Identify key points of agreement and disagreement",
-                "Provide clear, actionable guidance based on the consensus",
-            ]
+        return [
+            "All models have been consulted concurrently; their verdicts are in accumulated_responses",
+            "Synthesize all perspectives into a comprehensive recommendation",
+            "Identify key points of agreement and disagreement",
+            "Provide clear, actionable guidance based on the consensus",
+        ]
 
     def should_call_expert_analysis(self, consolidated_findings, request=None) -> bool:
-        """Consensus workflow doesn't use traditional expert analysis - it consults models step by step."""
+        """Consensus runs its own concurrent model consultations; there is no expert-analysis phase."""
         return False
 
     def prepare_expert_analysis_context(self, consolidated_findings) -> str:
@@ -952,31 +951,25 @@ of the evidence, even when it strongly points in one direction.""",
 
         return response_data
 
-    def handle_work_continuation(self, response_data: dict, request) -> dict:
-        """Handle continuation between consensus steps."""
-        current_idx = request.current_model_index or 0
+    def handle_work_continuation(self, response_data: dict, request) -> dict:  # noqa: ARG002
+        """Handle a step-2+ call with ``next_step_required`` true.
 
-        if request.step_number == 1:
-            # After CLI Agent's initial analysis, prepare to consult first model
-            response_data["status"] = "consulting_models"
-            response_data["next_model"] = self.models_to_consult[0] if self.models_to_consult else None
-            response_data["next_steps"] = (
-                "Your initial analysis is complete. The tool will now consult the specified models."
-            )
-        elif current_idx < len(self.models_to_consult):
-            next_model = self.models_to_consult[current_idx]
-            response_data["status"] = "consulting_next_model"
-            response_data["next_model"] = next_model
-            response_data["models_remaining"] = len(self.models_to_consult) - current_idx
-            response_data["next_steps"] = f"Model consultation in progress. Next: {next_model['model']}"
-        else:
-            response_data["status"] = "ready_for_synthesis"
-            response_data["next_steps"] = "All models consulted. Ready for final synthesis."
+        Step 1 returns before the base workflow, so it never reaches this method. Later steps run the
+        generic workflow and consult no model, whatever ``total_steps`` the caller sent, so the response must
+        not promise another consultation: it says the models were all consulted in step 1 and points at
+        synthesis or a fresh step 1.
+        """
+        response_data["status"] = "ready_for_synthesis"
+        response_data["next_steps"] = (
+            "No further models will be consulted: every model is consulted concurrently in step 1. "
+            "Synthesize the responses you already have, or start a new step 1 (optionally with the same "
+            "continuation_id) to run another round."
+        )
 
         return response_data
 
     async def execute_workflow(self, arguments: dict[str, Any]) -> list:
-        """Override execute_workflow to handle model consultations between steps."""
+        """Consult all models concurrently on step 1; later steps run the generic workflow without model calls."""
 
         # Store arguments
         self._current_arguments = arguments
@@ -1032,7 +1025,7 @@ of the evidence, even when it strongly points in one direction.""",
 
             return [TextContent(type="text", text=json.dumps(response_data, indent=2, ensure_ascii=False))]
 
-        # Steps 2+: no additional API calls — drive CLI agent synthesis workflow
+        # Steps 2+: accepted for compatibility, no model calls
         return await super().execute_workflow(arguments)
 
     @staticmethod
@@ -1137,7 +1130,7 @@ of the evidence, even when it strongly points in one direction.""",
     async def _consult_models_concurrently(self, model_configs: list[dict], request) -> list[dict]:
         """Dispatch all model consultations concurrently via asyncio.gather.
 
-        Each model call is wrapped in a per-model timeout (120s default).
+        Each model call is wrapped in a per-model timeout (120s, hard-coded below).
         Failures are isolated — one model's error does not cancel the others.
         """
         per_model_timeout = 120.0
@@ -1194,8 +1187,8 @@ of the evidence, even when it strongly points in one direction.""",
             # Prepare the prompt with any relevant files
             # Use continuation_id=None for blinded consensus - each model should only see
             # original prompt + files, not conversation history or other model responses
-            # CRITICAL: Use the original proposal from step 1, NOT what's in request.step for steps 2+!
-            # Steps 2+ contain summaries/notes that must NEVER be sent to other models
+            # CRITICAL: the prompt is the original step-1 proposal (never `findings`, the agent's own notes,
+            # or another model's answer); consulted models are blinded to each other.
             prompt = self.original_proposal if self.original_proposal else self.initial_prompt
             if request.relevant_files:
                 file_content, _ = self._prepare_file_content_for_prompt(
@@ -1363,20 +1356,20 @@ of the evidence, even when it strongly points in one direction.""",
         if accumulated:
             response_data["accumulated_responses"] = accumulated
 
-        # Add consensus-specific fields
-        if request.step_number == 1:
-            response_data["consensus_workflow_status"] = "initial_analysis_complete"
-        elif request.step_number < request.total_steps - 1:
-            response_data["consensus_workflow_status"] = "consulting_models"
-        else:
-            response_data["consensus_workflow_status"] = "ready_for_synthesis"
+        # consensus_workflow_status always repeats the response's own status, on every step, so the two can
+        # never disagree: step 1 reports consensus_workflow_complete or all_providers_unavailable, a step 2+
+        # call with next_step_required true reports ready_for_synthesis (handle_work_continuation), and one
+        # with next_step_required false reports consensus_workflow_complete (handle_work_completion). The
+        # fallback only covers a hand-built response that carries no status at all.
+        fallback = "consensus_workflow_complete" if request.step_number == 1 else "ready_for_synthesis"
+        response_data["consensus_workflow_status"] = response_data.get("status", fallback)
 
         # Customize metadata for consensus workflow
-        self._customize_consensus_metadata(response_data, request, models=models)
+        self._customize_consensus_metadata(response_data, models=models)
 
         return response_data
 
-    def _customize_consensus_metadata(self, response_data: dict, request, *, models: list[dict] | None = None) -> None:
+    def _customize_consensus_metadata(self, response_data: dict, *, models: list[dict] | None = None) -> None:
         """
         Customize metadata for consensus workflow to accurately reflect multi-model nature.
 
@@ -1393,44 +1386,23 @@ of the evidence, even when it strongly points in one direction.""",
         metadata["tool_name"] = self.get_name()
 
         roster = self.models_to_consult if models is None else models
-        if request.step_number == request.total_steps:
-            # Final step - show comprehensive consensus metadata
-            models_consulted = []
-            if roster:
-                models_consulted = [f"{m['model']}:{m.get('stance', 'neutral')}" for m in roster]
+        models_consulted = [f"{m['model']}:{m.get('stance', 'neutral')}" for m in roster] if roster else []
 
-            metadata.update(
-                {
-                    "workflow_type": "multi_model_consensus",
-                    "models_consulted": models_consulted,
-                    "consensus_complete": True,
-                    "total_models": len(roster) if roster else 0,
-                }
-            )
+        # Every consensus response reports a finished consultation: all models are consulted in step 1, and a
+        # later step consults none, so there is no in-progress shape (and nothing here depends on total_steps).
+        metadata.update(
+            {
+                "workflow_type": "multi_model_consensus",
+                "models_consulted": models_consulted,
+                "consensus_complete": True,
+                "total_models": len(roster) if roster else 0,
+            }
+        )
 
-            # Remove the misleading single model metadata
-            metadata.pop("model_used", None)
-            metadata.pop("provider_used", None)
-
-        else:
-            # Intermediate steps - show consensus workflow in progress
-            models_to_consult = []
-            if roster:
-                models_to_consult = [f"{m['model']}:{m.get('stance', 'neutral')}" for m in roster]
-
-            metadata.update(
-                {
-                    "workflow_type": "multi_model_consensus",
-                    "models_to_consult": models_to_consult,
-                    "consultation_step": request.step_number,
-                    "total_consultation_steps": request.total_steps,
-                }
-            )
-
-            # Remove the misleading single model metadata that shows Agent's execution model
-            # instead of the models being consulted
-            metadata.pop("model_used", None)
-            metadata.pop("provider_used", None)
+        # Remove the misleading single model metadata that shows Agent's execution model
+        # instead of the models being consulted
+        metadata.pop("model_used", None)
+        metadata.pop("provider_used", None)
 
     def _add_workflow_metadata(self, response_data: dict, arguments: dict[str, Any]) -> None:
         """

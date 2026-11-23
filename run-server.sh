@@ -2574,13 +2574,14 @@ display_setup_instructions() {
         print_info "Tool Configuration:"
         
         # Dynamically discover all available tools from the tools directory
-        # Excludes: __pycache__, shared modules, models.py, listmodels.py, version.py
+        # Excludes: __init__, models.py, listmodels.py, version.py, clink_jobs.py, registry.py
+        # (clink_jobs.py and registry.py are support modules, not tools)
         local all_tools=()
         for tool_file in tools/*.py; do
             if [[ -f "$tool_file" ]]; then
                 local tool_name=$(basename "$tool_file" .py)
                 # Skip non-tool files
-                if [[ "$tool_name" != "models" && "$tool_name" != "listmodels" && "$tool_name" != "version" && "$tool_name" != "__init__" ]]; then
+                if [[ "$tool_name" != "models" && "$tool_name" != "listmodels" && "$tool_name" != "version" && "$tool_name" != "__init__" && "$tool_name" != "clink_jobs" && "$tool_name" != "registry" ]]; then
                     all_tools+=("$tool_name")
                 fi
             fi

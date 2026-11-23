@@ -88,7 +88,7 @@ class TestImageSupportIntegration:
         mock_client = Mock()
         mock_storage.return_value = mock_client
 
-        # Mock the Redis operations to return success
+        # Mock the conversation-store operations to return success
         mock_client.set.return_value = True
 
         thread_id = create_thread("test_tool", {"initial": "context"})
@@ -327,7 +327,7 @@ class TestImageSupportIntegration:
         mock_client = Mock()
         mock_storage.return_value = mock_client
 
-        # Mock the Redis operations to return success
+        # Mock the conversation-store operations to return success
         mock_client.set.return_value = True
 
         # Create initial thread with chat tool
@@ -473,7 +473,7 @@ class TestImageSupportIntegration:
         mock_client = Mock()
         mock_storage.return_value = mock_client
 
-        # Mock the Redis operations to return success
+        # Mock the conversation-store operations to return success
         mock_client.set.return_value = True
 
         # Create parent thread with images
